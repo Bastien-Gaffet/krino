@@ -13,7 +13,7 @@
       <div class="accueil-centre">
         <h1>Krino</h1>
         <p class="sous-titre">Trier ses photos, une décision à la fois.</p>
-        <button id="btn-choisir" class="btn btn-primaire">📂 Choisir un dossier</button>
+        <button id="btn-choisir" class="btn btn-primaire">Choisir un dossier</button>
         <button id="btn-dernier" class="btn" hidden></button>
       </div>
     </section>
@@ -21,20 +21,20 @@
     <!-- ═══ Liste des mois ═══ -->
     <section id="vue-mois" class="vue" hidden>
       <header class="barre">
-        <button id="btn-retour-accueil" class="btn btn-ico" title="Changer de dossier">📂</button>
+        <button id="btn-retour-accueil" class="btn" title="Changer de dossier">Dossier</button>
         <span id="titre-dossier" class="titre-dossier"></span>
         <select id="tri-mois" class="btn">
-          <option value="chrono">Chronologique</option>
-          <option value="chrono-inv">Chronologique inverse</option>
-          <option value="taille">Taille (plus lourd d'abord)</option>
+          <option value="chrono">Date</option>
+          <option value="taille">Taille</option>
           <option value="nombre">Nombre de fichiers</option>
           <option value="restants">Restants à trier</option>
         </select>
+        <button id="btn-sens" class="btn btn-ico" title="Inverser l'ordre">&#9650;</button>
         <label class="filtre-faits"><input type="checkbox" id="masquer-faits" /> Masquer les mois faits</label>
         <span class="espace"></span>
-        <button id="btn-corbeille" class="btn">🗑️ Corbeille</button>
-        <button id="btn-raccourcis" class="btn btn-ico" title="Raccourcis clavier">⌨️</button>
-        <button id="btn-reset-tout" class="btn btn-danger-leger" title="Tout remettre à zéro pour une nouvelle passe">♻️ Reset global</button>
+        <button id="btn-corbeille" class="btn">Corbeille</button>
+        <button id="btn-reglages" class="btn">Réglages</button>
+        <button id="btn-reset-tout" class="btn btn-danger-leger" title="Tout remettre à zéro pour une nouvelle passe">Reset global</button>
       </header>
       <div id="grille-mois" class="grille-mois"></div>
     </section>
@@ -42,71 +42,107 @@
     <!-- ═══ Tri d'un mois ═══ -->
     <section id="vue-tri" class="vue" hidden>
       <header class="barre">
-        <button id="btn-retour-mois" class="btn btn-ico" title="Retour aux mois">←</button>
+        <button id="btn-retour-mois" class="btn btn-ico" title="Retour aux mois">&larr;</button>
         <span id="titre-tri" class="titre-dossier"></span>
         <span id="progression-tri" class="progression"></span>
         <span class="espace"></span>
-        <button id="btn-annuler" class="btn" title="Annuler la dernière décision">↩️ Annuler</button>
-        <button id="btn-garder-reste" class="btn" title="Marquer tout le reste comme gardé">✅ Garder le reste</button>
-        <button id="btn-revue" class="btn btn-primaire">Revue du mois →</button>
+        <button id="btn-rafale" class="btn" hidden>Comparer la rafale</button>
+        <button id="btn-annuler" class="btn" title="Annuler la dernière décision">Annuler</button>
+        <button id="btn-garder-reste" class="btn" title="Marquer tout le reste comme gardé">Garder le reste</button>
+        <button id="btn-revue" class="btn btn-primaire">Revue du mois</button>
       </header>
       <div id="scene" class="scene">
-        <div id="carte" class="carte">
-          <img id="apercu-img" alt="" draggable="false" hidden />
-          <video id="apercu-video" controls muted hidden></video>
-          <div id="badge-garder" class="badge badge-garder">GARDER</div>
-          <div id="badge-jeter" class="badge badge-jeter">JETER</div>
+        <div id="carte-fond" class="carte carte-fond" hidden>
+          <div class="carte-titre"></div>
+          <div class="carte-visuel"></div>
+          <div class="carte-infos"></div>
+        </div>
+        <div id="carte" class="carte" hidden>
+          <div id="carte-nom" class="carte-titre"></div>
+          <div class="carte-visuel">
+            <img id="apercu-img" alt="" draggable="false" hidden />
+            <video id="apercu-video" controls muted hidden></video>
+            <div id="badge-garder" class="badge badge-garder">GARDER</div>
+            <div id="badge-jeter" class="badge badge-jeter">JETER</div>
+          </div>
+          <div id="carte-infos" class="carte-infos"></div>
         </div>
         <div id="fin-mois" class="fin-mois" hidden>
-          <h2>Mois terminé 🎉</h2>
+          <h2>Mois terminé</h2>
           <p>Toutes les décisions sont prises. Passe à la revue pour valider.</p>
-          <button id="btn-fin-revue" class="btn btn-primaire">Revue du mois →</button>
+          <div class="rangee-boutons centre">
+            <button id="btn-fin-revue" class="btn btn-primaire">Revue du mois <kbd id="kbd-valider"></kbd></button>
+            <button id="btn-mois-suivant" class="btn">Mois suivant <kbd id="kbd-suivant"></kbd></button>
+          </div>
         </div>
       </div>
-      <footer class="pied-tri">
-        <button id="btn-jeter" class="btn btn-jeter">🗑️ Jeter <kbd id="kbd-jeter"></kbd></button>
-        <div id="info-fichier" class="info-fichier"></div>
-        <button id="btn-garder" class="btn btn-garder">❤️ Garder <kbd id="kbd-garder"></kbd></button>
+      <footer id="pied-tri" class="pied-tri">
+        <button id="btn-jeter" class="btn btn-jeter">Jeter <kbd id="kbd-jeter"></kbd></button>
+        <span class="aide-zoom">Molette : zoom &middot; double-clic : réinitialiser</span>
+        <button id="btn-garder" class="btn btn-garder">Garder <kbd id="kbd-garder"></kbd></button>
       </footer>
+    </section>
+
+    <!-- ═══ Comparateur de rafale ═══ -->
+    <section id="vue-rafale" class="vue" hidden>
+      <header class="barre">
+        <button id="btn-retour-rafale" class="btn btn-ico">&larr;</button>
+        <span class="titre-dossier">Comparateur — photos similaires</span>
+        <span class="espace"></span>
+        <span id="bilan-rafale" class="progression"></span>
+        <button id="btn-valider-rafale" class="btn btn-primaire">Appliquer</button>
+      </header>
+      <p class="aide-revue">Clique sur une photo pour basculer garder / jeter. Tout est appliqué d'un coup.</p>
+      <div id="grille-rafale" class="grille-rafale"></div>
     </section>
 
     <!-- ═══ Revue de fin de mois ═══ -->
     <section id="vue-revue" class="vue" hidden>
       <header class="barre">
-        <button id="btn-retour-tri" class="btn btn-ico">←</button>
+        <button id="btn-retour-tri" class="btn btn-ico">&larr;</button>
         <span id="titre-revue" class="titre-dossier"></span>
         <span class="espace"></span>
         <span id="bilan-revue" class="progression"></span>
-        <button id="btn-valider-mois" class="btn btn-primaire">✔️ Valider → corbeille</button>
+        <button id="btn-valider-mois" class="btn btn-primaire">Valider le mois <kbd id="kbd-valider2"></kbd></button>
       </header>
       <div class="defilable">
         <p class="aide-revue">Clique sur une vignette pour changer sa décision.</p>
-        <h3 class="titre-groupe garder">❤️ Gardées</h3>
+        <h3 class="titre-groupe garder">Gardées</h3>
         <div id="grille-gardees" class="grille-vignettes"></div>
-        <h3 class="titre-groupe jeter">🗑️ Jetées</h3>
+        <h3 class="titre-groupe jeter">Jetées</h3>
         <div id="grille-jetees" class="grille-vignettes"></div>
       </div>
     </section>
 
-    <!-- ═══ Modale corbeille ═══ -->
-    <dialog id="modale-corbeille">
-      <h2>🗑️ Corbeille</h2>
-      <p id="detail-corbeille"></p>
-      <p class="aide">Les fichiers validés sont déplacés ici (dans <code>.krino/corbeille</code>) avant toute suppression réelle.</p>
-      <div class="rangee-boutons">
-        <button id="btn-restaurer" class="btn">↩️ Tout restaurer</button>
-        <button id="btn-vider" class="btn btn-danger">💥 Vider définitivement</button>
-        <button class="btn fermer">Fermer</button>
+    <!-- ═══ Corbeille ═══ -->
+    <section id="vue-corbeille" class="vue" hidden>
+      <header class="barre">
+        <button id="btn-retour-corbeille" class="btn btn-ico">&larr;</button>
+        <span class="titre-dossier">Corbeille</span>
+        <span id="bilan-corbeille" class="progression"></span>
+        <span class="espace"></span>
+        <button id="btn-restaurer" class="btn">Tout restaurer</button>
+        <button id="btn-vider" class="btn btn-danger">Vider définitivement</button>
+      </header>
+      <div class="defilable">
+        <p class="aide-revue">Les fichiers validés attendent ici avant suppression réelle. Clique sur « Restaurer » pour récupérer un fichier.</p>
+        <div id="grille-corbeille" class="grille-vignettes"></div>
       </div>
-    </dialog>
+    </section>
 
-    <!-- ═══ Modale raccourcis ═══ -->
-    <dialog id="modale-raccourcis">
-      <h2>⌨️ Raccourcis clavier</h2>
-      <p class="aide">Clique sur un champ puis appuie sur la touche voulue. Les flèches ← / → fonctionnent toujours.</p>
+    <!-- ═══ Modale réglages ═══ -->
+    <dialog id="modale-reglages">
+      <h2>Réglages</h2>
+      <h3 class="titre-reglage">Regroupement par mois</h3>
+      <label class="ligne-radio"><input type="radio" name="source-date" value="exif" /> Date de prise de vue (EXIF), sinon date du fichier</label>
+      <label class="ligne-radio"><input type="radio" name="source-date" value="fichier" /> Date de modification du fichier</label>
+      <h3 class="titre-reglage">Raccourcis clavier</h3>
+      <p class="aide">Clique sur un champ puis appuie sur la touche voulue (Échap pour annuler).</p>
       <div class="ligne-raccourci"><span>Garder</span><button class="btn touche" data-action="garder"></button></div>
       <div class="ligne-raccourci"><span>Jeter</span><button class="btn touche" data-action="jeter"></button></div>
-      <div class="ligne-raccourci"><span>Annuler</span><button class="btn touche" data-action="annuler"></button></div>
+      <div class="ligne-raccourci"><span>Annuler la décision</span><button class="btn touche" data-action="annuler"></button></div>
+      <div class="ligne-raccourci"><span>Revue / Valider</span><button class="btn touche" data-action="valider"></button></div>
+      <div class="ligne-raccourci"><span>Mois suivant</span><button class="btn touche" data-action="suivant"></button></div>
       <div class="rangee-boutons"><button class="btn fermer">Fermer</button></div>
     </dialog>
   </body>

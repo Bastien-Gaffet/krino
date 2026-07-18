@@ -270,6 +270,46 @@ fn apercu_png(chemin: String, largeur_max: u32) -> Result<String, String> {
         .map_err(|e| format!("Décodage impossible : {e}"))
 }
 
+/// Crée (ou recrée) le dossier de démonstration du tutoriel dans %TEMP%,
+/// avec 6 images réparties sur deux mois — dont une « rafale » de 3 photos.
+#[tauri::command]
+fn creer_dossier_demo() -> Result<String, String> {
+    const IMAGES: [&[u8]; 6] = [
+        include_bytes!("../assets/demo/demo1.png"),
+        include_bytes!("../assets/demo/demo2.png"),
+        include_bytes!("../assets/demo/demo3.png"),
+        include_bytes!("../assets/demo/demo4.png"),
+        include_bytes!("../assets/demo/demo5.png"),
+        include_bytes!("../assets/demo/demo6.png"),
+    ];
+    let dossier = std::env::temp_dir().join("krino_demo");
+    if dossier.exists() {
+        fs::remove_dir_all(&dossier).map_err(|e| e.to_string())?;
+    }
+    fs::create_dir_all(&dossier).map_err(|e| e.to_string())?;
+    let maintenant = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|e| e.to_string())?
+        .as_secs() as i64;
+    const JOUR: i64 = 86_400;
+    // 3 photos en rafale (2 s d'écart) le mois dernier, 3 photos espacées il y a deux mois
+    let dates = [
+        maintenant - 35 * JOUR,
+        maintenant - 35 * JOUR + 2,
+        maintenant - 35 * JOUR + 4,
+        maintenant - 65 * JOUR,
+        maintenant - 62 * JOUR,
+        maintenant - 58 * JOUR,
+    ];
+    for (i, (octets, date)) in IMAGES.iter().zip(dates).enumerate() {
+        let chemin = dossier.join(format!("demo_{:02}.png", i + 1));
+        fs::write(&chemin, octets).map_err(|e| e.to_string())?;
+        filetime::set_file_mtime(&chemin, filetime::FileTime::from_unix_time(date, 0))
+            .map_err(|e| e.to_string())?;
+    }
+    Ok(dossier.to_string_lossy().into_owned())
+}
+
 mod wic {
     use windows::core::{Interface, HSTRING};
     use windows::Win32::Foundation::GENERIC_READ;
@@ -344,7 +384,8 @@ pub fn run() {
             restaurer_fichier,
             vider_corbeille,
             restaurer_corbeille,
-            apercu_png
+            apercu_png,
+            creer_dossier_demo
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

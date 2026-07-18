@@ -1,6 +1,6 @@
 [package]
 name = "krino"
-version = "0.2.0"
+version = "0.3.0"
 description = "A Tauri App"
 authors = ["you"]
 edition = "2021"
@@ -27,4 +27,5 @@ walkdir = "2.5.0"
 kamadak-exif = "0.6.1"
 base64 = "0.22.1"
 windows = { version = "0.62.2", features = ["Win32_Graphics_Imaging", "Win32_System_Com", "Win32_Foundation", "Win32_UI_Shell", "Win32_System_Com_StructuredStorage"] }
+filetime = "0.2.29"
 

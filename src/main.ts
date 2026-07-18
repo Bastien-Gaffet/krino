@@ -34,6 +34,24 @@ let decisionsRafale = new Map<string, "garder" | "jeter">();
 
 const ECART_RAFALE_MS = 5000;
 
+/* Préférences d'application (indépendantes du dossier trié) */
+interface Prefs {
+  theme: "auto" | "sombre" | "clair";
+  parAnnee: boolean;
+  tutoVu: boolean;
+  cguAcceptees: boolean;
+}
+const prefs: Prefs = {
+  theme: "auto", parAnnee: true, tutoVu: false, cguAcceptees: false,
+  ...JSON.parse(localStorage.getItem("krino-prefs") ?? "{}"),
+};
+function sauverPrefs() {
+  localStorage.setItem("krino-prefs", JSON.stringify(prefs));
+}
+function appliquerTheme() {
+  document.documentElement.dataset.theme = prefs.theme;
+}
+
 const RACCOURCIS_DEFAUT: Record<string, string> = {
   garder: "ArrowRight",
   jeter: "ArrowLeft",
@@ -160,12 +178,8 @@ function moisTries(): string[] {
   return statsParMois().map((s) => s.cle).sort();
 }
 
-function rendreMois() {
-  const critere = ($("#tri-mois") as unknown as HTMLSelectElement).value;
-  const masquerFaits = ($("#masquer-faits") as unknown as HTMLInputElement).checked;
-  let liste = statsParMois();
-  if (masquerFaits) liste = liste.filter((s) => !s.valide);
-  liste.sort((a, b) => {
+function comparerMois(critere: string) {
+  return (a: StatsMois, b: StatsMois) => {
     let c: number;
     switch (critere) {
       case "taille": c = a.taille - b.taille; break;
@@ -174,36 +188,81 @@ function rendreMois() {
       default: c = a.cle.localeCompare(b.cle);
     }
     return sensInverse ? -c : c;
-  });
+  };
+}
 
-  const grille = $("#grille-mois");
-  grille.innerHTML = "";
-  for (const s of liste) {
-    const carte = document.createElement("div");
-    carte.className = "carte-mois" + (s.valide ? " fait" : "");
-    const pct = s.fichiers.length ? Math.round((100 * s.decides) / s.fichiers.length) : 0;
-    carte.innerHTML = `
-      <h3>${nomMois(s.cle)}</h3>
-      <div class="stats">${s.fichiers.length} fichiers &middot; ${tailleLisible(s.taille)}</div>
-      <div class="jauge"><div style="width:${pct}%"></div></div>
-      <div class="stats">${s.valide ? '<span class="etiquette-fait">Fait</span>' : `${s.decides}/${s.fichiers.length} décidés`}</div>
-    `;
-    if (s.valide) {
-      const btn = document.createElement("button");
-      btn.className = "btn refaire";
-      btn.textContent = "Refaire ce mois";
-      btn.addEventListener("click", async (e) => {
-        e.stopPropagation();
-        if (!confirm(`Refaire ${nomMois(s.cle)} ? Les décisions de ce mois seront effacées (la corbeille n'est pas touchée).`)) return;
-        etat.mois_valides = etat.mois_valides.filter((m) => m !== s.cle);
-        for (const f of s.fichiers) delete etat.decisions[f.rel];
-        await sauver();
-        rendreMois();
-      });
-      carte.appendChild(btn);
+function carteDeMois(s: StatsMois): HTMLElement {
+  const carte = document.createElement("div");
+  carte.className = "carte-mois" + (s.valide ? " fait" : "");
+  const pct = s.fichiers.length ? Math.round((100 * s.decides) / s.fichiers.length) : 0;
+  const apercus = s.fichiers.filter((f) => !f.video).slice(0, 3);
+  carte.innerHTML = `
+    <h3>${nomMois(s.cle)}</h3>
+    <div class="eventail"></div>
+    <div class="stats">${s.fichiers.length} fichiers &middot; ${tailleLisible(s.taille)}</div>
+    <div class="jauge"><div style="width:${pct}%"></div></div>
+    <div class="stats">${s.valide ? '<span class="etiquette-fait">Fait</span>' : `${s.decides}/${s.fichiers.length} décidés`}</div>
+  `;
+  const eventail = carte.querySelector(".eventail") as HTMLElement;
+  (async () => {
+    for (const f of apercus) {
+      const img = document.createElement("img");
+      img.loading = "lazy";
+      img.src = await urlAffichable(src(f.rel), f.wic, true);
+      eventail.appendChild(img);
     }
-    carte.addEventListener("click", () => ouvrirMois(s.cle));
-    grille.appendChild(carte);
+  })();
+  if (s.valide) {
+    const btn = document.createElement("button");
+    btn.className = "btn refaire";
+    btn.textContent = "Refaire ce mois";
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+      if (!confirm(`Refaire ${nomMois(s.cle)} ? Les décisions de ce mois seront effacées (la corbeille n'est pas touchée).`)) return;
+      etat.mois_valides = etat.mois_valides.filter((m) => m !== s.cle);
+      for (const f of s.fichiers) delete etat.decisions[f.rel];
+      await sauver();
+      rendreMois();
+    });
+    carte.appendChild(btn);
+  }
+  carte.addEventListener("click", () => ouvrirMois(s.cle));
+  return carte;
+}
+
+function rendreMois() {
+  const critere = ($("#tri-mois") as unknown as HTMLSelectElement).value;
+  const masquerFaits = ($("#masquer-faits") as unknown as HTMLInputElement).checked;
+  let liste = statsParMois();
+  if (masquerFaits) liste = liste.filter((s) => !s.valide);
+  liste.sort(comparerMois(critere));
+
+  const conteneur = $("#conteneur-mois");
+  conteneur.innerHTML = "";
+  if (prefs.parAnnee) {
+    // Sections par année, dans l'ordre induit par le tri des mois
+    const annees: string[] = [];
+    for (const s of liste) {
+      const a = s.cle.slice(0, 4);
+      if (!annees.includes(a)) annees.push(a);
+    }
+    for (const annee of annees) {
+      const titre = document.createElement("h2");
+      titre.className = "titre-annee";
+      titre.textContent = annee;
+      conteneur.appendChild(titre);
+      const grille = document.createElement("div");
+      grille.className = "grille-mois";
+      for (const s of liste.filter((x) => x.cle.startsWith(annee))) {
+        grille.appendChild(carteDeMois(s));
+      }
+      conteneur.appendChild(grille);
+    }
+  } else {
+    const grille = document.createElement("div");
+    grille.className = "grille-mois";
+    for (const s of liste) grille.appendChild(carteDeMois(s));
+    conteneur.appendChild(grille);
   }
 }
 
@@ -617,14 +676,112 @@ function installerModaleReglages() {
       rendreMois();
     });
   }
+  for (const radio of document.querySelectorAll<HTMLInputElement>("input[name=theme]")) {
+    radio.addEventListener("change", () => {
+      prefs.theme = radio.value as Prefs["theme"];
+      sauverPrefs();
+      appliquerTheme();
+    });
+  }
+  $("#opt-annees").addEventListener("change", () => {
+    prefs.parAnnee = ($("#opt-annees") as unknown as HTMLInputElement).checked;
+    sauverPrefs();
+    rendreMois();
+  });
+  $("#btn-revoir-tuto").addEventListener("click", () => {
+    ($("#modale-reglages") as unknown as HTMLDialogElement).close();
+    tutoAller(0);
+  });
+  $("#btn-voir-cgu").addEventListener("click", () => {
+    ($("#modale-reglages") as unknown as HTMLDialogElement).close();
+    ($("#modale-cgu") as unknown as HTMLDialogElement).showModal();
+  });
 }
 
 function ouvrirReglages() {
   for (const radio of document.querySelectorAll<HTMLInputElement>("input[name=source-date]")) {
     radio.checked = radio.value === (etat.source_date || "exif");
   }
+  for (const radio of document.querySelectorAll<HTMLInputElement>("input[name=theme]")) {
+    radio.checked = radio.value === prefs.theme;
+  }
+  ($("#opt-annees") as unknown as HTMLInputElement).checked = prefs.parAnnee;
   rendreEtiquettesRaccourcis();
   ($("#modale-reglages") as unknown as HTMLDialogElement).showModal();
+}
+
+/* ═══ Tutoriel ═══ */
+
+interface EtapeTuto {
+  texte: string;
+  cible?: string;
+  avant?: () => void | Promise<void>;
+}
+
+const ETAPES_TUTO: EtapeTuto[] = [
+  {
+    texte: "Bienvenue dans Krino. Ce tutoriel utilise un dossier d'images de démonstration — tes vraies photos ne sont pas touchées.",
+    avant: async () => {
+      const dossier = await invoke<string>("creer_dossier_demo");
+      await ouvrirDossier(dossier);
+    },
+  },
+  {
+    texte: "Voici tes mois, regroupés par année. Chaque carte montre un aperçu, le nombre de fichiers, la taille et la progression du tri.",
+    cible: "#conteneur-mois",
+  },
+  {
+    texte: "Le menu déroulant change le critère de tri, et la petite flèche inverse l'ordre. On peut aussi masquer les mois déjà faits.",
+    cible: "#tri-mois",
+  },
+  {
+    texte: "Ouvrons le premier mois. Pour chaque photo : bouton Garder ou Jeter, flèches du clavier (→ garder, ← jeter), ou glisse la carte à droite/gauche comme un deck.",
+    avant: () => {
+      const premier = moisTries()[0];
+      if (premier) ouvrirMois(premier);
+    },
+    cible: "#carte",
+  },
+  {
+    texte: "La molette zoome dans l'image, le double-clic réinitialise. « Annuler » (ou Retour arrière) rattrape une erreur. Si des photos ont été prises en rafale, un bouton « Comparer la rafale » apparaît.",
+    cible: "#pied-tri",
+  },
+  {
+    texte: "Quand toutes les décisions sont prises, la Revue du mois (Entrée) récapitule tout : clique sur une vignette pour changer d'avis, puis « Valider le mois ».",
+    cible: "#btn-revue",
+  },
+  {
+    texte: "À la validation, les photos jetées sont DÉPLACÉES dans la corbeille interne de Krino — rien n'est encore supprimé. L'écran Corbeille permet de tout vérifier, restaurer fichier par fichier, ou vider définitivement pour libérer l'espace.",
+    cible: "#btn-revue",
+  },
+  {
+    texte: "C'est tout ! Réglages te permet de changer le thème, les raccourcis, le regroupement (EXIF ou date de fichier, par année ou non) et de revoir ce tutoriel. Bon tri !",
+  },
+];
+
+let etapeTuto = -1;
+
+async function tutoAller(i: number) {
+  document.querySelector(".tuto-cible")?.classList.remove("tuto-cible");
+  if (i >= ETAPES_TUTO.length) { tutoFin(); return; }
+  etapeTuto = i;
+  const etape = ETAPES_TUTO[i];
+  await etape.avant?.();
+  $("#tuto-texte").textContent = etape.texte;
+  $("#tuto-etape").textContent = `${i + 1}/${ETAPES_TUTO.length}`;
+  ($("#tuto-suivant") as unknown as HTMLButtonElement).textContent =
+    i === ETAPES_TUTO.length - 1 ? "Terminer" : "Suivant";
+  $("#tuto-bulle").hidden = false;
+  if (etape.cible) document.querySelector(etape.cible)?.classList.add("tuto-cible");
+}
+
+function tutoFin() {
+  document.querySelector(".tuto-cible")?.classList.remove("tuto-cible");
+  $("#tuto-bulle").hidden = true;
+  etapeTuto = -1;
+  prefs.tutoVu = true;
+  sauverPrefs();
+  afficherVue("vue-accueil");
 }
 
 function installerClavier() {
@@ -654,6 +811,29 @@ function installerClavier() {
 /* ═══ Câblage ═══ */
 
 window.addEventListener("DOMContentLoaded", () => {
+  appliquerTheme();
+
+  // Tutoriel
+  $("#tuto-suivant").addEventListener("click", () => tutoAller(etapeTuto + 1));
+  $("#tuto-quitter").addEventListener("click", tutoFin);
+
+  // Conditions d'utilisation : acceptation obligatoire au premier lancement
+  const cgu = $("#modale-cgu") as unknown as HTMLDialogElement;
+  $("#btn-accepter-cgu").addEventListener("click", () => {
+    prefs.cguAcceptees = true;
+    sauverPrefs();
+    cgu.close();
+    if (!prefs.tutoVu && confirm("Première utilisation : suivre le petit tutoriel (2 minutes, sur des images de démonstration) ?")) {
+      tutoAller(0);
+    }
+  });
+  if (!prefs.cguAcceptees) {
+    cgu.addEventListener("cancel", (e) => {
+      if (!prefs.cguAcceptees) e.preventDefault();
+    });
+    cgu.showModal();
+  }
+
   // Accueil
   $("#btn-choisir").addEventListener("click", choisirDossier);
   const dernier = localStorage.getItem("krino-dernier");
@@ -669,7 +849,7 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#tri-mois").addEventListener("change", rendreMois);
   $("#btn-sens").addEventListener("click", () => {
     sensInverse = !sensInverse;
-    $("#btn-sens").innerHTML = sensInverse ? "&#9660;" : "&#9650;";
+    $("#btn-sens").classList.toggle("inverse", sensInverse);
     rendreMois();
   });
   $("#masquer-faits").addEventListener("change", rendreMois);

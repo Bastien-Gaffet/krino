@@ -31,6 +31,10 @@ démarrage instantané, aucune dépendance à installer pour l'utilisateur final
   reste », annulation illimitée dans la session, reprise automatique du dernier
   dossier.
 - **Vidéos** prises en charge (lecture directe dans la visionneuse).
+- **Thème clair / sombre / automatique** (suit le mode de Windows).
+- **Mois regroupés par année** (désactivable) avec aperçu de 3 photos en éventail sur chaque carte.
+- **Tutoriel intégré** au premier lancement, sur un dossier d'images de démonstration — revisionnable depuis les Réglages.
+- **Comparateur de rafales**, **zoom** à la molette, regroupement par **date EXIF ou date de fichier**, HEIC/TIFF via Windows Imaging Component.
 
 ## 🚀 Développement
 
@@ -58,3 +62,10 @@ Krino ne supprime **jamais** un fichier directement :
 1. décider (garder/jeter) ne touche pas au disque ;
 2. valider un mois **déplace** les jetés vers `.krino/corbeille` ;
 3. seule l'action « Vider la corbeille », confirmée, supprime réellement.
+
+Les conditions d'utilisation (avec décharge de responsabilité) sont affichées et
+doivent être acceptées au premier lancement. **Faites une sauvegarde avant tout tri.**
+
+## Licence
+
+MIT — voir [LICENSE](LICENSE). Logiciel fourni « tel quel », sans garantie.

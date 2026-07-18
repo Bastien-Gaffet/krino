@@ -29,14 +29,14 @@
           <option value="nombre">Nombre de fichiers</option>
           <option value="restants">Restants à trier</option>
         </select>
-        <button id="btn-sens" class="btn btn-ico" title="Inverser l'ordre">&#9650;</button>
+        <span id="btn-sens" class="sens" title="Inverser l'ordre" role="button" tabindex="0"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3v10M4 7l4-4 4 4"/></svg></span>
         <label class="filtre-faits"><input type="checkbox" id="masquer-faits" /> Masquer les mois faits</label>
         <span class="espace"></span>
         <button id="btn-corbeille" class="btn">Corbeille</button>
         <button id="btn-reglages" class="btn">Réglages</button>
         <button id="btn-reset-tout" class="btn btn-danger-leger" title="Tout remettre à zéro pour une nouvelle passe">Reset global</button>
       </header>
-      <div id="grille-mois" class="grille-mois"></div>
+      <div id="conteneur-mois" class="conteneur-mois"></div>
     </section>
 
     <!-- ═══ Tri d'un mois ═══ -->
@@ -133,6 +133,12 @@
     <!-- ═══ Modale réglages ═══ -->
     <dialog id="modale-reglages">
       <h2>Réglages</h2>
+      <h3 class="titre-reglage">Apparence</h3>
+      <label class="ligne-radio"><input type="radio" name="theme" value="auto" /> Automatique (suit le mode de Windows)</label>
+      <label class="ligne-radio"><input type="radio" name="theme" value="sombre" /> Sombre</label>
+      <label class="ligne-radio"><input type="radio" name="theme" value="clair" /> Clair</label>
+      <h3 class="titre-reglage">Affichage des mois</h3>
+      <label class="ligne-radio"><input type="checkbox" id="opt-annees" /> Regrouper les mois par année</label>
       <h3 class="titre-reglage">Regroupement par mois</h3>
       <label class="ligne-radio"><input type="radio" name="source-date" value="exif" /> Date de prise de vue (EXIF), sinon date du fichier</label>
       <label class="ligne-radio"><input type="radio" name="source-date" value="fichier" /> Date de modification du fichier</label>
@@ -143,7 +149,44 @@
       <div class="ligne-raccourci"><span>Annuler la décision</span><button class="btn touche" data-action="annuler"></button></div>
       <div class="ligne-raccourci"><span>Revue / Valider</span><button class="btn touche" data-action="valider"></button></div>
       <div class="ligne-raccourci"><span>Mois suivant</span><button class="btn touche" data-action="suivant"></button></div>
-      <div class="rangee-boutons"><button class="btn fermer">Fermer</button></div>
+      <h3 class="titre-reglage">Aide</h3>
+      <div class="rangee-boutons">
+        <button id="btn-revoir-tuto" class="btn">Revoir le tutoriel</button>
+        <button id="btn-voir-cgu" class="btn">Conditions d'utilisation</button>
+        <button class="btn fermer">Fermer</button>
+      </div>
     </dialog>
+
+    <!-- ═══ Conditions d'utilisation ═══ -->
+    <dialog id="modale-cgu">
+      <h2>Conditions d'utilisation</h2>
+      <div class="texte-cgu">
+        <p><strong>Krino déplace et supprime des fichiers.</strong> Son rôle est
+        précisément de vous aider à effacer des photos et vidéos.</p>
+        <p>Garde-fous intégrés : aucune décision ne touche au disque avant la
+        validation d'un mois ; les fichiers validés sont d'abord <strong>déplacés dans la
+        corbeille interne</strong> (<code>.krino/corbeille</code>) ; seule l'action
+        « Vider définitivement », confirmée, supprime réellement les fichiers.</p>
+        <p><strong>Décharge de responsabilité</strong> — Krino est fourni « tel quel »,
+        sans aucune garantie (licence MIT). En l'utilisant, vous acceptez que ses
+        auteurs ne puissent être tenus responsables d'aucune perte de données,
+        y compris la suppression définitive de photos ou de vidéos, quelle qu'en
+        soit la cause (mauvaise manipulation, bug, coupure de courant…).</p>
+        <p><strong>Faites une sauvegarde de vos fichiers avant tout tri.</strong></p>
+      </div>
+      <div class="rangee-boutons">
+        <button id="btn-accepter-cgu" class="btn btn-primaire">J'accepte</button>
+      </div>
+    </dialog>
+
+    <!-- ═══ Bulle de tutoriel ═══ -->
+    <div id="tuto-bulle" class="tuto-bulle" hidden>
+      <p id="tuto-texte"></p>
+      <div class="rangee-boutons">
+        <span id="tuto-etape" class="etape espace"></span>
+        <button id="tuto-quitter" class="btn">Quitter le tutoriel</button>
+        <button id="tuto-suivant" class="btn btn-primaire">Suivant</button>
+      </div>
+    </div>
   </body>
 </html>

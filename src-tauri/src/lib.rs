@@ -83,13 +83,21 @@ fn epoch_ms(annee: i64, mois: i64, jour: i64, h: i64, min: i64, s: i64) -> i64 {
     ((jours * 86_400) + h * 3600 + min * 60 + s) * 1000
 }
 
+/// Scan récursif. L'EXIF est lu en parallèle (rayon) et la progression est
+/// envoyée à l'interface via l'événement `scan-progres`.
 #[tauri::command]
-fn scanner(racine: String) -> Result<Vec<Media>, String> {
+async fn scanner(fenetre: tauri::Window, racine: String) -> Result<Vec<Media>, String> {
+    use rayon::prelude::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use tauri::Emitter;
+
     let racine = PathBuf::from(&racine);
     if !racine.is_dir() {
         return Err("Dossier introuvable".into());
     }
-    let mut medias = Vec::new();
+
+    // 1) Parcours rapide de l'arborescence (métadonnées seules)
+    let mut entrees = Vec::new();
     for entree in WalkDir::new(&racine)
         .into_iter()
         .filter_entry(|e| e.file_name().to_string_lossy() != DOSSIER_ETAT)
@@ -107,29 +115,74 @@ fn scanner(racine: String) -> Result<Vec<Media>, String> {
         if !video && !EXT_IMAGES.contains(&ext.as_str()) {
             continue;
         }
-        let meta = entree.metadata().map_err(|e| e.to_string())?;
-        let mtime_ms = meta
-            .modified()
-            .ok()
-            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-            .map(|d| d.as_millis() as i64)
-            .unwrap_or(0);
-        let rel = entree
-            .path()
-            .strip_prefix(&racine)
-            .unwrap()
-            .to_string_lossy()
-            .replace('\\', "/");
-        medias.push(Media {
-            rel,
-            taille: meta.len(),
-            mtime_ms,
-            exif_ms: if video { None } else { date_exif(entree.path()) },
-            video,
-            wic: EXT_WIC.contains(&ext.as_str()),
-        });
+        entrees.push((entree.into_path(), ext, video));
     }
+    let total = entrees.len();
+    let _ = fenetre.emit("scan-progres", (0usize, total));
+
+    // 2) Lecture EXIF en parallèle, avec progression
+    let fait = AtomicUsize::new(0);
+    let medias: Vec<Media> = entrees
+        .par_iter()
+        .filter_map(|(chemin, ext, video)| {
+            let meta = fs::metadata(chemin).ok()?;
+            let mtime_ms = meta
+                .modified()
+                .ok()
+                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|d| d.as_millis() as i64)
+                .unwrap_or(0);
+            let n = fait.fetch_add(1, Ordering::Relaxed) + 1;
+            if n % 100 == 0 || n == total {
+                let _ = fenetre.emit("scan-progres", (n, total));
+            }
+            Some(Media {
+                rel: chemin
+                    .strip_prefix(&racine)
+                    .unwrap()
+                    .to_string_lossy()
+                    .replace('\\', "/"),
+                taille: meta.len(),
+                mtime_ms,
+                exif_ms: if *video { None } else { date_exif(chemin) },
+                video: *video,
+                wic: EXT_WIC.contains(&ext.as_str()),
+            })
+        })
+        .collect();
     Ok(medias)
+}
+
+/// Renvoie le chemin d'une miniature JPEG (320 px) du fichier, générée via WIC
+/// et mise en cache dans `.krino/miniatures` — la clé intègre la date de
+/// modification, donc un fichier remplacé régénère sa miniature.
+#[tauri::command]
+async fn miniature(racine: String, rel: String, corbeille: bool) -> Result<String, String> {
+    use std::hash::{Hash, Hasher};
+    let racine_p = PathBuf::from(&racine);
+    let source = if corbeille {
+        chemin_corbeille(&racine_p).join(&rel)
+    } else {
+        racine_p.join(&rel)
+    };
+    let meta = fs::metadata(&source).map_err(|e| e.to_string())?;
+    let mtime = meta
+        .modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let mut hacheur = std::collections::hash_map::DefaultHasher::new();
+    rel.hash(&mut hacheur);
+    mtime.hash(&mut hacheur);
+    let dossier = racine_p.join(DOSSIER_ETAT).join("miniatures");
+    let cible = dossier.join(format!("{:016x}.jpg", hacheur.finish()));
+    if !cible.exists() {
+        fs::create_dir_all(&dossier).map_err(|e| e.to_string())?;
+        wic::generer_miniature(&source.to_string_lossy(), &cible.to_string_lossy(), 320)
+            .map_err(|e| format!("miniature : {e}"))?;
+    }
+    Ok(cible.to_string_lossy().into_owned())
 }
 
 #[tauri::command]
@@ -312,16 +365,17 @@ fn creer_dossier_demo() -> Result<String, String> {
 
 mod wic {
     use windows::core::{Interface, HSTRING};
-    use windows::Win32::Foundation::GENERIC_READ;
+    use windows::Win32::Foundation::{GENERIC_READ, GENERIC_WRITE};
     use windows::Win32::Graphics::Imaging::*;
     use windows::Win32::System::Com::*;
     use windows::Win32::UI::Shell::SHCreateMemStream;
 
-    pub fn decoder_en_png(chemin: &str, largeur_max: u32) -> windows::core::Result<Vec<u8>> {
+    unsafe fn source_redimensionnee(
+        fabrique: &IWICImagingFactory,
+        chemin: &str,
+        largeur_max: u32,
+    ) -> windows::core::Result<IWICBitmapSource> {
         unsafe {
-            let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
-            let fabrique: IWICImagingFactory =
-                CoCreateInstance(&CLSID_WICImagingFactory, None, CLSCTX_INPROC_SERVER)?;
             let decodeur = fabrique.CreateDecoderFromFilename(
                 &HSTRING::from(chemin),
                 None,
@@ -329,17 +383,51 @@ mod wic {
                 WICDecodeMetadataCacheOnDemand,
             )?;
             let cadre = decodeur.GetFrame(0)?;
-
             let (mut l, mut h) = (0u32, 0u32);
             cadre.GetSize(&mut l, &mut h)?;
-            let source: IWICBitmapSource = if largeur_max > 0 && l > largeur_max {
+            if largeur_max > 0 && l > largeur_max {
                 let echelle = fabrique.CreateBitmapScaler()?;
                 let nh = (h as u64 * largeur_max as u64 / l as u64) as u32;
                 echelle.Initialize(&cadre, largeur_max, nh, WICBitmapInterpolationModeFant)?;
-                echelle.cast()?
+                echelle.cast()
             } else {
-                cadre.cast()?
-            };
+                cadre.cast()
+            }
+        }
+    }
+
+    /// Génère une miniature JPEG sur disque (cache des vues en grille).
+    pub fn generer_miniature(
+        source_chemin: &str,
+        cible: &str,
+        largeur_max: u32,
+    ) -> windows::core::Result<()> {
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+            let fabrique: IWICImagingFactory =
+                CoCreateInstance(&CLSID_WICImagingFactory, None, CLSCTX_INPROC_SERVER)?;
+            let source = source_redimensionnee(&fabrique, source_chemin, largeur_max)?;
+            let flux = fabrique.CreateStream()?;
+            flux.InitializeFromFilename(&HSTRING::from(cible), GENERIC_WRITE.0)?;
+            let encodeur = fabrique.CreateEncoder(&GUID_ContainerFormatJpeg, std::ptr::null())?;
+            encodeur.Initialize(&flux, WICBitmapEncoderNoCache)?;
+            let mut cadre_sortie = None;
+            encodeur.CreateNewFrame(&mut cadre_sortie, std::ptr::null_mut())?;
+            let cadre_sortie = cadre_sortie.unwrap();
+            cadre_sortie.Initialize(None)?;
+            cadre_sortie.WriteSource(&source, std::ptr::null())?;
+            cadre_sortie.Commit()?;
+            encodeur.Commit()?;
+            Ok(())
+        }
+    }
+
+    pub fn decoder_en_png(chemin: &str, largeur_max: u32) -> windows::core::Result<Vec<u8>> {
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+            let fabrique: IWICImagingFactory =
+                CoCreateInstance(&CLSID_WICImagingFactory, None, CLSCTX_INPROC_SERVER)?;
+            let source = source_redimensionnee(&fabrique, chemin, largeur_max)?;
 
             let flux = SHCreateMemStream(None).ok_or_else(windows::core::Error::empty)?;
             let encodeur = fabrique.CreateEncoder(&GUID_ContainerFormatPng, std::ptr::null())?;
@@ -385,6 +473,7 @@ pub fn run() {
             vider_corbeille,
             restaurer_corbeille,
             apercu_png,
+            miniature,
             creer_dossier_demo
         ])
         .run(tauri::generate_context!())

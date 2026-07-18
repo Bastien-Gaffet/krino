@@ -282,6 +282,20 @@ dialog h2 { margin-bottom: 0.6em; }
 .texte-cgu strong { color: var(--texte); }
 .texte-cgu p { margin: 0.6em 0; }
 
+/* ── Chargement ── */
+.chargement {
+  position: fixed; inset: 0; background: #000000aa; z-index: 60;
+  display: flex; align-items: center; justify-content: center;
+}
+.chargement-boite {
+  background: var(--panneau); border: 1px solid var(--bord); border-radius: 12px;
+  padding: 1.6em 2em; min-width: 320px; text-align: center;
+  display: flex; flex-direction: column; gap: 0.8em;
+}
+.jauge.grande { height: 8px; background: var(--voile); border-radius: 4px; overflow: hidden; }
+.jauge.grande > div { height: 100%; background: var(--accent); width: 0; transition: width 0.2s; }
+.chargement-boite p { color: var(--sourd); }
+
 /* ── Tutoriel ── */
 .tuto-bulle {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);

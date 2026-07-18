@@ -1,5 +1,6 @@
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
+import { listen } from "@tauri-apps/api/event";
 
 /* ═══ Types ═══ */
 
@@ -111,6 +112,23 @@ async function urlAffichable(cheminAbs: string, wic: boolean, miniature = false)
 }
 
 function src(rel: string): string { return `${racine}/${rel}`; }
+
+const cacheMiniatures = new Map<string, string>();
+
+/** Miniature JPEG 320 px générée et mise en cache côté Rust — pour les grilles. */
+async function urlMiniature(m: { rel: string; video: boolean }, corbeille = false): Promise<string> {
+  if (m.video) return convertFileSrc(corbeille ? srcCorbeille(m.rel) : src(m.rel));
+  const cle = `${corbeille}|${m.rel}`;
+  if (!cacheMiniatures.has(cle)) {
+    try {
+      const chemin = await invoke<string>("miniature", { racine, rel: m.rel, corbeille });
+      cacheMiniatures.set(cle, convertFileSrc(chemin));
+    } catch {
+      cacheMiniatures.set(cle, convertFileSrc(corbeille ? srcCorbeille(m.rel) : src(m.rel)));
+    }
+  }
+  return cacheMiniatures.get(cle)!;
+}
 function srcCorbeille(rel: string): string { return `${racine}/.krino/corbeille/${rel}`; }
 
 async function sauver() {
@@ -134,7 +152,14 @@ function vueActive(): string {
 async function ouvrirDossier(chemin: string) {
   racine = chemin;
   localStorage.setItem("krino-dernier", chemin);
-  medias = await invoke<Media[]>("scanner", { racine });
+  $("#chargement").hidden = false;
+  $("#chargement-detail").textContent = "Parcours de l'arborescence…";
+  ($("#chargement-jauge")).style.width = "0";
+  try {
+    medias = await invoke<Media[]>("scanner", { racine });
+  } finally {
+    $("#chargement").hidden = true;
+  }
   etat = await invoke<Etat>("lire_etat", { racine });
   if (!etat.source_date) etat.source_date = "exif";
   $("#titre-dossier").textContent = `${chemin} — ${medias.length} fichiers`;
@@ -208,7 +233,7 @@ function carteDeMois(s: StatsMois): HTMLElement {
     for (const f of apercus) {
       const img = document.createElement("img");
       img.loading = "lazy";
-      img.src = await urlAffichable(src(f.rel), f.wic, true);
+      img.src = await urlMiniature(f);
       eventail.appendChild(img);
     }
   })();
@@ -558,8 +583,10 @@ async function rendreRevue() {
       if (m.video) {
         v.innerHTML = `<video src="${convertFileSrc(src(m.rel))}" preload="metadata" muted></video><span class="marque">vidéo</span>`;
       } else {
-        const url = await urlAffichable(src(m.rel), m.wic, true);
-        v.innerHTML = `<img src="${url}" loading="lazy" alt="">`;
+        const img = document.createElement("img");
+        img.loading = "lazy";
+        urlMiniature(m).then((url) => { img.src = url; });
+        v.appendChild(img);
       }
       v.addEventListener("click", async () => {
         etat.decisions[m.rel] = etat.decisions[m.rel] === "garder" ? "jeter" : "garder";
@@ -612,8 +639,10 @@ async function rendreCorbeille() {
     if (f.video) {
       v.innerHTML = `<video src="${convertFileSrc(srcCorbeille(f.rel))}" preload="metadata" muted></video><span class="marque">vidéo</span>`;
     } else {
-      const url = await urlAffichable(srcCorbeille(f.rel), f.wic, true);
-      v.innerHTML = `<img src="${url}" loading="lazy" alt="">`;
+      const img = document.createElement("img");
+      img.loading = "lazy";
+      urlMiniature(f, true).then((url) => { img.src = url; });
+      v.appendChild(img);
     }
     const btn = document.createElement("button");
     btn.className = "btn-restaurer-un";
@@ -812,6 +841,13 @@ function installerClavier() {
 
 window.addEventListener("DOMContentLoaded", () => {
   appliquerTheme();
+
+  // Progression du scan (émise par le backend)
+  listen<[number, number]>("scan-progres", (e) => {
+    const [fait, total] = e.payload;
+    $("#chargement-detail").textContent = `${fait} / ${total} fichiers analysés`;
+    $("#chargement-jauge").style.width = total ? `${Math.round((100 * fait) / total)}%` : "0";
+  });
 
   // Tutoriel
   $("#tuto-suivant").addEventListener("click", () => tutoAller(etapeTuto + 1));

@@ -44,7 +44,16 @@ Prérequis : [Rust](https://rustup.rs) (toolchain MSVC sous Windows), Node.js.
 npm install
 npm run tauri dev     # lancement en mode développement
 npm run tauri build   # exécutable + installeur dans src-tauri/target/release
+.\publier.ps1         # build signé + release GitHub avec manifeste de mise à jour
 ```
+
+### Mises à jour automatiques
+
+Krino vérifie au démarrage si une version plus récente est publiée sur GitHub
+(manifeste `latest.json` attaché à la dernière release) et propose de la
+**télécharger et l'installer directement depuis l'application**. Les paquets
+sont signés (clé minisign) : l'updater refuse tout binaire dont la signature
+ne correspond pas à la clé publique embarquée.
 
 ## 🗂️ Données
 

@@ -4,6 +4,8 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { check, type Update } from "@tauri-apps/plugin-updater";
+import { relaunch } from "@tauri-apps/plugin-process";
 import kofiBanniere from "./assets/kofi.jpg";
 import { t, appliquerTraductions, definirLangue, resoudreLangue, langue } from "./i18n";
 
@@ -178,22 +180,63 @@ function cacherChargement() {
 
 /* ═══ Accueil ═══ */
 
+let dernierScanMs = 0;
+
+/** Erreur d'accès typique d'un blocage par Windows (Smart App Control, Defender). */
+function ressembleBlocageWindows(err: unknown): boolean {
+  return /os error (5|4551)|acc[eè]s refus|denied|application a bloqu/i.test(String(err));
+}
+
 async function ouvrirDossier(chemin: string) {
   racine = chemin;
   localStorage.setItem("krino-dernier", chemin);
   montrerChargement(t("chargement.analyse"), t("chargement.arborescence"));
   try {
     medias = await invoke<Media[]>("scanner", { racine });
+  } catch (err) {
+    cacherChargement();
+    if (ressembleBlocageWindows(err) && confirm(t("bloquee.detecte"))) {
+      void openUrl(URL_AIDE_BLOCAGE);
+    } else {
+      alert(String(err));
+    }
+    return;
   } finally {
     cacherChargement();
   }
+  dernierScanMs = Date.now();
   etat = await invoke<Etat>("lire_etat", { racine });
   if (!etat.source_date) etat.source_date = "exif";
   etat.ordre ??= [];
+  await purgerDisparus();
   $("#titre-dossier").textContent = t("mois.entete", { d: chemin, n: medias.length });
   afficherVue("vue-mois");
   rendreMois();
   rendreEtiquettesRaccourcis();
+}
+
+/** Oublie les décisions portant sur des fichiers supprimés hors de Krino. */
+async function purgerDisparus() {
+  const presents = new Set(medias.map((m) => m.rel));
+  const disparus = Object.keys(etat.decisions).filter((rel) => !presents.has(rel));
+  if (!disparus.length) return;
+  for (const rel of disparus) delete etat.decisions[rel];
+  etat.ordre = etat.ordre.filter((rel) => presents.has(rel));
+  await sauver();
+}
+
+/** Rescan silencieux (sans loader) — appelé au retour de focus sur la vue mois. */
+async function rafraichir() {
+  if (!racine || Date.now() - dernierScanMs < 30_000) return;
+  try {
+    medias = await invoke<Media[]>("scanner", { racine });
+    dernierScanMs = Date.now();
+    await purgerDisparus();
+    $("#titre-dossier").textContent = t("mois.entete", { d: racine, n: medias.length });
+    if (vueActive() === "vue-mois") rendreMois();
+  } catch {
+    /* le dossier peut être momentanément indisponible (disque externe) */
+  }
 }
 
 async function choisirDossier() {
@@ -706,6 +749,9 @@ async function rendreCorbeille() {
       v.innerHTML = `<video src="${convertFileSrc(srcCorbeille(f.rel))}" preload="metadata" muted></video><span class="marque">${t("vignette.video")}</span>`;
     } else {
       const img = document.createElement("img");
+      // lazy : le navigateur charge d'abord les vignettes visibles à l'écran
+      img.loading = "lazy";
+      img.decoding = "async";
       img.src = urls.get(f.rel) ?? "";
       v.appendChild(img);
     }
@@ -742,23 +788,68 @@ function versionPlusRecente(distante: string, locale: string): boolean {
 }
 
 let urlDerniereVersion = "";
+let majCourante: Update | null = null;
 
+/** Vérifie via le plugin updater (installation intégrée) ; en développement ou
+    si le plugin échoue, retombe sur l'API GitHub (lien vers la page de release). */
 async function verifierMaj(silencieux: boolean) {
+  const locale = await getVersion();
+  try {
+    majCourante = await check();
+    if (majCourante) {
+      $("#maj-detail").textContent = t("maj.texte", { v: majCourante.version, l: locale });
+      $("#btn-maj-telecharger").textContent = t("maj.installer");
+      ($("#modale-maj") as unknown as HTMLDialogElement).showModal();
+    } else if (!silencieux) {
+      alert(t("maj.aJour", { l: locale }));
+    }
+    return;
+  } catch {
+    majCourante = null;
+  }
   try {
     const rep = await fetch("https://api.github.com/repos/Bastien-Gaffet/krino/releases/latest");
     if (!rep.ok) throw new Error(String(rep.status));
     const data = await rep.json();
     const distante = String(data.tag_name ?? "").replace(/^v/, "");
-    const locale = await getVersion();
     if (distante && versionPlusRecente(distante, locale)) {
       urlDerniereVersion = data.html_url ?? "https://github.com/Bastien-Gaffet/krino/releases";
       $("#maj-detail").textContent = t("maj.texte", { v: distante, l: locale });
+      $("#btn-maj-telecharger").textContent = t("maj.telecharger");
       ($("#modale-maj") as unknown as HTMLDialogElement).showModal();
     } else if (!silencieux) {
       alert(t("maj.aJour", { l: locale }));
     }
   } catch {
     if (!silencieux) alert(t("maj.erreur"));
+  }
+}
+
+/** Télécharge et installe la mise à jour depuis l'application, puis relance. */
+async function installerMaj() {
+  if (!majCourante) {
+    void openUrl(urlDerniereVersion || "https://github.com/Bastien-Gaffet/krino/releases");
+    ($("#modale-maj") as unknown as HTMLDialogElement).close();
+    return;
+  }
+  const btn = $("#btn-maj-telecharger") as unknown as HTMLButtonElement;
+  btn.disabled = true;
+  let total = 0, recu = 0;
+  try {
+    await majCourante.downloadAndInstall((ev) => {
+      if (ev.event === "Started") total = ev.data.contentLength ?? 0;
+      else if (ev.event === "Progress") {
+        recu += ev.data.chunkLength;
+        const pct = total ? Math.round((100 * recu) / total) : 0;
+        $("#maj-detail").textContent = t("maj.telechargement", { p: pct });
+      } else if (ev.event === "Finished") {
+        $("#maj-detail").textContent = t("maj.redemarrage");
+      }
+    });
+    await relaunch();
+  } catch (err) {
+    alert(t("maj.erreurInstall", { e: String(err) }));
+    btn.disabled = false;
   }
 }
 
@@ -927,6 +1018,11 @@ async function basculerPleinEcran() {
 function installerClavier() {
   window.addEventListener("keydown", (e) => {
     if (e.key === "F11") { e.preventDefault(); basculerPleinEcran(); return; }
+    if (e.key === "F5") {
+      e.preventDefault();
+      if (racine && !document.querySelector("dialog[open]")) void ouvrirDossier(racine);
+      return;
+    }
     if (document.querySelector("dialog[open]")) return;
     const vue = vueActive();
     const k = e.key;
@@ -1040,10 +1136,7 @@ window.addEventListener("DOMContentLoaded", () => {
     prefs.kofiMasque = ($("#kofi-masquer") as unknown as HTMLInputElement).checked;
     sauverPrefs();
   });
-  $("#btn-maj-telecharger").addEventListener("click", () => {
-    void openUrl(urlDerniereVersion || "https://github.com/Bastien-Gaffet/krino/releases");
-    ($("#modale-maj") as unknown as HTMLDialogElement).close();
-  });
+  $("#btn-maj-telecharger").addEventListener("click", () => void installerMaj());
   $("#btn-verif-maj").addEventListener("click", () => verifierMaj(false));
   $("#btn-aide-blocage").addEventListener("click", () => void openUrl(URL_AIDE_BLOCAGE));
   void verifierMaj(true); // vérification silencieuse au démarrage
@@ -1079,6 +1172,12 @@ window.addEventListener("DOMContentLoaded", () => {
   for (const btn of document.querySelectorAll<HTMLButtonElement>("dialog .fermer")) {
     btn.addEventListener("click", () => btn.closest("dialog")!.close());
   }
+
+  // Rescan discret quand la fenêtre reprend le focus : les fichiers supprimés
+  // ou ajoutés hors de Krino sont pris en compte automatiquement.
+  window.addEventListener("focus", () => {
+    if (vueActive() === "vue-mois" && !document.querySelector("dialog[open]")) void rafraichir();
+  });
 
   installerModaleReglages();
   installerClavier();

@@ -140,6 +140,11 @@ const FR: Dico = {
   "maj.plusTard": "Plus tard",
   "maj.aJour": "Krino est à jour ({l}).",
   "maj.erreur": "Impossible de vérifier les mises à jour (hors ligne ?).",
+  "maj.installer": "Installer maintenant",
+  "maj.telechargement": "Téléchargement… {p} %",
+  "maj.redemarrage": "Installation… Krino va redémarrer.",
+  "maj.erreurInstall": "L'installation a échoué : {e}\nTu peux télécharger la mise à jour manuellement sur la page GitHub.",
+  "bloquee.detecte": "Windows a refusé l'accès au dossier — Krino est peut-être bloqué par Smart App Control ou Microsoft Defender.\n\nOuvrir la page d'aide pour débloquer l'application ?",
   "reglages.maj": "Vérifier les mises à jour",
   "reglages.bloquee": "Application bloquée par Windows ?",
 
@@ -284,6 +289,11 @@ const EN: Dico = {
   "maj.plusTard": "Later",
   "maj.aJour": "Krino is up to date ({l}).",
   "maj.erreur": "Could not check for updates (offline?).",
+  "maj.installer": "Install now",
+  "maj.telechargement": "Downloading… {p}%",
+  "maj.redemarrage": "Installing… Krino will restart.",
+  "maj.erreurInstall": "Installation failed: {e}\nYou can download the update manually from the GitHub page.",
+  "bloquee.detecte": "Windows denied access to the folder — Krino may be blocked by Smart App Control or Microsoft Defender.\n\nOpen the help page to unblock the app?",
   "reglages.maj": "Check for updates",
   "reglages.bloquee": "App blocked by Windows?",
 

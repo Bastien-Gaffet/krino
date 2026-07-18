@@ -209,8 +209,9 @@ kbd {
 }
 .aide-zoom { color: var(--discret); font-size: 0.85em; }
 
-/* Plein écran (F11) : barres masquées, la carte prend tout l'espace */
-body.plein-ecran .barre { display: none; }
+/* Plein écran (F11) : seule la vue de tri devient immersive —
+   les autres écrans gardent leurs barres de boutons */
+body.plein-ecran #vue-tri .barre { display: none; }
 body.plein-ecran .carte { height: min(92vh, calc(100vh - 90px)); width: min(720px, 92vw); }
 
 /* ── Comparateur de rafale ── */

@@ -332,3 +332,26 @@ dialog h2 { margin-bottom: 0.6em; }
 .tuto-bulle p { margin-bottom: 0.8em; line-height: 1.45; }
 .tuto-bulle .etape { color: var(--discret); font-size: 0.8em; }
 .tuto-cible { outline: 3px solid var(--accent); outline-offset: 3px; border-radius: 8px; }
+
+/* ═══ Outils : doublons & similaires ═══ */
+.params-outils {
+  display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap;
+  padding: 0 1.2rem 0.6rem;
+}
+.groupe-doublons {
+  margin: 0 1.2rem 1.4rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--bord);
+}
+.groupe-doublons h3 { margin: 0.3rem 0 0.6rem; font-size: 0.95rem; color: var(--sourd); }
+.vignette.sel-garder { outline: 3px solid #4caf50; }
+.vignette.sel-jeter { outline: 3px solid #e6a23c; opacity: 0.7; }
+.vignette .marque-sel { left: 6px; right: auto; }
+.vignette.sel-garder .marque-sel { color: #4caf50; }
+.vignette.sel-jeter .marque-sel { color: #e6a23c; }
+.legende-doublon {
+  position: absolute; left: 0; right: 0; bottom: 0;
+  padding: 3px 6px; font-size: 0.68rem; line-height: 1.25;
+  background: var(--voile); color: var(--texte);
+  word-break: break-all; pointer-events: none;
+}

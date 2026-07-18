@@ -32,6 +32,7 @@
         <span id="btn-sens" class="sens" data-i18n-title="mois.inverser" role="button" tabindex="0"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3v10M4 7l4-4 4 4"/></svg></span>
         <label class="filtre-faits"><input type="checkbox" id="masquer-faits" /> <span data-i18n="mois.masquerFaits"></span></label>
         <span class="espace"></span>
+        <button id="btn-outils" class="btn" data-i18n="mois.outils"></button>
         <button id="btn-corbeille" class="btn" data-i18n="mois.corbeille"></button>
         <button id="btn-reglages" class="btn" data-i18n="mois.reglages"></button>
         <button id="btn-reset-tout" class="btn btn-danger-leger" data-i18n="mois.reset" data-i18n-title="mois.resetTitre"></button>
@@ -126,6 +127,34 @@
       <div class="defilable">
         <p class="aide-revue" data-i18n="corbeille.aide"></p>
         <div id="grille-corbeille" class="grille-vignettes"></div>
+      </div>
+    </section>
+
+    <!-- ═══ Outils : doublons & similaires ═══ -->
+    <section id="vue-outils" class="vue" hidden>
+      <header class="barre">
+        <button id="btn-retour-outils" class="btn btn-ico">&larr;</button>
+        <span class="titre-dossier" data-i18n="outils.titre"></span>
+        <span id="bilan-doublons" class="progression"></span>
+        <span class="espace"></span>
+        <button id="btn-appliquer-doublons" class="btn btn-danger" hidden></button>
+      </header>
+      <div class="defilable">
+        <p class="aide-revue" data-i18n="outils.aide"></p>
+        <div class="params-outils">
+          <label class="ligne-radio"><input type="radio" name="mode-doublons" value="exact" checked /> <span data-i18n="outils.exact"></span></label>
+          <label class="ligne-radio"><input type="radio" name="mode-doublons" value="similaires" /> <span data-i18n="outils.similaires"></span></label>
+          <label id="ligne-seuil" class="ligne-radio" hidden><span data-i18n="outils.seuil"></span>
+            <select id="seuil-doublons" class="btn">
+              <option value="0" selected data-i18n="outils.seuil0"></option>
+              <option value="2" data-i18n="outils.seuil2"></option>
+              <option value="4" data-i18n="outils.seuil4"></option>
+            </select>
+          </label>
+          <button id="btn-analyser-doublons" class="btn btn-primaire" data-i18n="outils.analyser"></button>
+        </div>
+        <p id="avertissement-doublons" class="aide-revue" data-i18n="outils.avertissement" hidden></p>
+        <div id="groupes-doublons"></div>
       </div>
     </section>
 

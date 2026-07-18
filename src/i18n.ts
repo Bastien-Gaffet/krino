@@ -152,6 +152,25 @@ const FR: Dico = {
   "kofi.bouton": "Me soutenir sur Ko-fi",
   "kofi.plusTard": "Plus tard",
   "kofi.masquer": "Ne plus me le proposer",
+
+  "mois.outils": "Outils",
+  "outils.titre": "Outils — Doublons & similaires",
+  "outils.aide": "Trouve les fichiers en double dans le dossier. Rien n'est décidé automatiquement : dans chaque groupe, clique sur les vignettes pour choisir ce qui est gardé et ce qui part à la corbeille (récupérable).",
+  "outils.exact": "Doublons exacts (contenu strictement identique)",
+  "outils.similaires": "Photos semblables (recompressées, redimensionnées…)",
+  "outils.seuil": "Tolérance :",
+  "outils.seuil0": "stricte",
+  "outils.seuil2": "normale",
+  "outils.seuil4": "large (faux positifs probables)",
+  "outils.analyser": "Analyser",
+  "outils.analyse": "Analyse des doublons…",
+  "outils.avertissement": "Semblable n'est pas identique : des rafales ou des retouches peuvent être regroupées. Vérifie chaque groupe — un clic sur une vignette bascule garder / jeter.",
+  "outils.groupe": "Groupe {i} — {n} fichiers",
+  "outils.bilan": "{g} groupes · {n} à jeter",
+  "outils.appliquer": "Déplacer {n} vers la corbeille",
+  "outils.aucun": "Aucun doublon trouvé.",
+  "outils.deplaces": "{n} fichiers déplacés vers la corbeille interne — récupérables tant qu'elle n'est pas vidée.",
+  "confirm.doublons": "Déplacer {n} fichiers ({t}) vers la corbeille de Krino ?\nRien n'est supprimé tant que la corbeille n'est pas vidée.",
 };
 
 const EN: Dico = {
@@ -300,6 +319,25 @@ const EN: Dico = {
   "kofi.bouton": "Support me on Ko-fi",
   "kofi.plusTard": "Later",
   "kofi.masquer": "Don't ask me again",
+
+  "mois.outils": "Tools",
+  "outils.titre": "Tools — Duplicates & similar",
+  "outils.aide": "Finds duplicate files in the folder. Nothing is decided automatically: in each group, click the thumbnails to choose what is kept and what goes to the trash (recoverable).",
+  "outils.exact": "Exact duplicates (strictly identical content)",
+  "outils.similaires": "Similar photos (recompressed, resized…)",
+  "outils.seuil": "Tolerance:",
+  "outils.seuil0": "strict",
+  "outils.seuil2": "normal",
+  "outils.seuil4": "loose (false positives likely)",
+  "outils.analyser": "Analyze",
+  "outils.analyse": "Analyzing duplicates…",
+  "outils.avertissement": "Similar is not identical: bursts or edited photos may be grouped together. Check every group — clicking a thumbnail toggles keep / trash.",
+  "outils.groupe": "Group {i} — {n} files",
+  "outils.bilan": "{g} groups · {n} to trash",
+  "outils.appliquer": "Move {n} to trash",
+  "outils.aucun": "No duplicates found.",
+  "outils.deplaces": "{n} files moved to the internal trash — recoverable until it is emptied.",
+  "confirm.doublons": "Move {n} files ({t}) to Krino's trash?\nNothing is deleted until the trash is emptied.",
 };
 
 const DICOS: Record<Langue, Dico> = { fr: FR, en: EN };

@@ -394,6 +394,191 @@ fn creer_dossier_demo() -> Result<String, String> {
     Ok(dossier.to_string_lossy().into_owned())
 }
 
+#[derive(Serialize, Clone)]
+struct FichierDoublon {
+    rel: String,
+    taille: u64,
+    mtime_ms: i64,
+    video: bool,
+    wic: bool,
+}
+
+/// Outil « Doublons » : regroupe les fichiers identiques (`mode = "exact"`,
+/// SHA-256 du contenu) ou les images visuellement semblables
+/// (`mode = "similaires"`, dHash 64 bits à distance de Hamming ≤ seuil).
+/// Le choix de ce qui est gardé reste entièrement à l'utilisateur.
+#[tauri::command]
+async fn chercher_doublons(
+    fenetre: tauri::Window,
+    racine: String,
+    mode: String,
+    seuil: u32,
+) -> Result<Vec<Vec<FichierDoublon>>, String> {
+    use rayon::prelude::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use tauri::Emitter;
+
+    let racine_p = PathBuf::from(&racine);
+    let similaires = mode == "similaires";
+
+    let mut fichiers: Vec<(PathBuf, FichierDoublon)> = Vec::new();
+    for e in WalkDir::new(&racine_p)
+        .into_iter()
+        .filter_entry(|e| e.file_name().to_string_lossy() != DOSSIER_ETAT)
+        .filter_map(|e| e.ok())
+    {
+        if !e.file_type().is_file() {
+            continue;
+        }
+        let ext = e
+            .path()
+            .extension()
+            .map(|x| x.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        let video = EXT_VIDEOS.contains(&ext.as_str());
+        let image = EXT_IMAGES.contains(&ext.as_str());
+        if similaires && !image {
+            continue; // le perceptuel ne s'applique qu'aux images
+        }
+        if !similaires && !image && !video {
+            continue;
+        }
+        let meta = match e.metadata() {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        let mtime_ms = meta
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_millis() as i64)
+            .unwrap_or(0);
+        let rel = e
+            .path()
+            .strip_prefix(&racine_p)
+            .unwrap()
+            .to_string_lossy()
+            .replace('\\', "/");
+        fichiers.push((
+            e.into_path(),
+            FichierDoublon {
+                rel,
+                taille: meta.len(),
+                mtime_ms,
+                video,
+                wic: EXT_WIC.contains(&ext.as_str()),
+            },
+        ));
+    }
+
+    let total = fichiers.len();
+    let fait = AtomicUsize::new(0);
+    let progres = |n: usize| {
+        if n % 50 == 0 || n == total {
+            let _ = fenetre.emit("doublons-progres", (n, total));
+        }
+    };
+
+    let mut groupes: Vec<Vec<FichierDoublon>> = if similaires {
+        // dHash en parallèle (décodage WIC réduit à 9×8, niveaux de gris)
+        let hashes: Vec<(u64, &FichierDoublon)> = fichiers
+            .par_iter()
+            .filter_map(|(chemin, f)| {
+                let h = wic::dhash(&chemin.to_string_lossy());
+                progres(fait.fetch_add(1, Ordering::Relaxed) + 1);
+                // Empreintes dégénérées (image quasi uniforme) : inexploitables
+                let h = h?;
+                let bits = h.count_ones();
+                if !(4..=60).contains(&bits) {
+                    return None;
+                }
+                Some((h, f))
+            })
+            .collect();
+
+        let mut par_hash: HashMap<u64, Vec<&FichierDoublon>> = HashMap::new();
+        for (h, f) in hashes {
+            par_hash.entry(h).or_default().push(f);
+        }
+        let uniques: Vec<u64> = par_hash.keys().copied().collect();
+
+        // Union-find sur les empreintes distinctes (seuil > 0)
+        let mut parent: HashMap<u64, u64> = uniques.iter().map(|&h| (h, h)).collect();
+        fn trouver(parent: &mut HashMap<u64, u64>, mut h: u64) -> u64 {
+            while parent[&h] != h {
+                let p = parent[&parent[&h]];
+                parent.insert(h, p);
+                h = p;
+            }
+            h
+        }
+        if seuil > 0 {
+            for i in 0..uniques.len() {
+                for j in (i + 1)..uniques.len() {
+                    if (uniques[i] ^ uniques[j]).count_ones() <= seuil {
+                        let a = trouver(&mut parent, uniques[i]);
+                        let b = trouver(&mut parent, uniques[j]);
+                        parent.insert(a, b);
+                    }
+                }
+            }
+        }
+        let mut groupes_map: HashMap<u64, Vec<FichierDoublon>> = HashMap::new();
+        for h in uniques {
+            let r = trouver(&mut parent, h);
+            groupes_map
+                .entry(r)
+                .or_default()
+                .extend(par_hash[&h].iter().map(|f| (*f).clone()));
+        }
+        groupes_map.into_values().filter(|g| g.len() > 1).collect()
+    } else {
+        // Exact : pré-groupe par taille, puis SHA-256 complet en parallèle
+        let mut par_taille: HashMap<u64, Vec<&(PathBuf, FichierDoublon)>> = HashMap::new();
+        for e in &fichiers {
+            par_taille.entry(e.1.taille).or_default().push(e);
+        }
+        let candidats: Vec<&(PathBuf, FichierDoublon)> = par_taille
+            .into_values()
+            .filter(|v| v.len() > 1)
+            .flatten()
+            .collect();
+        let _ = fenetre.emit("doublons-progres", (0usize, candidats.len()));
+        let total = candidats.len();
+        let progres = |n: usize| {
+            if n % 20 == 0 || n == total {
+                let _ = fenetre.emit("doublons-progres", (n, total));
+            }
+        };
+        let hashes: Vec<([u8; 32], &FichierDoublon)> = candidats
+            .par_iter()
+            .filter_map(|(chemin, f)| {
+                use sha2::{Digest, Sha256};
+                let r = (|| -> std::io::Result<[u8; 32]> {
+                    let mut h = Sha256::new();
+                    let mut fh = fs::File::open(chemin)?;
+                    std::io::copy(&mut fh, &mut h)?;
+                    Ok(h.finalize().into())
+                })();
+                progres(fait.fetch_add(1, Ordering::Relaxed) + 1);
+                r.ok().map(|h| (h, f))
+            })
+            .collect();
+        let mut par_hash: HashMap<[u8; 32], Vec<FichierDoublon>> = HashMap::new();
+        for (h, f) in hashes {
+            par_hash.entry(h).or_default().push(f.clone());
+        }
+        par_hash.into_values().filter(|g| g.len() > 1).collect()
+    };
+
+    // Plus gros fichier d'abord dans chaque groupe ; gros groupes en premier
+    for g in &mut groupes {
+        g.sort_by(|a, b| b.taille.cmp(&a.taille).then(a.rel.cmp(&b.rel)));
+    }
+    groupes.sort_by_key(|g| std::cmp::Reverse(g.iter().skip(1).map(|f| f.taille).sum::<u64>()));
+    Ok(groupes)
+}
+
 mod wic {
     use windows::core::{Interface, HSTRING};
     use windows::Win32::Foundation::{GENERIC_READ, GENERIC_WRITE};
@@ -453,6 +638,48 @@ mod wic {
         }
     }
 
+    /// dHash 64 bits : réduction 9×8 en niveaux de gris via WIC, puis gradient
+    /// horizontal — insensible à la recompression et au redimensionnement.
+    pub fn dhash(chemin: &str) -> Option<u64> {
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+            let fabrique: IWICImagingFactory =
+                CoCreateInstance(&CLSID_WICImagingFactory, None, CLSCTX_INPROC_SERVER).ok()?;
+            let decodeur = fabrique
+                .CreateDecoderFromFilename(
+                    &HSTRING::from(chemin),
+                    None,
+                    GENERIC_READ,
+                    WICDecodeMetadataCacheOnDemand,
+                )
+                .ok()?;
+            let cadre = decodeur.GetFrame(0).ok()?;
+            let echelle = fabrique.CreateBitmapScaler().ok()?;
+            echelle
+                .Initialize(&cadre, 9, 8, WICBitmapInterpolationModeFant)
+                .ok()?;
+            let gris = fabrique.CreateFormatConverter().ok()?;
+            gris.Initialize(
+                &echelle,
+                &GUID_WICPixelFormat8bppGray,
+                WICBitmapDitherTypeNone,
+                None,
+                0.0,
+                WICBitmapPaletteTypeCustom,
+            )
+            .ok()?;
+            let mut px = [0u8; 72];
+            gris.CopyPixels(std::ptr::null(), 9, &mut px).ok()?;
+            let mut h = 0u64;
+            for y in 0..8 {
+                for x in 0..8 {
+                    h = (h << 1) | u64::from(px[y * 9 + x] > px[y * 9 + x + 1]);
+                }
+            }
+            Some(h)
+        }
+    }
+
     pub fn decoder_en_png(chemin: &str, largeur_max: u32) -> windows::core::Result<Vec<u8>> {
         unsafe {
             let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
@@ -507,6 +734,7 @@ pub fn run() {
             restaurer_corbeille,
             apercu_png,
             miniature,
+            chercher_doublons,
             creer_dossier_demo
         ])
         .run(tauri::generate_context!())

@@ -778,6 +778,126 @@ async function rendreCorbeille() {
   }
 }
 
+/* ═══ Outils : doublons & similaires ═══ */
+
+interface FichierDoublon {
+  rel: string;
+  taille: number;
+  mtime_ms: number;
+  video: boolean;
+  wic: boolean;
+}
+
+let groupesDoublons: FichierDoublon[][] = [];
+let selectionDoublons = new Map<string, "garder" | "jeter">();
+
+function majBilanDoublons() {
+  const jetes = [...selectionDoublons.values()].filter((v) => v === "jeter").length;
+  $("#bilan-doublons").textContent = groupesDoublons.length
+    ? t("outils.bilan", { g: groupesDoublons.length, n: jetes })
+    : "";
+  const btn = $("#btn-appliquer-doublons") as unknown as HTMLButtonElement;
+  btn.hidden = jetes === 0;
+  btn.textContent = t("outils.appliquer", { n: jetes });
+}
+
+async function analyserDoublons() {
+  const mode = document.querySelector<HTMLInputElement>("input[name=mode-doublons]:checked")!.value;
+  const seuil = Number(($("#seuil-doublons") as unknown as HTMLSelectElement).value);
+  montrerChargement(t("outils.analyse"));
+  try {
+    groupesDoublons = await invoke<FichierDoublon[][]>("chercher_doublons", {
+      racine, mode, seuil,
+    });
+  } catch (err) {
+    alert(String(err));
+    return;
+  } finally {
+    cacherChargement();
+  }
+  // Par défaut : le plus gros fichier de chaque groupe est gardé, le reste
+  // marqué à jeter — chaque vignette se bascule d'un clic.
+  selectionDoublons = new Map();
+  for (const g of groupesDoublons) {
+    g.forEach((f, i) => selectionDoublons.set(f.rel, i === 0 ? "garder" : "jeter"));
+  }
+  $("#avertissement-doublons").hidden = mode !== "similaires";
+  rendreGroupesDoublons();
+}
+
+function rendreGroupesDoublons() {
+  const conteneur = $("#groupes-doublons");
+  conteneur.innerHTML = "";
+  if (!groupesDoublons.length) {
+    conteneur.innerHTML = `<p class="aide-revue">${t("outils.aucun")}</p>`;
+    majBilanDoublons();
+    return;
+  }
+  groupesDoublons.forEach((g, i) => {
+    const bloc = document.createElement("div");
+    bloc.className = "groupe-doublons";
+    bloc.innerHTML = `<h3>${t("outils.groupe", { i: i + 1, n: g.length })}</h3>`;
+    const grille = document.createElement("div");
+    grille.className = "grille-vignettes";
+    for (const f of g) {
+      const v = document.createElement("div");
+      v.className = "vignette sel-" + selectionDoublons.get(f.rel);
+      v.title = f.rel;
+      const img = document.createElement("img");
+      img.loading = "lazy";
+      img.decoding = "async";
+      urlMiniature(f).then((u) => { img.src = u; });
+      const marque = document.createElement("span");
+      marque.className = "marque marque-sel";
+      const legende = document.createElement("span");
+      legende.className = "legende-doublon";
+      legende.textContent =
+        `${f.rel.split("/").pop()} · ${tailleLisible(f.taille)} · ` +
+        new Date(f.mtime_ms).toLocaleDateString(localeDate());
+      const maj = () => {
+        const sel = selectionDoublons.get(f.rel);
+        v.className = "vignette sel-" + sel;
+        marque.textContent = sel === "garder" ? t("rafale.garder") : t("rafale.jeter");
+      };
+      maj();
+      v.append(img, marque, legende);
+      v.addEventListener("click", () => {
+        selectionDoublons.set(f.rel,
+          selectionDoublons.get(f.rel) === "garder" ? "jeter" : "garder");
+        maj();
+        majBilanDoublons();
+      });
+      grille.appendChild(v);
+    }
+    bloc.appendChild(grille);
+    conteneur.appendChild(bloc);
+  });
+  majBilanDoublons();
+}
+
+async function appliquerDoublons() {
+  const rels = [...selectionDoublons.entries()]
+    .filter(([, v]) => v === "jeter")
+    .map(([rel]) => rel);
+  if (!rels.length) return;
+  const octets = groupesDoublons.flat()
+    .filter((f) => selectionDoublons.get(f.rel) === "jeter")
+    .reduce((s, f) => s + f.taille, 0);
+  if (!confirm(t("confirm.doublons", { n: rels.length, t: tailleLisible(octets) }))) return;
+  montrerChargement(t("chargement.validation"));
+  try {
+    await invoke("valider_mois", { racine, rels });
+  } finally {
+    cacherChargement();
+  }
+  alert(t("outils.deplaces", { n: rels.length }));
+  groupesDoublons = [];
+  selectionDoublons = new Map();
+  rendreGroupesDoublons();
+  dernierScanMs = 0;
+  void rafraichir();
+}
+
 /* ═══ Mises à jour & soutien ═══ */
 
 const URL_KOFI = "https://ko-fi.com/bastiengft";
@@ -1046,7 +1166,7 @@ function installerClavier() {
     } else if (vue === "vue-rafale") {
       if (k === raccourci("valider")) { e.preventDefault(); appliquerRafale(); }
       else if (k === "Escape") { afficherVue("vue-tri"); rendreCarte(); }
-    } else if (vue === "vue-corbeille" && k === "Escape") {
+    } else if ((vue === "vue-corbeille" || vue === "vue-outils") && k === "Escape") {
       afficherVue("vue-mois"); rendreMois();
     }
   });
@@ -1104,6 +1224,20 @@ window.addEventListener("DOMContentLoaded", () => {
   });
   $("#masquer-faits").addEventListener("change", rendreMois);
   $("#btn-corbeille").addEventListener("click", rendreCorbeille);
+  $("#btn-outils").addEventListener("click", () => afficherVue("vue-outils"));
+  $("#btn-retour-outils").addEventListener("click", () => { afficherVue("vue-mois"); rendreMois(); });
+  $("#btn-analyser-doublons").addEventListener("click", () => void analyserDoublons());
+  $("#btn-appliquer-doublons").addEventListener("click", () => void appliquerDoublons());
+  for (const radio of document.querySelectorAll<HTMLInputElement>("input[name=mode-doublons]")) {
+    radio.addEventListener("change", () => {
+      $("#ligne-seuil").hidden = radio.value !== "similaires" || !radio.checked;
+    });
+  }
+  listen<[number, number]>("doublons-progres", (e) => {
+    const [fait, total] = e.payload;
+    $("#chargement-detail").textContent = t("chargement.progression", { a: fait, b: total });
+    $("#chargement-jauge").style.width = total ? `${Math.round((100 * fait) / total)}%` : "0";
+  });
   $("#btn-reglages").addEventListener("click", ouvrirReglages);
   $("#btn-reset-tout").addEventListener("click", async () => {
     if (!confirm(t("confirm.reset"))) return;

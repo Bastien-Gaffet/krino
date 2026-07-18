@@ -301,26 +301,19 @@ dialog h2 { margin-bottom: 0.6em; }
 .chargement-boite p { color: var(--sourd); }
 
 .loader {
-  width: 80px;
-  aspect-ratio: 1;
-  margin: 0 auto;
-  border: 10px solid #0000;
-  padding: 5px;
-  box-sizing: border-box;
+  width: 56px;
+  aspect-ratio: 1.154;
+  margin: 0 auto 0.4em;
+  --_g: no-repeat radial-gradient(farthest-side, var(--accent) 90%, #0000);
   background:
-    radial-gradient(farthest-side,#fff 98%,#0000 ) 0 0/20px 20px no-repeat,
-    conic-gradient(from 90deg at 10px 10px,#0000 90deg,#fff 0) content-box,
-    conic-gradient(from -90deg at 40px 40px,#0000 90deg,#fff 0) content-box,
-    #000;
-  filter: blur(4px) contrast(10);
-  animation: l11 2s infinite;
+    var(--_g) 50%  0,
+    var(--_g) 0    100%,
+    var(--_g) 100% 100%;
+  background-size: 35% calc(35% * 1.154);
+  animation: l16 1s infinite;
 }
-@keyframes l11 {
-  0%   {background-position:0 0}
-  25%  {background-position:100% 0}
-  50%  {background-position:100% 100%}
-  75%  {background-position:0% 100%}
-  100% {background-position:0% 0}
+@keyframes l16 {
+  50%, 100% { background-position: 100% 100%, 50% 0, 0 100%; }
 }
 
 /* ── Tutoriel ── */

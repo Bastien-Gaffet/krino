@@ -76,7 +76,6 @@ const RACCOURCIS_DEFAUT: Record<string, string> = {
   jeter: "ArrowLeft",
   annuler: "Backspace",
   valider: "Enter",
-  suivant: "n",
 };
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string) =>
@@ -741,6 +740,7 @@ async function rendreCorbeille() {
     : t("corbeille.vide");
   const grille = $("#grille-corbeille");
   grille.innerHTML = "";
+  let rang = 0;
   for (const f of liste) {
     const v = document.createElement("div");
     v.className = "vignette";
@@ -749,11 +749,16 @@ async function rendreCorbeille() {
       v.innerHTML = `<video src="${convertFileSrc(srcCorbeille(f.rel))}" preload="metadata" muted></video><span class="marque">${t("vignette.video")}</span>`;
     } else {
       const img = document.createElement("img");
-      // lazy : le navigateur charge d'abord les vignettes visibles à l'écran
-      img.loading = "lazy";
+      // Premier écran en priorité haute, le reste en chargement paresseux
+      if (rang < 18) {
+        img.fetchPriority = "high";
+      } else {
+        img.loading = "lazy";
+      }
       img.decoding = "async";
       img.src = urls.get(f.rel) ?? "";
       v.appendChild(img);
+      rang++;
     }
     const btn = document.createElement("button");
     btn.className = "btn-restaurer-un";
@@ -873,6 +878,9 @@ function rendreEtiquettesRaccourcis() {
   $("#kbd-jeter").textContent = joli(raccourci("jeter"));
   $("#kbd-valider").textContent = joli(raccourci("valider"));
   $("#kbd-valider2").textContent = joli(raccourci("valider"));
+  // Fenêtre « mois validé » : mêmes touches que garder/jeter — intuitif
+  $("#kbd-valide-suivant").textContent = joli(raccourci("garder"));
+  $("#kbd-valide-menu").textContent = joli(raccourci("jeter"));
   for (const btn of document.querySelectorAll<HTMLButtonElement>(".touche")) {
     btn.textContent = joli(raccourci(btn.dataset.action!));
   }
@@ -1031,7 +1039,6 @@ function installerClavier() {
       else if (k === raccourci("jeter")) { e.preventDefault(); decider("jeter"); }
       else if (k === raccourci("annuler")) { e.preventDefault(); annuler(); }
       else if (k === raccourci("valider")) { e.preventDefault(); afficherVue("vue-revue"); rendreRevue(); }
-      else if (k === raccourci("suivant")) { e.preventDefault(); allerMoisSuivant(); }
       else if (k === "Escape") { afficherVue("vue-mois"); rendreMois(); }
     } else if (vue === "vue-revue") {
       if (k === raccourci("valider")) { e.preventDefault(); validerMois(); }
@@ -1172,6 +1179,26 @@ window.addEventListener("DOMContentLoaded", () => {
   for (const btn of document.querySelectorAll<HTMLButtonElement>("dialog .fermer")) {
     btn.addEventListener("click", () => btn.closest("dialog")!.close());
   }
+
+  // Clic en dehors d'une fenêtre = fermeture (sauf CGU, dont l'acceptation est requise)
+  for (const dlg of document.querySelectorAll<HTMLDialogElement>("dialog")) {
+    if (dlg.id === "modale-cgu") continue;
+    dlg.addEventListener("click", (e) => {
+      if (e.target === dlg) dlg.close();
+    });
+  }
+
+  // Fenêtre « mois validé » : la touche garder = mois suivant, jeter = retour au menu
+  ($("#modale-valide") as unknown as HTMLDialogElement).addEventListener("keydown", (e) => {
+    const suivantVisible = !($("#btn-valide-suivant") as unknown as HTMLButtonElement).hidden;
+    if (e.key === raccourci("garder") && suivantVisible) {
+      e.preventDefault();
+      ($("#btn-valide-suivant") as unknown as HTMLButtonElement).click();
+    } else if (e.key === raccourci("jeter")) {
+      e.preventDefault();
+      ($("#btn-valide-menu") as unknown as HTMLButtonElement).click();
+    }
+  });
 
   // Rescan discret quand la fenêtre reprend le focus : les fichiers supprimés
   // ou ajoutés hors de Krino sont pris en compte automatiquement.

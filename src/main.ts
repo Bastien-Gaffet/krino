@@ -2,6 +2,9 @@ import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { getVersion } from "@tauri-apps/api/app";
+import { openUrl } from "@tauri-apps/plugin-opener";
+import kofiBanniere from "./assets/kofi.jpg";
 import { t, appliquerTraductions, definirLangue, resoudreLangue, langue } from "./i18n";
 
 /* ═══ Types ═══ */
@@ -34,6 +37,7 @@ let historique: string[] = [];
 let sensInverse = false;
 let zoom = 1, panX = 0, panY = 0;
 let rafaleCourante: Media[] = [];
+let jalonKofi = false;
 let decisionsRafale = new Map<string, "garder" | "jeter">();
 
 const ECART_RAFALE_MS = 5000;
@@ -45,9 +49,11 @@ interface Prefs {
   parAnnee: boolean;
   tutoVu: boolean;
   cguAcceptees: boolean;
+  kofiMasque: boolean;
 }
 const prefs: Prefs = {
   theme: "auto", langue: "auto", parAnnee: true, tutoVu: false, cguAcceptees: false,
+  kofiMasque: false,
   ...JSON.parse(localStorage.getItem("krino-prefs") ?? "{}"),
 };
 function sauverPrefs() {
@@ -656,6 +662,9 @@ async function validerMois() {
   const relsJetes = new Set(jetees.map((m) => m.rel));
   medias = medias.filter((m) => !relsJetes.has(m.rel));
 
+  // Jalons de soutien : tous les 6 mois validés, ou dernier mois du dossier
+  jalonKofi = etat.mois_valides.length % 6 === 0 || !prochainMois();
+
   // Fenêtre de fin : retour au menu ou mois suivant — pas d'enchaînement forcé
   $("#valide-detail").textContent =
     t("valide.texte", { n: jetees.length, t: tailleLisible(octets) });
@@ -667,8 +676,22 @@ async function validerMois() {
 
 async function rendreCorbeille() {
   afficherVue("vue-corbeille");
-  const liste = await invoke<{ rel: string; taille: number; video: boolean; wic: boolean }[]>(
-    "lister_corbeille", { racine });
+  montrerChargement(t("chargement.corbeille"));
+  let liste: { rel: string; taille: number; video: boolean; wic: boolean }[] = [];
+  const urls = new Map<string, string>();
+  try {
+    liste = await invoke<typeof liste>("lister_corbeille", { racine });
+    // Prépare toutes les miniatures AVANT l'affichage (sinon vignettes grises)
+    let faites = 0;
+    await Promise.all(liste.filter((f) => !f.video).map(async (f) => {
+      urls.set(f.rel, await urlMiniature(f, true));
+      faites++;
+      $("#chargement-detail").textContent = t("chargement.vignettes", { a: faites, b: liste.length });
+      $("#chargement-jauge").style.width = `${Math.round((100 * faites) / Math.max(1, liste.length))}%`;
+    }));
+  } finally {
+    cacherChargement();
+  }
   const octets = liste.reduce((s, f) => s + f.taille, 0);
   $("#bilan-corbeille").textContent = liste.length
     ? t("corbeille.bilan", { n: liste.length, t: tailleLisible(octets) })
@@ -683,8 +706,7 @@ async function rendreCorbeille() {
       v.innerHTML = `<video src="${convertFileSrc(srcCorbeille(f.rel))}" preload="metadata" muted></video><span class="marque">${t("vignette.video")}</span>`;
     } else {
       const img = document.createElement("img");
-      img.loading = "lazy";
-      urlMiniature(f, true).then((url) => { img.src = url; });
+      img.src = urls.get(f.rel) ?? "";
       v.appendChild(img);
     }
     const btn = document.createElement("button");
@@ -703,6 +725,47 @@ async function rendreCorbeille() {
     v.appendChild(btn);
     grille.appendChild(v);
   }
+}
+
+/* ═══ Mises à jour & soutien ═══ */
+
+const URL_KOFI = "https://ko-fi.com/bastiengft";
+const URL_AIDE_BLOCAGE = "https://github.com/Bastien-Gaffet/krino#lapplication-est-bloqu%C3%A9e-par-windows-";
+
+function versionPlusRecente(distante: string, locale: string): boolean {
+  const d = distante.split(".").map(Number);
+  const l = locale.split(".").map(Number);
+  for (let i = 0; i < Math.max(d.length, l.length); i++) {
+    if ((d[i] ?? 0) !== (l[i] ?? 0)) return (d[i] ?? 0) > (l[i] ?? 0);
+  }
+  return false;
+}
+
+let urlDerniereVersion = "";
+
+async function verifierMaj(silencieux: boolean) {
+  try {
+    const rep = await fetch("https://api.github.com/repos/Bastien-Gaffet/krino/releases/latest");
+    if (!rep.ok) throw new Error(String(rep.status));
+    const data = await rep.json();
+    const distante = String(data.tag_name ?? "").replace(/^v/, "");
+    const locale = await getVersion();
+    if (distante && versionPlusRecente(distante, locale)) {
+      urlDerniereVersion = data.html_url ?? "https://github.com/Bastien-Gaffet/krino/releases";
+      $("#maj-detail").textContent = t("maj.texte", { v: distante, l: locale });
+      ($("#modale-maj") as unknown as HTMLDialogElement).showModal();
+    } else if (!silencieux) {
+      alert(t("maj.aJour", { l: locale }));
+    }
+  } catch {
+    if (!silencieux) alert(t("maj.erreur"));
+  }
+}
+
+/** Fenêtre de soutien Ko-fi — aux grandes étapes, jamais si l'utilisateur l'a masquée. */
+function proposerSoutien() {
+  if (prefs.kofiMasque) return;
+  ($("#modale-kofi") as unknown as HTMLDialogElement).showModal();
 }
 
 /* ═══ Réglages & raccourcis ═══ */
@@ -967,6 +1030,27 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#btn-retour-tri").addEventListener("click", () => ouvrirMois(moisCourant));
   $("#btn-valider-mois").addEventListener("click", validerMois);
 
+  // Mises à jour & soutien
+  ($("#kofi-banniere") as unknown as HTMLImageElement).src = kofiBanniere;
+  $("#btn-kofi").addEventListener("click", () => {
+    void openUrl(URL_KOFI);
+    ($("#modale-kofi") as unknown as HTMLDialogElement).close();
+  });
+  $("#kofi-masquer").addEventListener("change", () => {
+    prefs.kofiMasque = ($("#kofi-masquer") as unknown as HTMLInputElement).checked;
+    sauverPrefs();
+  });
+  $("#btn-maj-telecharger").addEventListener("click", () => {
+    void openUrl(urlDerniereVersion || "https://github.com/Bastien-Gaffet/krino/releases");
+    ($("#modale-maj") as unknown as HTMLDialogElement).close();
+  });
+  $("#btn-verif-maj").addEventListener("click", () => verifierMaj(false));
+  $("#btn-aide-blocage").addEventListener("click", () => void openUrl(URL_AIDE_BLOCAGE));
+  void verifierMaj(true); // vérification silencieuse au démarrage
+  ($("#modale-valide") as unknown as HTMLDialogElement).addEventListener("close", () => {
+    if (jalonKofi) { jalonKofi = false; proposerSoutien(); }
+  });
+
   // Modale « mois validé »
   $("#btn-valide-menu").addEventListener("click", () => {
     ($("#modale-valide") as unknown as HTMLDialogElement).close();
@@ -983,7 +1067,8 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#btn-vider").addEventListener("click", async () => {
     if (!confirm(t("confirm.vider"))) return;
     await invoke("vider_corbeille", { racine });
-    rendreCorbeille();
+    await rendreCorbeille();
+    proposerSoutien();
   });
   $("#btn-restaurer").addEventListener("click", async () => {
     const n = await invoke<number>("restaurer_corbeille", { racine });

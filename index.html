@@ -153,10 +153,36 @@
       <div class="ligne-raccourci"><span data-i18n="reglages.valider"></span><button class="btn touche" data-action="valider"></button></div>
       <div class="ligne-raccourci"><span data-i18n="reglages.suivant"></span><button class="btn touche" data-action="suivant"></button></div>
       <h3 class="titre-reglage" data-i18n="reglages.aide"></h3>
-      <div class="rangee-boutons">
+      <div class="rangee-boutons gauche">
         <button id="btn-revoir-tuto" class="btn" data-i18n="reglages.tuto"></button>
         <button id="btn-voir-cgu" class="btn" data-i18n="reglages.cgu"></button>
+        <button id="btn-verif-maj" class="btn" data-i18n="reglages.maj"></button>
+        <button id="btn-aide-blocage" class="btn" data-i18n="reglages.bloquee"></button>
+      </div>
+      <div class="rangee-boutons">
         <button class="btn fermer" data-i18n="reglages.fermer"></button>
+      </div>
+    </dialog>
+
+    <!-- ═══ Mise à jour disponible ═══ -->
+    <dialog id="modale-maj">
+      <h2 data-i18n="maj.titre"></h2>
+      <p id="maj-detail" class="aide"></p>
+      <div class="rangee-boutons">
+        <button class="btn fermer" data-i18n="maj.plusTard"></button>
+        <button id="btn-maj-telecharger" class="btn btn-primaire" data-i18n="maj.telecharger"></button>
+      </div>
+    </dialog>
+
+    <!-- ═══ Soutien Ko-fi ═══ -->
+    <dialog id="modale-kofi" class="modale-kofi">
+      <img id="kofi-banniere" class="kofi-banniere" alt="Ko-fi" />
+      <h2 data-i18n="kofi.titre"></h2>
+      <p class="aide" data-i18n="kofi.texte"></p>
+      <label class="ligne-radio"><input type="checkbox" id="kofi-masquer" /> <span data-i18n="kofi.masquer"></span></label>
+      <div class="rangee-boutons">
+        <button class="btn fermer" data-i18n="kofi.plusTard"></button>
+        <button id="btn-kofi" class="btn btn-kofi" data-i18n="kofi.bouton"></button>
       </div>
     </dialog>
 

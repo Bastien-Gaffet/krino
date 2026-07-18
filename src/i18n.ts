@@ -130,6 +130,24 @@ const FR: Dico = {
   "tuto.7": "C'est tout ! Réglages te permet de changer le thème, la langue, les raccourcis, le regroupement, et de revoir ce tutoriel. Bon tri !",
 
   "erreur.dejaPresent": "Un fichier existe déjà à l'emplacement d'origine",
+
+  "chargement.corbeille": "Chargement de la corbeille…",
+  "chargement.vignettes": "{a} / {b} aperçus",
+
+  "maj.titre": "Mise à jour disponible",
+  "maj.texte": "Krino {v} est disponible (tu utilises la {l}).",
+  "maj.telecharger": "Télécharger",
+  "maj.plusTard": "Plus tard",
+  "maj.aJour": "Krino est à jour ({l}).",
+  "maj.erreur": "Impossible de vérifier les mises à jour (hors ligne ?).",
+  "reglages.maj": "Vérifier les mises à jour",
+  "reglages.bloquee": "Application bloquée par Windows ?",
+
+  "kofi.titre": "Krino te plaît ?",
+  "kofi.texte": "Si tu apprécies ce que je fais, tu peux me soutenir — chaque petit geste compte énormément !",
+  "kofi.bouton": "Me soutenir sur Ko-fi",
+  "kofi.plusTard": "Plus tard",
+  "kofi.masquer": "Ne plus me le proposer",
 };
 
 const EN: Dico = {
@@ -256,6 +274,24 @@ const EN: Dico = {
   "tuto.7": "That's it! Settings lets you change the theme, language, shortcuts, grouping, and replay this tutorial. Happy sorting!",
 
   "erreur.dejaPresent": "A file already exists at the original location",
+
+  "chargement.corbeille": "Loading the trash…",
+  "chargement.vignettes": "{a} / {b} previews",
+
+  "maj.titre": "Update available",
+  "maj.texte": "Krino {v} is available (you are on {l}).",
+  "maj.telecharger": "Download",
+  "maj.plusTard": "Later",
+  "maj.aJour": "Krino is up to date ({l}).",
+  "maj.erreur": "Could not check for updates (offline?).",
+  "reglages.maj": "Check for updates",
+  "reglages.bloquee": "App blocked by Windows?",
+
+  "kofi.titre": "Enjoying Krino?",
+  "kofi.texte": "If you enjoy what I do, consider supporting me! Every little bit means the world!",
+  "kofi.bouton": "Support me on Ko-fi",
+  "kofi.plusTard": "Later",
+  "kofi.masquer": "Don't ask me again",
 };
 
 const DICOS: Record<Langue, Dico> = { fr: FR, en: EN };

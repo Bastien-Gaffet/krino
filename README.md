@@ -66,6 +66,25 @@ Krino ne supprime **jamais** un fichier directement :
 Les conditions d'utilisation (avec décharge de responsabilité) sont affichées et
 doivent être acceptées au premier lancement. **Faites une sauvegarde avant tout tri.**
 
+## L'application est bloquée par Windows ?
+
+Krino n'est pas signé par un certificat commercial ; Windows peut donc se méfier :
+
+- **SmartScreen** (« Windows a protégé votre ordinateur ») : cliquer sur
+  **Informations complémentaires** puis **Exécuter quand même**. Cela n'arrive
+  qu'au premier lancement.
+- **Microsoft Defender** signale le fichier : ouvrir Sécurité Windows →
+  *Protection contre les virus et menaces* → *Historique de protection*,
+  sélectionner l'entrée concernant Krino et choisir **Autoriser**.
+- **Smart App Control** (Windows 11) : cette protection **n'a pas de liste
+  d'exclusions** — elle bloque tout exécutable non signé. Il faut soit la
+  désactiver (Sécurité Windows → *Contrôle des applications et du navigateur* →
+  *Paramètres de Smart App Control* → Désactivé, action irréversible), soit
+  renoncer à utiliser Krino sur cette machine.
+
+Le code est ouvert : vous pouvez l'auditer et compiler vous-même l'exécutable
+(`npm run tauri build`) plutôt que de télécharger la release.
+
 ## Licence
 
 MIT — voir [LICENSE](LICENSE). Logiciel fourni « tel quel », sans garantie.

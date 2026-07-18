@@ -1,6 +1,7 @@
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 
 /* ═══ Types ═══ */
 
@@ -813,8 +814,17 @@ function tutoFin() {
   afficherVue("vue-accueil");
 }
 
+async function basculerPleinEcran() {
+  const fenetre = getCurrentWindow();
+  const actif = await fenetre.isFullscreen();
+  await fenetre.setFullscreen(!actif);
+  // En plein écran, on masque les barres pour un tri immersif
+  document.body.classList.toggle("plein-ecran", !actif);
+}
+
 function installerClavier() {
   window.addEventListener("keydown", (e) => {
+    if (e.key === "F11") { e.preventDefault(); basculerPleinEcran(); return; }
     if (document.querySelector("dialog[open]")) return;
     const vue = vueActive();
     const k = e.key;

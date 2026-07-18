@@ -120,7 +120,16 @@ async fn scanner(fenetre: tauri::Window, racine: String) -> Result<Vec<Media>, S
     let total = entrees.len();
     let _ = fenetre.emit("scan-progres", (0usize, total));
 
-    // 2) Lecture EXIF en parallèle, avec progression
+    // Cache EXIF : rel -> (mtime_ms, taille, exif_ms). Un fichier inchangé
+    // (même date, même taille) n'est pas rouvert au rescan.
+    type CacheExif = HashMap<String, (i64, u64, Option<i64>)>;
+    let chemin_cache = racine.join(DOSSIER_ETAT).join("exif_cache.json");
+    let cache: CacheExif = fs::read_to_string(&chemin_cache)
+        .ok()
+        .and_then(|s| serde_json::from_str(&s).ok())
+        .unwrap_or_default();
+
+    // 2) Lecture EXIF en parallèle (sauf entrées en cache), avec progression
     let fait = AtomicUsize::new(0);
     let medias: Vec<Media> = entrees
         .par_iter()
@@ -132,24 +141,44 @@ async fn scanner(fenetre: tauri::Window, racine: String) -> Result<Vec<Media>, S
                 .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
                 .map(|d| d.as_millis() as i64)
                 .unwrap_or(0);
+            let rel = chemin
+                .strip_prefix(&racine)
+                .unwrap()
+                .to_string_lossy()
+                .replace('\\', "/");
+            let exif_ms = if *video {
+                None
+            } else {
+                match cache.get(&rel) {
+                    Some(&(m, t, e)) if m == mtime_ms && t == meta.len() => e,
+                    _ => date_exif(chemin),
+                }
+            };
             let n = fait.fetch_add(1, Ordering::Relaxed) + 1;
             if n % 100 == 0 || n == total {
                 let _ = fenetre.emit("scan-progres", (n, total));
             }
             Some(Media {
-                rel: chemin
-                    .strip_prefix(&racine)
-                    .unwrap()
-                    .to_string_lossy()
-                    .replace('\\', "/"),
+                rel,
                 taille: meta.len(),
                 mtime_ms,
-                exif_ms: if *video { None } else { date_exif(chemin) },
+                exif_ms,
                 video: *video,
                 wic: EXT_WIC.contains(&ext.as_str()),
             })
         })
         .collect();
+
+    // 3) Réécriture du cache pour le prochain lancement
+    let nouveau_cache: CacheExif = medias
+        .iter()
+        .filter(|m| !m.video)
+        .map(|m| (m.rel.clone(), (m.mtime_ms, m.taille, m.exif_ms)))
+        .collect();
+    if let Ok(json) = serde_json::to_string(&nouveau_cache) {
+        let _ = fs::create_dir_all(chemin_cache.parent().unwrap());
+        let _ = fs::write(&chemin_cache, json);
+    }
     Ok(medias)
 }
 

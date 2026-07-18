@@ -209,6 +209,10 @@ kbd {
 }
 .aide-zoom { color: var(--discret); font-size: 0.85em; }
 
+/* Plein écran (F11) : barres masquées, la carte prend tout l'espace */
+body.plein-ecran .barre { display: none; }
+body.plein-ecran .carte { height: min(92vh, calc(100vh - 90px)); width: min(720px, 92vw); }
+
 /* ── Comparateur de rafale ── */
 .grille-rafale {
   flex: 1; display: flex; gap: 0.8em; padding: 1em;
@@ -295,6 +299,29 @@ dialog h2 { margin-bottom: 0.6em; }
 .jauge.grande { height: 8px; background: var(--voile); border-radius: 4px; overflow: hidden; }
 .jauge.grande > div { height: 100%; background: var(--accent); width: 0; transition: width 0.2s; }
 .chargement-boite p { color: var(--sourd); }
+
+.loader {
+  width: 80px;
+  aspect-ratio: 1;
+  margin: 0 auto;
+  border: 10px solid #0000;
+  padding: 5px;
+  box-sizing: border-box;
+  background:
+    radial-gradient(farthest-side,#fff 98%,#0000 ) 0 0/20px 20px no-repeat,
+    conic-gradient(from 90deg at 10px 10px,#0000 90deg,#fff 0) content-box,
+    conic-gradient(from -90deg at 40px 40px,#0000 90deg,#fff 0) content-box,
+    #000;
+  filter: blur(4px) contrast(10);
+  animation: l11 2s infinite;
+}
+@keyframes l11 {
+  0%   {background-position:0 0}
+  25%  {background-position:100% 0}
+  50%  {background-position:100% 100%}
+  75%  {background-position:0% 100%}
+  100% {background-position:0% 0}
+}
 
 /* ── Tutoriel ── */
 .tuto-bulle {

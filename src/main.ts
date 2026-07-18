@@ -2,6 +2,7 @@ import { invoke, convertFileSrc } from "@tauri-apps/api/core";
 import { open } from "@tauri-apps/plugin-dialog";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { t, appliquerTraductions, definirLangue, resoudreLangue, langue } from "./i18n";
 
 /* ═══ Types ═══ */
 
@@ -19,13 +20,14 @@ interface Etat {
   mois_valides: string[];
   raccourcis: Record<string, string>;
   source_date: string;
+  ordre: string[]; // ordre chronologique des décisions (pour Annuler entre sessions)
 }
 
 /* ═══ État global ═══ */
 
 let racine = "";
 let medias: Media[] = [];
-let etat: Etat = { decisions: {}, mois_valides: [], raccourcis: {}, source_date: "exif" };
+let etat: Etat = { decisions: {}, mois_valides: [], raccourcis: {}, source_date: "exif", ordre: [] };
 let moisCourant = "";
 let file: Media[] = []; // restants à trier dans le mois courant
 let historique: string[] = [];
@@ -39,12 +41,13 @@ const ECART_RAFALE_MS = 5000;
 /* Préférences d'application (indépendantes du dossier trié) */
 interface Prefs {
   theme: "auto" | "sombre" | "clair";
+  langue: "auto" | "fr" | "en";
   parAnnee: boolean;
   tutoVu: boolean;
   cguAcceptees: boolean;
 }
 const prefs: Prefs = {
-  theme: "auto", parAnnee: true, tutoVu: false, cguAcceptees: false,
+  theme: "auto", langue: "auto", parAnnee: true, tutoVu: false, cguAcceptees: false,
   ...JSON.parse(localStorage.getItem("krino-prefs") ?? "{}"),
 };
 function sauverPrefs() {
@@ -52,6 +55,12 @@ function sauverPrefs() {
 }
 function appliquerTheme() {
   document.documentElement.dataset.theme = prefs.theme;
+}
+function appliquerLangue() {
+  definirLangue(resoudreLangue(prefs.langue));
+  document.documentElement.lang = langue();
+  appliquerTraductions();
+  rendreEtiquettesRaccourcis();
 }
 
 const RACCOURCIS_DEFAUT: Record<string, string> = {
@@ -68,10 +77,14 @@ const $ = <T extends HTMLElement = HTMLElement>(sel: string) =>
 /* ═══ Utilitaires ═══ */
 
 function tailleLisible(octets: number): string {
-  const unites = ["o", "Ko", "Mo", "Go"];
+  const unites = langue() === "fr" ? ["o", "Ko", "Mo", "Go"] : ["B", "KB", "MB", "GB"];
   let v = octets, i = 0;
   while (v >= 1024 && i < unites.length - 1) { v /= 1024; i++; }
   return `${v < 10 && i > 0 ? v.toFixed(1) : Math.round(v)} ${unites[i]}`;
+}
+
+function localeDate(): string {
+  return langue() === "fr" ? "fr-FR" : "en-US";
 }
 
 function dateDe(m: Media): number {
@@ -85,34 +98,34 @@ function moisDe(m: Media): string {
 
 function nomMois(cle: string): string {
   const [a, mo] = cle.split("-").map(Number);
-  return new Date(a, mo - 1).toLocaleDateString("fr-FR", { month: "long", year: "numeric" });
+  return new Date(a, mo - 1).toLocaleDateString(localeDate(), { month: "long", year: "numeric" });
 }
 
 function dateLisible(m: Media): string {
-  return new Date(dateDe(m)).toLocaleDateString("fr-FR", {
+  return new Date(dateDe(m)).toLocaleDateString(localeDate(), {
     day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit",
   });
 }
 
 const cacheWic = new Map<string, string>();
 
-/** URL affichable : directe pour les formats webview, décodée via Rust pour HEIC/TIFF. */
-async function urlAffichable(cheminAbs: string, wic: boolean, miniature = false): Promise<string> {
+/** URL affichable en grand : directe, ou décodée via Rust pour HEIC/TIFF. */
+async function urlAffichable(cheminAbs: string, wic: boolean): Promise<string> {
   if (!wic) return convertFileSrc(cheminAbs);
-  const cle = `${cheminAbs}|${miniature}`;
-  if (!cacheWic.has(cle)) {
+  if (!cacheWic.has(cheminAbs)) {
     try {
-      cacheWic.set(cle, await invoke<string>("apercu_png", {
-        chemin: cheminAbs, largeurMax: miniature ? 320 : 1920,
+      cacheWic.set(cheminAbs, await invoke<string>("apercu_png", {
+        chemin: cheminAbs, largeurMax: 1920,
       }));
     } catch {
-      cacheWic.set(cle, "");
+      cacheWic.set(cheminAbs, "");
     }
   }
-  return cacheWic.get(cle)!;
+  return cacheWic.get(cheminAbs)!;
 }
 
 function src(rel: string): string { return `${racine}/${rel}`; }
+function srcCorbeille(rel: string): string { return `${racine}/.krino/corbeille/${rel}`; }
 
 const cacheMiniatures = new Map<string, string>();
 
@@ -130,7 +143,6 @@ async function urlMiniature(m: { rel: string; video: boolean }, corbeille = fals
   }
   return cacheMiniatures.get(cle)!;
 }
-function srcCorbeille(rel: string): string { return `${racine}/.krino/corbeille/${rel}`; }
 
 async function sauver() {
   await invoke("ecrire_etat", { racine, etat });
@@ -148,29 +160,38 @@ function vueActive(): string {
   return document.querySelector<HTMLElement>(".vue:not([hidden])")?.id ?? "";
 }
 
+function montrerChargement(titre: string, detail = "") {
+  $("#chargement-titre").textContent = titre;
+  $("#chargement-detail").textContent = detail;
+  $("#chargement-jauge").style.width = "0";
+  $("#chargement").hidden = false;
+}
+function cacherChargement() {
+  $("#chargement").hidden = true;
+}
+
 /* ═══ Accueil ═══ */
 
 async function ouvrirDossier(chemin: string) {
   racine = chemin;
   localStorage.setItem("krino-dernier", chemin);
-  $("#chargement").hidden = false;
-  $("#chargement-detail").textContent = "Parcours de l'arborescence…";
-  ($("#chargement-jauge")).style.width = "0";
+  montrerChargement(t("chargement.analyse"), t("chargement.arborescence"));
   try {
     medias = await invoke<Media[]>("scanner", { racine });
   } finally {
-    $("#chargement").hidden = true;
+    cacherChargement();
   }
   etat = await invoke<Etat>("lire_etat", { racine });
   if (!etat.source_date) etat.source_date = "exif";
-  $("#titre-dossier").textContent = `${chemin} — ${medias.length} fichiers`;
+  etat.ordre ??= [];
+  $("#titre-dossier").textContent = t("mois.entete", { d: chemin, n: medias.length });
   afficherVue("vue-mois");
   rendreMois();
   rendreEtiquettesRaccourcis();
 }
 
 async function choisirDossier() {
-  const chemin = await open({ directory: true, title: "Dossier de photos à trier" });
+  const chemin = await open({ directory: true, title: t("accueil.titreDialogue") });
   if (typeof chemin === "string") await ouvrirDossier(chemin);
 }
 
@@ -225,9 +246,11 @@ function carteDeMois(s: StatsMois): HTMLElement {
   carte.innerHTML = `
     <h3>${nomMois(s.cle)}</h3>
     <div class="eventail"></div>
-    <div class="stats">${s.fichiers.length} fichiers &middot; ${tailleLisible(s.taille)}</div>
+    <div class="stats">${t("mois.fichiers", { n: s.fichiers.length, t: tailleLisible(s.taille) })}</div>
     <div class="jauge"><div style="width:${pct}%"></div></div>
-    <div class="stats">${s.valide ? '<span class="etiquette-fait">Fait</span>' : `${s.decides}/${s.fichiers.length} décidés`}</div>
+    <div class="stats">${s.valide
+      ? `<span class="etiquette-fait">${t("mois.fait")}</span>`
+      : t("mois.decides", { a: s.decides, b: s.fichiers.length })}</div>
   `;
   const eventail = carte.querySelector(".eventail") as HTMLElement;
   (async () => {
@@ -241,12 +264,13 @@ function carteDeMois(s: StatsMois): HTMLElement {
   if (s.valide) {
     const btn = document.createElement("button");
     btn.className = "btn refaire";
-    btn.textContent = "Refaire ce mois";
+    btn.textContent = t("mois.refaire");
     btn.addEventListener("click", async (e) => {
       e.stopPropagation();
-      if (!confirm(`Refaire ${nomMois(s.cle)} ? Les décisions de ce mois seront effacées (la corbeille n'est pas touchée).`)) return;
+      if (!confirm(t("confirm.refaireMois", { m: nomMois(s.cle) }))) return;
       etat.mois_valides = etat.mois_valides.filter((m) => m !== s.cle);
       for (const f of s.fichiers) delete etat.decisions[f.rel];
+      etat.ordre = etat.ordre.filter((rel) => etat.decisions[rel]);
       await sauver();
       rendreMois();
     });
@@ -266,7 +290,6 @@ function rendreMois() {
   const conteneur = $("#conteneur-mois");
   conteneur.innerHTML = "";
   if (prefs.parAnnee) {
-    // Sections par année, dans l'ordre induit par le tri des mois
     const annees: string[] = [];
     for (const s of liste) {
       const a = s.cle.slice(0, 4);
@@ -296,7 +319,10 @@ function rendreMois() {
 
 function ouvrirMois(cle: string) {
   moisCourant = cle;
-  historique = [];
+  // L'historique d'annulation est reconstruit depuis l'ordre persisté des
+  // décisions : « Annuler » fonctionne donc aussi après avoir quitté le mois.
+  const duMois = new Set(medias.filter((m) => moisDe(m) === cle).map((m) => m.rel));
+  historique = etat.ordre.filter((rel) => duMois.has(rel) && etat.decisions[rel]);
   file = medias
     .filter((m) => moisDe(m) === cle && !etat.decisions[m.rel])
     .sort((a, b) => dateDe(a) - dateDe(b));
@@ -345,7 +371,6 @@ async function rendreCarte() {
   if (!m) {
     fond.hidden = true;
     video.pause(); video.removeAttribute("src");
-    $("#btn-mois-suivant").hidden = !prochainMois();
     return;
   }
 
@@ -370,7 +395,7 @@ async function rendreCarte() {
   const rafale = m.video ? [m] : rafaleDe(m);
   const btnRafale = $("#btn-rafale");
   btnRafale.hidden = rafale.length < 2;
-  if (rafale.length >= 2) btnRafale.textContent = `Comparer la rafale (${rafale.length})`;
+  if (rafale.length >= 2) btnRafale.textContent = t("tri.rafale", { n: rafale.length });
 
   // Carte de fond : la suivante, en attente au centre du deck
   const suivant = file[1];
@@ -397,7 +422,6 @@ function animerSortie(action: "garder" | "jeter", ensuite: () => void) {
   carte.style.transition = "transform 0.22s ease-in, opacity 0.22s";
   carte.style.transform = `translateX(${dir * window.innerWidth}px) rotate(${dir * 18}deg)`;
   carte.style.opacity = "0";
-  // La carte suivante émerge du centre du deck
   fond.style.transition = "transform 0.22s ease-out, filter 0.22s";
   fond.style.transform = "scale(1)";
   fond.style.filter = "brightness(1)";
@@ -410,11 +434,17 @@ function animerSortie(action: "garder" | "jeter", ensuite: () => void) {
   }, 220);
 }
 
+function noterDecision(rel: string, action: "garder" | "jeter") {
+  etat.decisions[rel] = action;
+  etat.ordre = etat.ordre.filter((r) => r !== rel);
+  etat.ordre.push(rel);
+  historique.push(rel);
+}
+
 async function decider(action: "garder" | "jeter", animer = true) {
   const m = courant();
   if (!m) return;
-  etat.decisions[m.rel] = action;
-  historique.push(m.rel);
+  noterDecision(m.rel, action);
   file.shift();
   if (animer) animerSortie(action, rendreCarte);
   else rendreCarte();
@@ -425,6 +455,7 @@ async function annuler() {
   const rel = historique.pop();
   if (!rel) return;
   delete etat.decisions[rel];
+  etat.ordre = etat.ordre.filter((r) => r !== rel);
   const m = medias.find((x) => x.rel === rel);
   if (m) file.unshift(m);
   rendreCarte();
@@ -433,8 +464,8 @@ async function annuler() {
 
 async function garderLeReste() {
   if (!file.length) return;
-  if (!confirm(`Marquer les ${file.length} fichiers restants comme gardés ?`)) return;
-  for (const m of file) { etat.decisions[m.rel] = "garder"; historique.push(m.rel); }
+  if (!confirm(t("confirm.garderReste", { n: file.length }))) return;
+  for (const m of file) noterDecision(m.rel, "garder");
   file = [];
   rendreCarte();
   await sauver();
@@ -459,18 +490,18 @@ function installerSwipe() {
   const carte = $("#carte");
   const badgeG = $("#badge-garder");
   const badgeJ = $("#badge-jeter");
-  let x0 = 0, y0 = 0, dx = 0, actif = false;
+  let x0 = 0, dx = 0, actif = false;
   const SEUIL = 120;
 
   carte.addEventListener("pointerdown", (e) => {
     if ((e.target as HTMLElement).tagName === "VIDEO") return;
-    actif = true; x0 = e.clientX; y0 = e.clientY; dx = 0;
+    actif = true; x0 = e.clientX; dx = 0;
     carte.classList.add("saisi");
     carte.setPointerCapture(e.pointerId);
   });
   carte.addEventListener("pointermove", (e) => {
     if (!actif) return;
-    if (zoom > 1) { // en zoom : on déplace l'image, pas la carte
+    if (zoom > 1) {
       panX += e.movementX; panY += e.movementY;
       appliquerZoom();
       return;
@@ -494,7 +525,6 @@ function installerSwipe() {
   carte.addEventListener("pointerup", relacher);
   carte.addEventListener("pointercancel", relacher);
 
-  // Zoom molette, réinitialisation double-clic
   carte.addEventListener("wheel", (e) => {
     if (courant()?.video) return;
     e.preventDefault();
@@ -504,7 +534,6 @@ function installerSwipe() {
     appliquerZoom();
   }, { passive: false });
   carte.addEventListener("dblclick", reinitZoom);
-  void y0;
 }
 
 /* ═══ Comparateur de rafale ═══ */
@@ -532,7 +561,7 @@ async function ouvrirRafale() {
     const majEtiquette = () => {
       div.className = "carte-rafale " + decisionsRafale.get(x.rel);
       div.querySelector(".etat-rafale")!.textContent =
-        decisionsRafale.get(x.rel) === "garder" ? "GARDER" : "JETER";
+        decisionsRafale.get(x.rel) === "garder" ? t("rafale.garder") : t("rafale.jeter");
     };
     majEtiquette();
     div.addEventListener("click", () => {
@@ -548,77 +577,90 @@ async function ouvrirRafale() {
 function majBilanRafale() {
   const jetees = [...decisionsRafale.values()].filter((v) => v === "jeter").length;
   $("#bilan-rafale").textContent =
-    `${decisionsRafale.size - jetees} à garder, ${jetees} à jeter`;
+    t("rafale.bilan", { g: decisionsRafale.size - jetees, j: jetees });
 }
 
-async function appliquerRafale() {
-  for (const [rel, action] of decisionsRafale) {
-    etat.decisions[rel] = action;
-    historique.push(rel);
-  }
+function appliquerRafale() {
+  for (const [rel, action] of decisionsRafale) noterDecision(rel, action);
   const rels = new Set(decisionsRafale.keys());
   file = file.filter((m) => !rels.has(m.rel));
-  await sauver();
+  // Retour immédiat au tri — la sauvegarde se fait en arrière-plan
   afficherVue("vue-tri");
   rendreCarte();
+  void sauver();
 }
 
 /* ═══ Vue revue ═══ */
 
 async function rendreRevue() {
-  const fichiers = medias.filter((m) => moisDe(m) === moisCourant);
-  const gardees = fichiers.filter((m) => etat.decisions[m.rel] === "garder");
-  const jetees = fichiers.filter((m) => etat.decisions[m.rel] === "jeter");
-  $("#titre-revue").textContent = `Revue — ${nomMois(moisCourant)}`;
-  const octetsJetes = jetees.reduce((s, f) => s + f.taille, 0);
-  $("#bilan-revue").textContent =
-    `${gardees.length} gardées &middot; ${jetees.length} jetées (${tailleLisible(octetsJetes)} à libérer)`
-      .replace("&middot;", "·");
+  montrerChargement(t("chargement.revue"));
+  try {
+    const fichiers = medias.filter((m) => moisDe(m) === moisCourant);
+    const gardees = fichiers.filter((m) => etat.decisions[m.rel] === "garder");
+    const jetees = fichiers.filter((m) => etat.decisions[m.rel] === "jeter");
+    $("#titre-revue").textContent = t("revue.titre", { m: nomMois(moisCourant) });
+    const octetsJetes = jetees.reduce((s, f) => s + f.taille, 0);
+    $("#bilan-revue").textContent =
+      t("revue.bilan", { g: gardees.length, j: jetees.length, t: tailleLisible(octetsJetes) });
 
-  const rendreGrille = async (conteneur: HTMLElement, liste: Media[]) => {
-    conteneur.innerHTML = "";
-    for (const m of liste) {
-      const v = document.createElement("div");
-      v.className = "vignette";
-      v.title = m.rel;
-      if (m.video) {
-        v.innerHTML = `<video src="${convertFileSrc(src(m.rel))}" preload="metadata" muted></video><span class="marque">vidéo</span>`;
-      } else {
-        const img = document.createElement("img");
-        img.loading = "lazy";
-        urlMiniature(m).then((url) => { img.src = url; });
-        v.appendChild(img);
+    const rendreGrille = (conteneur: HTMLElement, liste: Media[]) => {
+      conteneur.innerHTML = "";
+      for (const m of liste) {
+        const v = document.createElement("div");
+        v.className = "vignette";
+        v.title = m.rel;
+        if (m.video) {
+          v.innerHTML = `<video src="${convertFileSrc(src(m.rel))}" preload="metadata" muted></video><span class="marque">${t("vignette.video")}</span>`;
+        } else {
+          const img = document.createElement("img");
+          img.loading = "lazy";
+          urlMiniature(m).then((url) => { img.src = url; });
+          v.appendChild(img);
+        }
+        v.addEventListener("click", async () => {
+          etat.decisions[m.rel] = etat.decisions[m.rel] === "garder" ? "jeter" : "garder";
+          void sauver();
+          rendreRevue();
+        });
+        conteneur.appendChild(v);
       }
-      v.addEventListener("click", async () => {
-        etat.decisions[m.rel] = etat.decisions[m.rel] === "garder" ? "jeter" : "garder";
-        await sauver();
-        rendreRevue();
-      });
-      conteneur.appendChild(v);
-    }
-  };
-  await rendreGrille($("#grille-gardees"), gardees);
-  await rendreGrille($("#grille-jetees"), jetees);
+    };
+    rendreGrille($("#grille-gardees"), gardees);
+    rendreGrille($("#grille-jetees"), jetees);
+  } finally {
+    cacherChargement();
+  }
 }
 
 async function validerMois() {
   const fichiers = medias.filter((m) => moisDe(m) === moisCourant);
+  const nonDecides = fichiers.filter((m) => !etat.decisions[m.rel]);
+  if (nonDecides.length) {
+    alert(t("revue.nonDecides", { n: nonDecides.length }));
+    return;
+  }
   const jetees = fichiers.filter((m) => etat.decisions[m.rel] === "jeter");
   const octets = jetees.reduce((s, f) => s + f.taille, 0);
-  if (!confirm(
-    `Valider ${nomMois(moisCourant)} ?\n\n` +
-    `${jetees.length} fichiers (${tailleLisible(octets)}) seront déplacés vers la corbeille de Krino.\n` +
-    `Rien n'est supprimé tant que la corbeille n'est pas vidée.`
-  )) return;
-  await invoke("valider_mois", { racine, rels: jetees.map((m) => m.rel) });
-  if (!etat.mois_valides.includes(moisCourant)) etat.mois_valides.push(moisCourant);
-  await sauver();
+  if (!confirm(t("confirm.validerMois", {
+    m: nomMois(moisCourant), n: jetees.length, t: tailleLisible(octets),
+  }))) return;
+
+  montrerChargement(t("chargement.validation"));
+  try {
+    await invoke("valider_mois", { racine, rels: jetees.map((m) => m.rel) });
+    if (!etat.mois_valides.includes(moisCourant)) etat.mois_valides.push(moisCourant);
+    await sauver();
+  } finally {
+    cacherChargement();
+  }
   const relsJetes = new Set(jetees.map((m) => m.rel));
   medias = medias.filter((m) => !relsJetes.has(m.rel));
-  // Enchaîne directement sur le mois suivant non trié, s'il existe
-  const prochain = prochainMois();
-  if (prochain) ouvrirMois(prochain);
-  else { afficherVue("vue-mois"); rendreMois(); }
+
+  // Fenêtre de fin : retour au menu ou mois suivant — pas d'enchaînement forcé
+  $("#valide-detail").textContent =
+    t("valide.texte", { n: jetees.length, t: tailleLisible(octets) });
+  ($("#btn-valide-suivant") as unknown as HTMLButtonElement).hidden = !prochainMois();
+  ($("#modale-valide") as unknown as HTMLDialogElement).showModal();
 }
 
 /* ═══ Vue corbeille ═══ */
@@ -629,8 +671,8 @@ async function rendreCorbeille() {
     "lister_corbeille", { racine });
   const octets = liste.reduce((s, f) => s + f.taille, 0);
   $("#bilan-corbeille").textContent = liste.length
-    ? `${liste.length} fichiers · ${tailleLisible(octets)} récupérables`
-    : "vide";
+    ? t("corbeille.bilan", { n: liste.length, t: tailleLisible(octets) })
+    : t("corbeille.vide");
   const grille = $("#grille-corbeille");
   grille.innerHTML = "";
   for (const f of liste) {
@@ -638,7 +680,7 @@ async function rendreCorbeille() {
     v.className = "vignette";
     v.title = f.rel;
     if (f.video) {
-      v.innerHTML = `<video src="${convertFileSrc(srcCorbeille(f.rel))}" preload="metadata" muted></video><span class="marque">vidéo</span>`;
+      v.innerHTML = `<video src="${convertFileSrc(srcCorbeille(f.rel))}" preload="metadata" muted></video><span class="marque">${t("vignette.video")}</span>`;
     } else {
       const img = document.createElement("img");
       img.loading = "lazy";
@@ -647,7 +689,7 @@ async function rendreCorbeille() {
     }
     const btn = document.createElement("button");
     btn.className = "btn-restaurer-un";
-    btn.textContent = "Restaurer";
+    btn.textContent = t("corbeille.restaurer");
     btn.addEventListener("click", async (e) => {
       e.stopPropagation();
       try {
@@ -666,15 +708,17 @@ async function rendreCorbeille() {
 /* ═══ Réglages & raccourcis ═══ */
 
 function rendreEtiquettesRaccourcis() {
-  const joli = (t: string) =>
-    t.replace("Arrow", "").replace("Right", "→").replace("Left", "←")
-     .replace("Up", "↑").replace("Down", "↓")
-     .replace("Backspace", "Retour").replace("Enter", "Entrée").replace(" ", "Espace");
+  const joli = (touche: string) => {
+    const fr = langue() === "fr";
+    return touche.replace("Arrow", "").replace("Right", "→").replace("Left", "←")
+      .replace("Up", "↑").replace("Down", "↓")
+      .replace("Backspace", fr ? "Retour" : "Bksp")
+      .replace("Enter", fr ? "Entrée" : "Enter").replace(" ", fr ? "Espace" : "Space");
+  };
   $("#kbd-garder").textContent = joli(raccourci("garder"));
   $("#kbd-jeter").textContent = joli(raccourci("jeter"));
   $("#kbd-valider").textContent = joli(raccourci("valider"));
   $("#kbd-valider2").textContent = joli(raccourci("valider"));
-  $("#kbd-suivant").textContent = joli(raccourci("suivant"));
   for (const btn of document.querySelectorAll<HTMLButtonElement>(".touche")) {
     btn.textContent = joli(raccourci(btn.dataset.action!));
   }
@@ -713,6 +757,17 @@ function installerModaleReglages() {
       appliquerTheme();
     });
   }
+  for (const radio of document.querySelectorAll<HTMLInputElement>("input[name=langue]")) {
+    radio.addEventListener("change", () => {
+      prefs.langue = radio.value as Prefs["langue"];
+      sauverPrefs();
+      appliquerLangue();
+      if (racine) {
+        $("#titre-dossier").textContent = t("mois.entete", { d: racine, n: medias.length });
+        if (vueActive() === "vue-mois") rendreMois();
+      }
+    });
+  }
   $("#opt-annees").addEventListener("change", () => {
     prefs.parAnnee = ($("#opt-annees") as unknown as HTMLInputElement).checked;
     sauverPrefs();
@@ -735,6 +790,9 @@ function ouvrirReglages() {
   for (const radio of document.querySelectorAll<HTMLInputElement>("input[name=theme]")) {
     radio.checked = radio.value === prefs.theme;
   }
+  for (const radio of document.querySelectorAll<HTMLInputElement>("input[name=langue]")) {
+    radio.checked = radio.value === prefs.langue;
+  }
   ($("#opt-annees") as unknown as HTMLInputElement).checked = prefs.parAnnee;
   rendreEtiquettesRaccourcis();
   ($("#modale-reglages") as unknown as HTMLDialogElement).showModal();
@@ -743,50 +801,30 @@ function ouvrirReglages() {
 /* ═══ Tutoriel ═══ */
 
 interface EtapeTuto {
-  texte: string;
   cible?: string;
   avant?: () => void | Promise<void>;
 }
 
 const ETAPES_TUTO: EtapeTuto[] = [
   {
-    texte: "Bienvenue dans Krino. Ce tutoriel utilise un dossier d'images de démonstration — tes vraies photos ne sont pas touchées.",
     avant: async () => {
       const dossier = await invoke<string>("creer_dossier_demo");
       await ouvrirDossier(dossier);
     },
   },
+  { cible: "#conteneur-mois" },
+  { cible: "#tri-mois" },
   {
-    texte: "Voici tes mois, regroupés par année. Chaque carte montre un aperçu, le nombre de fichiers, la taille et la progression du tri.",
-    cible: "#conteneur-mois",
-  },
-  {
-    texte: "Le menu déroulant change le critère de tri, et la petite flèche inverse l'ordre. On peut aussi masquer les mois déjà faits.",
-    cible: "#tri-mois",
-  },
-  {
-    texte: "Ouvrons le premier mois. Pour chaque photo : bouton Garder ou Jeter, flèches du clavier (→ garder, ← jeter), ou glisse la carte à droite/gauche comme un deck.",
     avant: () => {
       const premier = moisTries()[0];
       if (premier) ouvrirMois(premier);
     },
     cible: "#carte",
   },
-  {
-    texte: "La molette zoome dans l'image, le double-clic réinitialise. « Annuler » (ou Retour arrière) rattrape une erreur. Si des photos ont été prises en rafale, un bouton « Comparer la rafale » apparaît.",
-    cible: "#pied-tri",
-  },
-  {
-    texte: "Quand toutes les décisions sont prises, la Revue du mois (Entrée) récapitule tout : clique sur une vignette pour changer d'avis, puis « Valider le mois ».",
-    cible: "#btn-revue",
-  },
-  {
-    texte: "À la validation, les photos jetées sont DÉPLACÉES dans la corbeille interne de Krino — rien n'est encore supprimé. L'écran Corbeille permet de tout vérifier, restaurer fichier par fichier, ou vider définitivement pour libérer l'espace.",
-    cible: "#btn-revue",
-  },
-  {
-    texte: "C'est tout ! Réglages te permet de changer le thème, les raccourcis, le regroupement (EXIF ou date de fichier, par année ou non) et de revoir ce tutoriel. Bon tri !",
-  },
+  { cible: "#pied-tri" },
+  { cible: "#btn-revue" },
+  { cible: "#btn-revue" },
+  {},
 ];
 
 let etapeTuto = -1;
@@ -797,10 +835,10 @@ async function tutoAller(i: number) {
   etapeTuto = i;
   const etape = ETAPES_TUTO[i];
   await etape.avant?.();
-  $("#tuto-texte").textContent = etape.texte;
+  $("#tuto-texte").textContent = t(`tuto.${i}`);
   $("#tuto-etape").textContent = `${i + 1}/${ETAPES_TUTO.length}`;
   ($("#tuto-suivant") as unknown as HTMLButtonElement).textContent =
-    i === ETAPES_TUTO.length - 1 ? "Terminer" : "Suivant";
+    i === ETAPES_TUTO.length - 1 ? t("tuto.terminer") : t("tuto.suivant");
   $("#tuto-bulle").hidden = false;
   if (etape.cible) document.querySelector(etape.cible)?.classList.add("tuto-cible");
 }
@@ -814,11 +852,12 @@ function tutoFin() {
   afficherVue("vue-accueil");
 }
 
+/* ═══ Clavier ═══ */
+
 async function basculerPleinEcran() {
   const fenetre = getCurrentWindow();
   const actif = await fenetre.isFullscreen();
   await fenetre.setFullscreen(!actif);
-  // En plein écran, on masque les barres pour un tri immersif
   document.body.classList.toggle("plein-ecran", !actif);
 }
 
@@ -851,11 +890,12 @@ function installerClavier() {
 
 window.addEventListener("DOMContentLoaded", () => {
   appliquerTheme();
+  appliquerLangue();
 
   // Progression du scan (émise par le backend)
   listen<[number, number]>("scan-progres", (e) => {
     const [fait, total] = e.payload;
-    $("#chargement-detail").textContent = `${fait} / ${total} fichiers analysés`;
+    $("#chargement-detail").textContent = t("chargement.progression", { a: fait, b: total });
     $("#chargement-jauge").style.width = total ? `${Math.round((100 * fait) / total)}%` : "0";
   });
 
@@ -869,9 +909,7 @@ window.addEventListener("DOMContentLoaded", () => {
     prefs.cguAcceptees = true;
     sauverPrefs();
     cgu.close();
-    if (!prefs.tutoVu && confirm("Première utilisation : suivre le petit tutoriel (2 minutes, sur des images de démonstration) ?")) {
-      tutoAller(0);
-    }
+    if (!prefs.tutoVu && confirm(t("confirm.tuto"))) tutoAller(0);
   });
   if (!prefs.cguAcceptees) {
     cgu.addEventListener("cancel", (e) => {
@@ -886,7 +924,7 @@ window.addEventListener("DOMContentLoaded", () => {
   if (dernier) {
     const btn = $("#btn-dernier") as unknown as HTMLButtonElement;
     btn.hidden = false;
-    btn.textContent = `Reprendre : ${dernier}`;
+    btn.textContent = t("accueil.reprendre", { d: dernier });
     btn.addEventListener("click", () => ouvrirDossier(dernier));
   }
 
@@ -902,9 +940,10 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#btn-corbeille").addEventListener("click", rendreCorbeille);
   $("#btn-reglages").addEventListener("click", ouvrirReglages);
   $("#btn-reset-tout").addEventListener("click", async () => {
-    if (!confirm("Reset global : effacer TOUTES les décisions et refaire une passe complète ?\n(La corbeille n'est pas touchée.)")) return;
+    if (!confirm(t("confirm.reset"))) return;
     etat.decisions = {};
     etat.mois_valides = [];
+    etat.ordre = [];
     await sauver();
     rendreMois();
   });
@@ -918,7 +957,6 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#btn-rafale").addEventListener("click", ouvrirRafale);
   $("#btn-revue").addEventListener("click", () => { afficherVue("vue-revue"); rendreRevue(); });
   $("#btn-fin-revue").addEventListener("click", () => { afficherVue("vue-revue"); rendreRevue(); });
-  $("#btn-mois-suivant").addEventListener("click", allerMoisSuivant);
   installerSwipe();
 
   // Rafale
@@ -929,16 +967,27 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#btn-retour-tri").addEventListener("click", () => ouvrirMois(moisCourant));
   $("#btn-valider-mois").addEventListener("click", validerMois);
 
+  // Modale « mois validé »
+  $("#btn-valide-menu").addEventListener("click", () => {
+    ($("#modale-valide") as unknown as HTMLDialogElement).close();
+    afficherVue("vue-mois");
+    rendreMois();
+  });
+  $("#btn-valide-suivant").addEventListener("click", () => {
+    ($("#modale-valide") as unknown as HTMLDialogElement).close();
+    allerMoisSuivant();
+  });
+
   // Corbeille
   $("#btn-retour-corbeille").addEventListener("click", () => { afficherVue("vue-mois"); rendreMois(); });
   $("#btn-vider").addEventListener("click", async () => {
-    if (!confirm("Vider la corbeille DÉFINITIVEMENT ? Cette action est irréversible.")) return;
+    if (!confirm(t("confirm.vider"))) return;
     await invoke("vider_corbeille", { racine });
     rendreCorbeille();
   });
   $("#btn-restaurer").addEventListener("click", async () => {
     const n = await invoke<number>("restaurer_corbeille", { racine });
-    alert(`${n} fichiers restaurés.`);
+    alert(t("corbeille.restaures", { n }));
     await ouvrirDossier(racine);
   });
 

@@ -35,6 +35,8 @@ struct Etat {
     raccourcis: HashMap<String, String>,
     #[serde(default)]
     source_date: String, // "exif" (défaut) ou "fichier"
+    #[serde(default)]
+    ordre: Vec<String>, // ordre chronologique des décisions (annulation inter-sessions)
 }
 
 fn chemin_etat(racine: &Path) -> PathBuf {

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Krino</title>
+    <link rel="stylesheet" href="/src/styles.css" />
+    <script type="module" src="/src/main.ts" defer></script>
+  </head>
+  <body>
+    <!-- ═══ Accueil ═══ -->
+    <section id="vue-accueil" class="vue">
+      <div class="accueil-centre">
+        <h1>Krino</h1>
+        <p class="sous-titre">Trier ses photos, une décision à la fois.</p>
+        <button id="btn-choisir" class="btn btn-primaire">📂 Choisir un dossier</button>
+        <button id="btn-dernier" class="btn" hidden></button>
+      </div>
+    </section>
+
+    <!-- ═══ Liste des mois ═══ -->
+    <section id="vue-mois" class="vue" hidden>
+      <header class="barre">
+        <button id="btn-retour-accueil" class="btn btn-ico" title="Changer de dossier">📂</button>
+        <span id="titre-dossier" class="titre-dossier"></span>
+        <select id="tri-mois" class="btn">
+          <option value="chrono">Chronologique</option>
+          <option value="chrono-inv">Chronologique inverse</option>
+          <option value="taille">Taille (plus lourd d'abord)</option>
+          <option value="nombre">Nombre de fichiers</option>
+          <option value="restants">Restants à trier</option>
+        </select>
+        <label class="filtre-faits"><input type="checkbox" id="masquer-faits" /> Masquer les mois faits</label>
+        <span class="espace"></span>
+        <button id="btn-corbeille" class="btn">🗑️ Corbeille</button>
+        <button id="btn-raccourcis" class="btn btn-ico" title="Raccourcis clavier">⌨️</button>
+        <button id="btn-reset-tout" class="btn btn-danger-leger" title="Tout remettre à zéro pour une nouvelle passe">♻️ Reset global</button>
+      </header>
+      <div id="grille-mois" class="grille-mois"></div>
+    </section>
+
+    <!-- ═══ Tri d'un mois ═══ -->
+    <section id="vue-tri" class="vue" hidden>
+      <header class="barre">
+        <button id="btn-retour-mois" class="btn btn-ico" title="Retour aux mois">←</button>
+        <span id="titre-tri" class="titre-dossier"></span>
+        <span id="progression-tri" class="progression"></span>
+        <span class="espace"></span>
+        <button id="btn-annuler" class="btn" title="Annuler la dernière décision">↩️ Annuler</button>
+        <button id="btn-garder-reste" class="btn" title="Marquer tout le reste comme gardé">✅ Garder le reste</button>
+        <button id="btn-revue" class="btn btn-primaire">Revue du mois →</button>
+      </header>
+      <div id="scene" class="scene">
+        <div id="carte" class="carte">
+          <img id="apercu-img" alt="" draggable="false" hidden />
+          <video id="apercu-video" controls muted hidden></video>
+          <div id="badge-garder" class="badge badge-garder">GARDER</div>
+          <div id="badge-jeter" class="badge badge-jeter">JETER</div>
+        </div>
+        <div id="fin-mois" class="fin-mois" hidden>
+          <h2>Mois terminé 🎉</h2>
+          <p>Toutes les décisions sont prises. Passe à la revue pour valider.</p>
+          <button id="btn-fin-revue" class="btn btn-primaire">Revue du mois →</button>
+        </div>
+      </div>
+      <footer class="pied-tri">
+        <button id="btn-jeter" class="btn btn-jeter">🗑️ Jeter <kbd id="kbd-jeter"></kbd></button>
+        <div id="info-fichier" class="info-fichier"></div>
+        <button id="btn-garder" class="btn btn-garder">❤️ Garder <kbd id="kbd-garder"></kbd></button>
+      </footer>
+    </section>
+
+    <!-- ═══ Revue de fin de mois ═══ -->
+    <section id="vue-revue" class="vue" hidden>
+      <header class="barre">
+        <button id="btn-retour-tri" class="btn btn-ico">←</button>
+        <span id="titre-revue" class="titre-dossier"></span>
+        <span class="espace"></span>
+        <span id="bilan-revue" class="progression"></span>
+        <button id="btn-valider-mois" class="btn btn-primaire">✔️ Valider → corbeille</button>
+      </header>
+      <div class="defilable">
+        <p class="aide-revue">Clique sur une vignette pour changer sa décision.</p>
+        <h3 class="titre-groupe garder">❤️ Gardées</h3>
+        <div id="grille-gardees" class="grille-vignettes"></div>
+        <h3 class="titre-groupe jeter">🗑️ Jetées</h3>
+        <div id="grille-jetees" class="grille-vignettes"></div>
+      </div>
+    </section>
+
+    <!-- ═══ Modale corbeille ═══ -->
+    <dialog id="modale-corbeille">
+      <h2>🗑️ Corbeille</h2>
+      <p id="detail-corbeille"></p>
+      <p class="aide">Les fichiers validés sont déplacés ici (dans <code>.krino/corbeille</code>) avant toute suppression réelle.</p>
+      <div class="rangee-boutons">
+        <button id="btn-restaurer" class="btn">↩️ Tout restaurer</button>
+        <button id="btn-vider" class="btn btn-danger">💥 Vider définitivement</button>
+        <button class="btn fermer">Fermer</button>
+      </div>
+    </dialog>
+
+    <!-- ═══ Modale raccourcis ═══ -->
+    <dialog id="modale-raccourcis">
+      <h2>⌨️ Raccourcis clavier</h2>
+      <p class="aide">Clique sur un champ puis appuie sur la touche voulue. Les flèches ← / → fonctionnent toujours.</p>
+      <div class="ligne-raccourci"><span>Garder</span><button class="btn touche" data-action="garder"></button></div>
+      <div class="ligne-raccourci"><span>Jeter</span><button class="btn touche" data-action="jeter"></button></div>
+      <div class="ligne-raccourci"><span>Annuler</span><button class="btn touche" data-action="annuler"></button></div>
+      <div class="rangee-boutons"><button class="btn fermer">Fermer</button></div>
+    </dialog>
+  </body>
+</html>

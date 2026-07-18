@@ -1,0 +1,151 @@
+:root {
+  font-family: Inter, "Segoe UI", Avenir, Helvetica, Arial, sans-serif;
+  font-size: 15px;
+  color: #e8e8ea;
+  background-color: #141418;
+  --panneau: #1e1e24;
+  --bord: #33333c;
+  --accent: #6c8cff;
+  --vert: #3ecf8e;
+  --rouge: #ff5d5d;
+  --rouge-sombre: #b03030;
+}
+
+* { box-sizing: border-box; margin: 0; }
+body { height: 100vh; overflow: hidden; user-select: none; }
+
+.vue { height: 100vh; display: flex; flex-direction: column; }
+[hidden] { display: none !important; }
+
+/* ── Boutons ── */
+.btn {
+  border-radius: 8px;
+  border: 1px solid var(--bord);
+  padding: 0.55em 1em;
+  font-size: 1em;
+  font-family: inherit;
+  color: inherit;
+  background-color: var(--panneau);
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s, transform 0.1s;
+}
+.btn:hover { border-color: var(--accent); }
+.btn:active { transform: scale(0.97); }
+.btn-primaire { background-color: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.btn-danger { background-color: var(--rouge-sombre); border-color: var(--rouge-sombre); color: #fff; }
+.btn-danger-leger { color: var(--rouge); }
+.btn-ico { padding: 0.55em 0.8em; }
+.btn-garder { border-color: var(--vert); color: var(--vert); font-size: 1.15em; padding: 0.7em 1.6em; }
+.btn-jeter { border-color: var(--rouge); color: var(--rouge); font-size: 1.15em; padding: 0.7em 1.6em; }
+.btn-garder:hover { background-color: var(--vert); color: #10241a; }
+.btn-jeter:hover { background-color: var(--rouge); color: #2b1212; }
+kbd {
+  background: #00000055; border: 1px solid var(--bord); border-radius: 4px;
+  padding: 0.1em 0.45em; font-size: 0.8em; margin-left: 0.4em;
+}
+
+/* ── Accueil ── */
+.accueil-centre {
+  margin: auto; text-align: center; display: flex; flex-direction: column; gap: 1.2em; align-items: center;
+}
+.accueil-centre h1 { font-size: 3.2em; letter-spacing: 0.06em; }
+.sous-titre { color: #9a9aa6; margin-bottom: 1em; }
+
+/* ── Barre du haut ── */
+.barre {
+  display: flex; align-items: center; gap: 0.6em;
+  padding: 0.6em 0.9em; border-bottom: 1px solid var(--bord); background: var(--panneau);
+  flex-wrap: wrap;
+}
+.titre-dossier { font-weight: 600; }
+.espace { flex: 1; }
+.progression { color: #9a9aa6; }
+.filtre-faits { display: flex; align-items: center; gap: 0.35em; color: #9a9aa6; cursor: pointer; }
+
+/* ── Grille des mois ── */
+.grille-mois {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 0.9em; padding: 1em; overflow-y: auto;
+}
+.carte-mois {
+  background: var(--panneau); border: 1px solid var(--bord); border-radius: 12px;
+  padding: 1em; cursor: pointer; transition: border-color 0.15s, transform 0.1s;
+  display: flex; flex-direction: column; gap: 0.4em;
+}
+.carte-mois:hover { border-color: var(--accent); transform: translateY(-2px); }
+.carte-mois h3 { text-transform: capitalize; }
+.carte-mois .stats { color: #9a9aa6; font-size: 0.9em; }
+.carte-mois .jauge { height: 6px; background: #00000066; border-radius: 3px; overflow: hidden; }
+.carte-mois .jauge > div { height: 100%; background: var(--accent); }
+.carte-mois.fait { border-color: var(--vert); }
+.carte-mois.fait .jauge > div { background: var(--vert); }
+.etiquette-fait { color: var(--vert); font-weight: 600; font-size: 0.85em; }
+.carte-mois .refaire { align-self: flex-start; font-size: 0.85em; padding: 0.3em 0.7em; }
+
+/* ── Scène de tri ── */
+.scene {
+  flex: 1; display: flex; align-items: center; justify-content: center;
+  position: relative; overflow: hidden; padding: 1em;
+}
+.carte {
+  position: relative; max-width: 92%; max-height: 100%;
+  touch-action: none; cursor: grab;
+  transition: transform 0.18s ease-out, opacity 0.18s;
+}
+.carte.saisi { transition: none; cursor: grabbing; }
+.carte img, .carte video {
+  max-width: 100%; max-height: calc(100vh - 190px);
+  border-radius: 10px; box-shadow: 0 8px 40px #00000088; display: block;
+  pointer-events: none;
+}
+.carte video { pointer-events: auto; }
+.badge {
+  position: absolute; top: 8%; font-size: 2em; font-weight: 800;
+  padding: 0.15em 0.5em; border: 4px solid; border-radius: 10px;
+  opacity: 0; transform: rotate(-12deg); pointer-events: none;
+}
+.badge-garder { right: 6%; color: var(--vert); border-color: var(--vert); transform: rotate(12deg); }
+.badge-jeter { left: 6%; color: var(--rouge); border-color: var(--rouge); }
+.fin-mois { text-align: center; display: flex; flex-direction: column; gap: 0.8em; align-items: center; }
+.pied-tri {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.7em 1.2em; border-top: 1px solid var(--bord); background: var(--panneau);
+}
+.info-fichier { color: #9a9aa6; font-size: 0.9em; text-align: center; }
+
+/* ── Revue ── */
+.defilable { overflow-y: auto; padding: 0 1em 2em; }
+.aide-revue { color: #9a9aa6; padding: 0.8em 0; }
+.titre-groupe { padding: 0.6em 0; }
+.titre-groupe.garder { color: var(--vert); }
+.titre-groupe.jeter { color: var(--rouge); }
+.grille-vignettes {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 0.5em;
+}
+.vignette {
+  position: relative; aspect-ratio: 1; border-radius: 8px; overflow: hidden;
+  cursor: pointer; border: 2px solid transparent;
+}
+.vignette:hover { border-color: var(--accent); }
+.vignette img, .vignette video { width: 100%; height: 100%; object-fit: cover; }
+.vignette .duree {
+  position: absolute; bottom: 4px; right: 6px; background: #000000aa;
+  border-radius: 4px; padding: 0 0.3em; font-size: 0.75em;
+}
+
+/* ── Modales ── */
+dialog {
+  background: var(--panneau); color: inherit; border: 1px solid var(--bord);
+  border-radius: 12px; padding: 1.4em; max-width: 480px;
+}
+dialog::backdrop { background: #000000aa; }
+dialog h2 { margin-bottom: 0.6em; }
+.aide { color: #9a9aa6; font-size: 0.9em; margin: 0.6em 0 1em; }
+.rangee-boutons { display: flex; gap: 0.6em; justify-content: flex-end; margin-top: 1em; }
+.ligne-raccourci {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 0.4em 0; gap: 1em;
+}
+.touche { min-width: 90px; }
+.touche.ecoute { border-color: var(--accent); animation: pulse 1s infinite; }
+@keyframes pulse { 50% { opacity: 0.5; } }

@@ -1721,6 +1721,7 @@ function installerSwipeVisionneuse() {
 
   vue.addEventListener("pointermove", (e) => {
     if (!actif || e.pointerId !== ptr) return;
+    if (!surMedia) return; // glissement ignoré hors de la photo (le fond sert à fermer)
     dx = e.clientX - x0;
     const dy = e.clientY - y0;
     if (!pris) {

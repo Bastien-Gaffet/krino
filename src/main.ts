@@ -30,6 +30,7 @@ interface Etat {
   regroupement: string; // "mois" ou "evenement"
   favoris: string[];
   albums: Record<string, string[]>;
+  ordre_albums: string[]; // ordre d'affichage des albums choisi par l'utilisateur
 }
 
 /* ═══ État global ═══ */
@@ -38,7 +39,7 @@ let racine = "";
 let medias: Media[] = [];
 let etat: Etat = {
   decisions: {}, mois_valides: [], raccourcis: {}, source_date: "exif", ordre: [],
-  regroupement: "mois", favoris: [], albums: {},
+  regroupement: "mois", favoris: [], albums: {}, ordre_albums: [],
 };
 let moisCourant = "";
 let file: Media[] = []; // restants à trier dans le mois courant
@@ -231,6 +232,7 @@ function allerA(vue: string) {
   else if (vue === "vue-galerie") afficherGalerie();
   else if (vue === "vue-corbeille") void rendreCorbeille();
   else if (vue === "vue-rangement") rendreApercuRangement();
+  else if (vue === "vue-albums") { modeChoixAlbum = false; rendrePageAlbums(); }
 }
 
 function afficherGalerie() {
@@ -295,6 +297,8 @@ async function ouvrirDossier(chemin: string) {
   etat.regroupement ||= "mois";
   etat.favoris ??= [];
   etat.albums ??= {};
+  etat.ordre_albums ??= [];
+  albumsOrdonnes(); // migration douce : réconcilie l'ordre avec les albums existants
   await purgerDisparus();
   construireEvenements();
   invaliderGalerie();
@@ -1179,29 +1183,218 @@ function contenuAlbum(nom: string): string[] {
   return nom === ALBUM_FAVORIS ? etat.favoris : (etat.albums[nom] ?? []);
 }
 
-/** Alimente la barre latérale avec Favoris + les albums (avec compteurs). */
+// Combien d'albums restent visibles en permanence dans la barre latérale, et
+// jusqu'où « afficher plus » les déplie (jamais tous : au-delà, page Albums).
+const ALBUMS_VISIBLES = 3;
+const ALBUMS_ETENDUS = 7;
+let albumsEtendus = false;
+
+/** Ordre d'affichage des albums (hors Favoris), réconcilié avec l'état :
+ *  les albums connus sont conservés dans l'ordre, les nouveaux ajoutés à la fin,
+ *  les disparus retirés. Migration douce quand `ordre_albums` est absent/partiel. */
+function albumsOrdonnes(): string[] {
+  etat.ordre_albums ??= [];
+  const ordre = etat.ordre_albums.filter((n) => n in etat.albums);
+  for (const nom of Object.keys(etat.albums)) if (!ordre.includes(nom)) ordre.push(nom);
+  etat.ordre_albums = ordre;
+  return ordre;
+}
+
+/** Déplace `source` juste avant `cible` (ou en fin si `cible` est null). */
+function reordonnerAlbum(source: string, cible: string | null) {
+  const ordre = albumsOrdonnes().filter((n) => n !== source);
+  let to = cible ? ordre.indexOf(cible) : ordre.length;
+  if (to < 0) to = ordre.length;
+  ordre.splice(to, 0, source);
+  etat.ordre_albums = ordre;
+}
+
+/** Ouvre un album dans la galerie filtrée. */
+function ouvrirAlbum(nom: string) {
+  albumOuvert = nom;
+  allerA("vue-galerie");
+  // L'album ouvert est la vraie section active, pas « Galerie » ni « Albums »
+  document.querySelector(".nav-item[data-vue=vue-galerie]")?.classList.remove("actif");
+  document.querySelector(".nav-item[data-vue=vue-albums]")?.classList.remove("actif");
+  document.querySelector<HTMLElement>(`.nav-album[data-album="${CSS.escape(nom)}"]`)
+    ?.classList.add("actif");
+}
+
+/** Alimente la barre latérale avec Favoris + les 3 premiers albums (+ dépliage
+ *  limité), un par ligne, compteur discret, réordonnables par glisser-déposer. */
 function rendreNavAlbums() {
   const conteneur = $("#nav-albums");
   conteneur.innerHTML = "";
-  const entree = (nom: string, libelle: string) => {
+  const entree = (nom: string, libelle: string, compteur: number, reordonnable: boolean) => {
     const b = document.createElement("button");
     b.className = "nav-item nav-album";
     b.dataset.album = nom;
-    b.textContent = libelle;
     b.title = libelle;
-    b.addEventListener("click", () => {
-      albumOuvert = nom;
-      allerA("vue-galerie");
-      // L'album ouvert est la vraie section active, pas « Galerie »
-      document.querySelector(".nav-item[data-vue=vue-galerie]")?.classList.remove("actif");
-      b.classList.add("actif");
-    });
+    const lib = document.createElement("span");
+    lib.className = "nav-album-nom";
+    lib.textContent = libelle;
+    const cpt = document.createElement("span");
+    cpt.className = "nav-compteur";
+    cpt.textContent = String(compteur);
+    b.append(lib, cpt);
+    b.addEventListener("click", () => ouvrirAlbum(nom));
+    if (reordonnable) {
+      b.draggable = true;
+      b.addEventListener("dragstart", (e) => {
+        dragAlbumNom = nom;
+        e.dataTransfer!.effectAllowed = "move";
+      });
+      b.addEventListener("dragend", () => { dragAlbumNom = null; });
+    }
     installerDropAlbum(b, nom);
     conteneur.appendChild(b);
   };
-  entree(ALBUM_FAVORIS, t("albums.favoris", { n: etat.favoris.length }));
-  for (const nom of Object.keys(etat.albums).sort()) {
-    entree(nom, `${nom} (${etat.albums[nom].length})`);
+  entree(ALBUM_FAVORIS, t("albums.nomFavoris"), etat.favoris.length, false);
+  const ordre = albumsOrdonnes();
+  const nbAffiches = albumsEtendus
+    ? Math.min(ordre.length, ALBUMS_ETENDUS)
+    : Math.min(ordre.length, ALBUMS_VISIBLES);
+  for (const nom of ordre.slice(0, nbAffiches)) {
+    entree(nom, nom, etat.albums[nom].length, true);
+  }
+  // Lien « afficher plus / moins » dès qu'il y a plus de 3 albums.
+  if (ordre.length > ALBUMS_VISIBLES) {
+    const plus = document.createElement("button");
+    plus.className = "nav-item discret nav-plus";
+    plus.textContent = albumsEtendus ? t("albums.afficherMoins") : t("albums.afficherPlus");
+    plus.addEventListener("click", () => { albumsEtendus = !albumsEtendus; rendreNavAlbums(); });
+    conteneur.appendChild(plus);
+  }
+  // Au-delà du dépliage : renvoi vers la page Albums (jamais tous dans la barre).
+  if (ordre.length > ALBUMS_ETENDUS) {
+    const tous = document.createElement("button");
+    tous.className = "nav-item discret nav-plus";
+    tous.textContent = t("albums.tousAlbums");
+    tous.addEventListener("click", () => { albumOuvert = null; allerA("vue-albums"); activerNav("vue-albums"); });
+    conteneur.appendChild(tous);
+  }
+}
+
+/* ── Page d'accueil des albums (cartes à éventail) ── */
+// Mode « choix de destination » : la page sert à déplacer la sélection courante.
+let modeChoixAlbum = false;
+let choixAlbumRels: string[] = [];
+
+function rendrePageAlbums() {
+  $("#titre-albums").textContent = modeChoixAlbum ? t("albums.choixTitre") : t("nav.albums");
+  ($("#btn-retour-choix") as unknown as HTMLButtonElement).hidden = !modeChoixAlbum;
+  const ordre = albumsOrdonnes();
+  $("#bilan-albums").textContent = modeChoixAlbum
+    ? t("albums.selection", { n: choixAlbumRels.length })
+    : t("albums.nbAlbums", { n: ordre.length });
+  const grille = $("#grille-albums");
+  grille.innerHTML = "";
+  grille.appendChild(carteAlbum(ALBUM_FAVORIS, t("albums.nomFavoris"), etat.favoris, false));
+  for (const nom of ordre) {
+    grille.appendChild(carteAlbum(nom, nom, etat.albums[nom], true));
+  }
+  grille.appendChild(carteCreerAlbum());
+}
+
+function carteAlbum(nom: string, libelle: string, rels: string[], reordonnable: boolean): HTMLElement {
+  const carte = document.createElement("div");
+  carte.className = "carte-mois carte-album";
+  carte.innerHTML = `
+    <h3>${libelle}</h3>
+    <div class="eventail"></div>
+    <div class="stats"><span class="compteur-album">${t("albums.nbPhotos", { n: rels.length })}</span></div>
+  `;
+  const eventail = carte.querySelector(".eventail") as HTMLElement;
+  const apercus = rels
+    .map((r) => medias.find((m) => m.rel === r))
+    .filter((m): m is Media => !!m && !m.video)
+    .slice(0, 3);
+  (async () => {
+    for (const f of apercus) {
+      const img = document.createElement("img");
+      img.loading = "lazy";
+      img.src = await urlMiniature(f);
+      eventail.appendChild(img);
+    }
+  })();
+  carte.addEventListener("click", () => {
+    if (modeChoixAlbum) deplacerVersAlbum(nom);
+    else ouvrirAlbum(nom);
+  });
+  if (reordonnable) {
+    carte.draggable = true;
+    carte.addEventListener("dragstart", (e) => {
+      dragAlbumNom = nom;
+      e.dataTransfer!.effectAllowed = "move";
+    });
+    carte.addEventListener("dragend", () => { dragAlbumNom = null; });
+  }
+  carte.addEventListener("dragover", (e) => {
+    if (!dragAlbumNom) return;
+    e.preventDefault();
+    carte.classList.add("drop-cible");
+  });
+  carte.addEventListener("dragleave", () => carte.classList.remove("drop-cible"));
+  carte.addEventListener("drop", async (e) => {
+    carte.classList.remove("drop-cible");
+    if (!dragAlbumNom || dragAlbumNom === nom) return;
+    e.preventDefault();
+    const cible = nom === ALBUM_FAVORIS
+      ? (albumsOrdonnes().find((n) => n !== dragAlbumNom) ?? null)
+      : nom;
+    reordonnerAlbum(dragAlbumNom, cible);
+    dragAlbumNom = null;
+    await sauver();
+    rendrePageAlbums();
+    rendreNavAlbums();
+  });
+  return carte;
+}
+
+function carteCreerAlbum(): HTMLElement {
+  const carte = document.createElement("div");
+  carte.className = "carte-mois carte-creer-album";
+  carte.innerHTML = `<div class="signe-creer">+</div><div class="stats">${t("albums.creer")}</div>`;
+  carte.addEventListener("click", () => void creerAlbum());
+  return carte;
+}
+
+/** Crée un album (saisie du nom) et l'ouvre ; en mode choix, y déplace la sélection. */
+async function creerAlbum() {
+  const nom = (await demander(t("albums.nomNouveau")))?.trim();
+  if (!nom || nom === ALBUM_FAVORIS || etat.albums[nom]) return;
+  etat.albums[nom] = [];
+  albumsOrdonnes();
+  await sauver();
+  rendreNavAlbums();
+  if (modeChoixAlbum) deplacerVersAlbum(nom);
+  else ouvrirAlbum(nom);
+}
+
+/** Ajoute la sélection mémorisée à l'album choisi, puis revient à la galerie au
+ *  même défilement, sans reconstruction complète (sauf si l'album cible est ouvert). */
+function deplacerVersAlbum(nom: string) {
+  const rels = choixAlbumRels;
+  if (nom === ALBUM_FAVORIS) {
+    etat.favoris = [...new Set([...etat.favoris, ...rels])];
+    for (const r of rels) majBadgeVignette(r);
+  } else {
+    const liste = etat.albums[nom] ?? (etat.albums[nom] = []);
+    for (const r of rels) if (!liste.includes(r)) liste.push(r);
+  }
+  void sauver();
+  rendreNavAlbums();
+  modeChoixAlbum = false;
+  choixAlbumRels = [];
+  const reconstruire = albumOuvert === nom;
+  selectionGalerie = new Set();
+  afficherVue("vue-galerie");
+  if (reconstruire) {
+    invaliderGalerie();
+    rendreGalerie();
+  } else {
+    ($("#defil-galerie") as unknown as HTMLElement).scrollTop = galerieScroll;
+    majBarreSelection();
   }
 }
 
@@ -1250,6 +1443,8 @@ function majSelectionVisuelle() {
 
 /* ── Glisser-déposer de la sélection vers les albums de la barre latérale ── */
 let dragEnCours: string[] = [];
+// Nom de l'album en cours de réordonnancement par glisser-déposer (null sinon).
+let dragAlbumNom: string | null = null;
 
 function demarrerDrag(rel: string, e: DragEvent) {
   if (!selectionGalerie.has(rel)) {
@@ -1272,6 +1467,19 @@ function installerDropAlbum(b: HTMLButtonElement, nom: string) {
   b.addEventListener("drop", async (e) => {
     e.preventDefault();
     b.classList.remove("drop-cible");
+    // Réordonnancement d'un album déposé sur un autre (prioritaire sur l'ajout).
+    if (dragAlbumNom) {
+      if (dragAlbumNom !== nom) {
+        const cible = nom === ALBUM_FAVORIS
+          ? (albumsOrdonnes().find((n) => n !== dragAlbumNom) ?? null)
+          : nom;
+        reordonnerAlbum(dragAlbumNom, cible);
+        await sauver();
+        rendreNavAlbums();
+      }
+      dragAlbumNom = null;
+      return;
+    }
     if (!dragEnCours.length) return;
     if (nom === ALBUM_FAVORIS) {
       etat.favoris = [...new Set([...etat.favoris, ...dragEnCours])];
@@ -1435,7 +1643,7 @@ function installerSwipeVisionneuse() {
   vue.addEventListener("pointercancel", relacher);
 }
 
-async function actionSelection(action: "favori" | "ajouter" | "retirer" | "corbeille") {
+async function actionSelection(action: "favori" | "retirer" | "corbeille") {
   const rels = [...selectionGalerie];
   if (!rels.length) return;
   // Reconstruction complète nécessaire seulement si l'action change les médias
@@ -1451,18 +1659,6 @@ async function actionSelection(action: "favori" | "ajouter" | "retirer" | "corbe
     for (const r of rels) majBadgeVignette(r);
     reconstruire = albumOuvert === ALBUM_FAVORIS
       || ($("#filtre-galerie") as unknown as HTMLSelectElement).value === "favoris";
-  } else if (action === "ajouter") {
-    const cible = ($("#sel-album-cible") as unknown as HTMLSelectElement).value;
-    if (cible === ALBUM_FAVORIS) {
-      etat.favoris = [...new Set([...etat.favoris, ...rels])];
-      for (const r of rels) majBadgeVignette(r);
-    } else {
-      const liste = etat.albums[cible] ?? (etat.albums[cible] = []);
-      for (const r of rels) if (!liste.includes(r)) liste.push(r);
-    }
-    // La galerie ne montre pas l'appartenance à un album ordinaire : rien à
-    // reconstruire sauf si l'album affiché est justement la cible.
-    reconstruire = albumOuvert === cible;
   } else if (action === "retirer" && albumOuvert) {
     if (albumOuvert === ALBUM_FAVORIS) etat.favoris = etat.favoris.filter((r) => !rels.includes(r));
     else etat.albums[albumOuvert] = (etat.albums[albumOuvert] ?? []).filter((r) => !rels.includes(r));
@@ -1649,16 +1845,6 @@ function majBarreSelection() {
   barre.hidden = selectionGalerie.size === 0;
   $("#bilan-selection").textContent = t("albums.selection", { n: selectionGalerie.size });
   ($("#sel-retirer") as unknown as HTMLButtonElement).hidden = !albumOuvert;
-  const cible = $("#sel-album-cible") as unknown as HTMLSelectElement;
-  cible.innerHTML = "";
-  const of = document.createElement("option");
-  of.value = ALBUM_FAVORIS; of.textContent = t("albums.nomFavoris");
-  cible.appendChild(of);
-  for (const nom of Object.keys(etat.albums).sort()) {
-    const o = document.createElement("option");
-    o.value = nom; o.textContent = nom;
-    cible.appendChild(o);
-  }
 }
 
 /* ═══ Mises à jour & soutien ═══ */
@@ -1968,6 +2154,15 @@ function installerClavier() {
         if (selectionGalerie.size > 0) { selectionGalerie = new Set(); majSelectionVisuelle(); }
         else allerA("vue-mois");
       }
+    } else if (vue === "vue-albums" && k === "Escape") {
+      if (modeChoixAlbum) {
+        modeChoixAlbum = false;
+        choixAlbumRels = [];
+        afficherVue("vue-galerie");
+        ($("#defil-galerie") as unknown as HTMLElement).scrollTop = galerieScroll;
+      } else {
+        allerA("vue-mois");
+      }
     } else if (vue === "vue-doublons" && !$("#verif-doublons").hidden && k === "Escape") {
       fermerVerifDoublons();
     } else if (
@@ -2029,14 +2224,12 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
   $("#nav-reglages").addEventListener("click", ouvrirReglages);
-  $("#nav-nouvel-album").addEventListener("click", async () => {
-    const nom = (await demander(t("albums.nomNouveau")))?.trim();
-    if (!nom || nom === ALBUM_FAVORIS || etat.albums[nom]) return;
-    etat.albums[nom] = [];
-    await sauver();
-    rendreNavAlbums();
-    albumOuvert = nom;
-    allerA("vue-galerie");
+  $("#nav-nouvel-album").addEventListener("click", () => void creerAlbum());
+  $("#btn-retour-choix").addEventListener("click", () => {
+    modeChoixAlbum = false;
+    choixAlbumRels = [];
+    afficherVue("vue-galerie");
+    ($("#defil-galerie") as unknown as HTMLElement).scrollTop = galerieScroll;
   });
   $("#btn-exporter-album2").addEventListener("click", async () => {
     const rels = contenuAlbum(albumOuvert!);
@@ -2105,7 +2298,13 @@ window.addEventListener("DOMContentLoaded", () => {
     majSelectionVisuelle();
   });
   $("#sel-favori").addEventListener("click", () => void actionSelection("favori"));
-  $("#sel-ajouter").addEventListener("click", () => void actionSelection("ajouter"));
+  $("#sel-deplacer").addEventListener("click", () => {
+    if (!selectionGalerie.size) return;
+    choixAlbumRels = [...selectionGalerie];
+    modeChoixAlbum = true;
+    afficherVue("vue-albums");
+    rendrePageAlbums();
+  });
   $("#sel-retirer").addEventListener("click", () => void actionSelection("retirer"));
   $("#sel-corbeille").addEventListener("click", () => void actionSelection("corbeille"));
   installerRectangleSelection();

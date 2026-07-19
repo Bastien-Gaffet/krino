@@ -24,9 +24,9 @@
         <div id="nav-dossier" class="nav-dossier"></div>
         <button class="nav-item actif" data-vue="vue-mois" data-i18n="nav.trier"></button>
         <button class="nav-item" data-vue="vue-galerie" data-i18n="nav.galerie"></button>
-        <div class="nav-titre" data-i18n="nav.albums"></div>
+        <button class="nav-item nav-titre-albums" data-vue="vue-albums" data-i18n="nav.albums"></button>
         <div id="nav-albums"></div>
-        <button id="nav-nouvel-album" class="nav-item discret" data-i18n="albums.nouveau"></button>
+        <button id="nav-nouvel-album" class="nav-item discret nav-nouvel-album"><span data-i18n="albums.nouveau"></span><span class="plus-nouvel-album">+</span></button>
         <button class="nav-item" data-vue="vue-doublons" data-i18n="outils.ongletDoublons"></button>
         <button class="nav-item" data-vue="vue-rangement" data-i18n="outils.ongletRangement"></button>
         <span class="espace"></span>
@@ -75,11 +75,23 @@
       <div id="barre-selection" class="barre-selection" hidden>
         <span id="bilan-selection"></span>
         <button id="sel-favori" class="btn">&#9733; <span data-i18n="galerie.favori"></span></button>
-        <select id="sel-album-cible" class="btn"></select>
-        <button id="sel-ajouter" class="btn" data-i18n="albums.ajouterA"></button>
+        <button id="sel-deplacer" class="btn btn-primaire" data-i18n="albums.deplacer"></button>
         <button id="sel-retirer" class="btn" data-i18n="albums.retirer" hidden></button>
         <button id="sel-corbeille" class="btn btn-danger-leger" data-i18n="mois.corbeille"></button>
         <button id="sel-annuler" class="btn" data-i18n="galerie.annulerSel"></button>
+      </div>
+    </section>
+
+    <!-- ═══ Page d'accueil des albums (Task 5) ═══ -->
+    <section id="vue-albums" class="vue" hidden>
+      <header class="barre">
+        <button id="btn-retour-choix" class="btn btn-ico" hidden>&larr;</button>
+        <span class="titre-dossier" id="titre-albums"></span>
+        <span class="espace"></span>
+        <span id="bilan-albums" class="progression"></span>
+      </header>
+      <div class="defilable">
+        <div id="grille-albums" class="grille-mois"></div>
       </div>
     </section>
 

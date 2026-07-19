@@ -356,15 +356,7 @@ dialog h2 { margin-bottom: 0.6em; }
   word-break: break-all; pointer-events: none;
 }
 
-/* ═══ Organiser : onglets, favoris, albums ═══ */
-.onglets { display: flex; gap: 4px; }
-.onglet { opacity: 0.65; }
-.onglet.actif {
-  opacity: 1;
-  border-color: var(--accent);
-  color: var(--accent);
-}
-.module-outil { padding-top: 0.4rem; }
+/* ═══ Organiser : favoris, albums ═══ */
 .grille-vignettes.marge { margin: 0 1.2rem 1.2rem; }
 .btn-favori { font-size: 1.05rem; }
 .btn-favori.actif { color: #f5c518; border-color: #f5c518; }
@@ -377,3 +369,25 @@ dialog h2 { margin-bottom: 0.6em; }
   padding: 8px 10px; border-radius: 8px;
   border: 1px solid var(--bord); background: var(--fond); color: var(--texte);
 }
+
+/* ═══ Barre latérale ═══ */
+.cadre-app { display: flex; height: 100vh; }
+.barre-laterale {
+  width: 200px; flex-shrink: 0; display: flex; flex-direction: column;
+  gap: 2px; padding: 12px 8px; border-right: 1px solid var(--bord);
+  background: var(--panneau); overflow-y: auto;
+}
+.contenu-app { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.contenu-app .vue { flex: 1; height: auto; min-height: 0; display: flex; flex-direction: column; }
+.marque-krino { font-weight: 800; letter-spacing: 2px; padding: 4px 10px; }
+.nav-dossier { font-size: .72rem; color: var(--sourd); padding: 0 10px 10px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nav-item { text-align: left; border: none; background: none; color: var(--texte);
+  padding: 7px 10px; border-radius: 8px; cursor: pointer; font-size: .92rem; }
+.nav-item:hover { background: var(--voile); }
+.nav-item.actif { background: var(--accent); color: #fff; }
+.nav-item.discret { color: var(--sourd); font-size: .8rem; }
+.nav-titre { font-size: .7rem; text-transform: uppercase; letter-spacing: 1px;
+  color: var(--sourd); padding: 10px 10px 2px; }
+.nav-album.drop-cible { outline: 2px dashed var(--accent); }
+body.plein-ecran .barre-laterale { display: none; }

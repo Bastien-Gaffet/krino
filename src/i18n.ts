@@ -12,6 +12,10 @@ const FR: Dico = {
   "accueil.reprendre": "Reprendre : {d}",
   "accueil.titreDialogue": "Dossier de photos à trier",
 
+  "nav.trier": "Trier",
+  "nav.galerie": "Galerie",
+  "nav.albums": "Albums",
+
   "mois.dossier": "Dossier",
   "mois.inverser": "Inverser l'ordre",
   "tri.date": "Date",
@@ -219,6 +223,10 @@ const EN: Dico = {
   "accueil.choisir": "Choose a folder",
   "accueil.reprendre": "Resume: {d}",
   "accueil.titreDialogue": "Photo folder to sort",
+
+  "nav.trier": "Sort",
+  "nav.galerie": "Gallery",
+  "nav.albums": "Albums",
 
   "mois.dossier": "Folder",
   "mois.inverser": "Reverse order",

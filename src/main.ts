@@ -215,6 +215,19 @@ function vueActive(): string {
   return document.querySelector<HTMLElement>(".vue:not([hidden])")?.id ?? "";
 }
 
+function activerNav(vue: string) {
+  for (const b of document.querySelectorAll<HTMLButtonElement>(".nav-item[data-vue]")) {
+    b.classList.toggle("actif", b.dataset.vue === vue);
+  }
+}
+
+function allerA(vue: string) {
+  afficherVue(vue);
+  activerNav(vue);
+  if (vue === "vue-mois") rendreMois();
+  else if (vue === "vue-corbeille") void rendreCorbeille();
+}
+
 function montrerChargement(titre: string, detail = "", annulable = false) {
   $("#chargement-titre").textContent = titre;
   $("#chargement-detail").textContent = detail;
@@ -264,8 +277,11 @@ async function ouvrirDossier(chemin: string) {
   await purgerDisparus();
   construireEvenements();
   $("#titre-dossier").textContent = t("mois.entete", { d: chemin, n: medias.length });
-  afficherVue("vue-mois");
-  rendreMois();
+  ($("#cadre-app") as unknown as HTMLElement).hidden = false;
+  const nd = $("#nav-dossier");
+  nd.textContent = chemin.split(/[\\/]/).pop() ?? chemin;
+  nd.title = chemin;
+  allerA("vue-mois");
   rendreEtiquettesRaccourcis();
 }
 
@@ -1010,144 +1026,12 @@ async function annulerDernierRangement() {
 /* ═══ Organiser : favoris & albums ═══ */
 
 const ALBUM_FAVORIS = "__favoris__";
-let albumCourant = ALBUM_FAVORIS;
-let selectionAlbum = new Set<string>();
 
+// utilisé par la galerie (Task 4-6)
 function contenuAlbum(nom: string): string[] {
   return nom === ALBUM_FAVORIS ? etat.favoris : (etat.albums[nom] ?? []);
 }
-
-function rendreChoixAlbums() {
-  const remplir = (sel: HTMLSelectElement, avecFavoris: boolean) => {
-    sel.innerHTML = "";
-    if (avecFavoris) {
-      const o = document.createElement("option");
-      o.value = ALBUM_FAVORIS;
-      o.textContent = t("albums.favoris", { n: etat.favoris.length });
-      sel.appendChild(o);
-    }
-    for (const nom of Object.keys(etat.albums).sort()) {
-      const o = document.createElement("option");
-      o.value = nom;
-      o.textContent = `${nom} (${etat.albums[nom].length})`;
-      sel.appendChild(o);
-    }
-  };
-  remplir($("#choix-album") as unknown as HTMLSelectElement, true);
-  remplir($("#album-cible") as unknown as HTMLSelectElement, false);
-  ($("#choix-album") as unknown as HTMLSelectElement).value = albumCourant;
-}
-
-function majActionsAlbum() {
-  const bloc = $("#actions-selection-album");
-  bloc.hidden = selectionAlbum.size === 0;
-  $("#bilan-selection-album").textContent = t("albums.selection", { n: selectionAlbum.size });
-  ($("#btn-ajouter-album") as unknown as HTMLButtonElement).hidden =
-    !Object.keys(etat.albums).length;
-  ($("#album-cible") as unknown as HTMLSelectElement).hidden =
-    !Object.keys(etat.albums).length;
-  ($("#btn-supprimer-album") as unknown as HTMLButtonElement).hidden =
-    albumCourant === ALBUM_FAVORIS;
-}
-
-function rendreAlbum() {
-  rendreChoixAlbums();
-  selectionAlbum = new Set();
-  const rels = contenuAlbum(albumCourant);
-  const presentes = new Set(medias.map((m) => m.rel));
-  const grille = $("#grille-album");
-  grille.innerHTML = "";
-  for (const rel of rels) {
-    if (!presentes.has(rel)) continue;
-    const m = medias.find((x) => x.rel === rel)!;
-    const v = document.createElement("div");
-    v.className = "vignette";
-    v.title = rel;
-    if (m.video) {
-      // #t=0.1 force le rendu de la première image de la vidéo
-      v.innerHTML = `<video src="${convertFileSrc(src(rel))}#t=0.1" preload="metadata" muted></video><span class="marque">${t("vignette.video")}</span>`;
-    } else {
-      const img = document.createElement("img");
-      img.loading = "lazy";
-      img.decoding = "async";
-      urlMiniature(m).then((u) => { img.src = u; });
-      v.appendChild(img);
-    }
-    v.addEventListener("click", () => {
-      if (selectionAlbum.has(rel)) selectionAlbum.delete(rel);
-      else selectionAlbum.add(rel);
-      v.classList.toggle("sel-garder", selectionAlbum.has(rel));
-      majActionsAlbum();
-    });
-    grille.appendChild(v);
-  }
-  if (!rels.length) {
-    grille.innerHTML = `<p class="aide-revue">${
-      albumCourant === ALBUM_FAVORIS ? t("albums.videFavoris") : t("albums.videAlbum")}</p>`;
-  }
-  majActionsAlbum();
-}
-
-function installerAlbums() {
-  ($("#choix-album") as unknown as HTMLSelectElement).addEventListener("change", () => {
-    albumCourant = ($("#choix-album") as unknown as HTMLSelectElement).value;
-    rendreAlbum();
-  });
-  $("#btn-nouvel-album").addEventListener("click", async () => {
-    const nom = await demander(t("albums.nomNouveau"));
-    if (!nom || nom === ALBUM_FAVORIS) return;
-    etat.albums[nom] ??= [];
-    albumCourant = nom;
-    await sauver();
-    rendreAlbum();
-  });
-  $("#btn-supprimer-album").addEventListener("click", async () => {
-    if (albumCourant === ALBUM_FAVORIS) return;
-    if (!(await confirmer(t("confirm.supprimerAlbum", { a: albumCourant }), { danger: true }))) return;
-    delete etat.albums[albumCourant];
-    albumCourant = ALBUM_FAVORIS;
-    await sauver();
-    rendreAlbum();
-  });
-  $("#btn-ajouter-album").addEventListener("click", async () => {
-    const cible = ($("#album-cible") as unknown as HTMLSelectElement).value;
-    if (!cible || !selectionAlbum.size) return;
-    const liste = etat.albums[cible] ?? (etat.albums[cible] = []);
-    for (const rel of selectionAlbum) {
-      if (!liste.includes(rel)) liste.push(rel);
-    }
-    await sauver();
-    rendreAlbum();
-  });
-  $("#btn-retirer-album").addEventListener("click", async () => {
-    if (!selectionAlbum.size) return;
-    if (albumCourant === ALBUM_FAVORIS) {
-      etat.favoris = etat.favoris.filter((r) => !selectionAlbum.has(r));
-    } else {
-      etat.albums[albumCourant] =
-        (etat.albums[albumCourant] ?? []).filter((r) => !selectionAlbum.has(r));
-    }
-    await sauver();
-    rendreAlbum();
-  });
-  $("#btn-exporter-album").addEventListener("click", async () => {
-    const rels = contenuAlbum(albumCourant);
-    if (!rels.length) return;
-    const nom = albumCourant === ALBUM_FAVORIS ? t("albums.nomFavoris") : albumCourant;
-    if (!(await confirmer(t("confirm.exporterAlbum", { n: rels.length, a: nom })))) return;
-    montrerChargement(t("albums.exportEnCours"));
-    let copies = 0;
-    try {
-      copies = await invoke<number>("exporter_album", { racine, nom, rels });
-    } catch (err) {
-      await informer(String(err));
-      return;
-    } finally {
-      cacherChargement();
-    }
-    await informer(t("albums.exportes", { n: copies, a: nom }));
-  });
-}
+void contenuAlbum;
 
 /* ═══ Mises à jour & soutien ═══ */
 
@@ -1430,8 +1314,11 @@ function installerClavier() {
     } else if (vue === "vue-rafale") {
       if (k === raccourci("valider")) { e.preventDefault(); appliquerRafale(); }
       else if (k === "Escape") { afficherVue("vue-tri"); rendreCarte(); }
-    } else if ((vue === "vue-corbeille" || vue === "vue-outils") && k === "Escape") {
-      afficherVue("vue-mois"); rendreMois();
+    } else if (
+      (vue === "vue-galerie" || vue === "vue-doublons" || vue === "vue-rangement" ||
+        vue === "vue-corbeille") && k === "Escape"
+    ) {
+      allerA("vue-mois");
     }
   });
 }
@@ -1478,8 +1365,23 @@ window.addEventListener("DOMContentLoaded", () => {
     btn.addEventListener("click", () => ouvrirDossier(dernier));
   }
 
+  // Barre latérale
+  for (const btn of document.querySelectorAll<HTMLButtonElement>(".nav-item[data-vue]")) {
+    btn.addEventListener("click", () => allerA(btn.dataset.vue!));
+  }
+  $("#nav-reglages").addEventListener("click", ouvrirReglages);
+  $("#nav-nouvel-album").addEventListener("click", async () => {
+    const nom = await demander(t("albums.nomNouveau"));
+    if (!nom) return;
+    etat.albums[nom] ??= [];
+    await sauver();
+  });
+
   // Vue mois
-  $("#btn-retour-accueil").addEventListener("click", () => afficherVue("vue-accueil"));
+  $("#btn-retour-accueil").addEventListener("click", () => {
+    ($("#cadre-app") as unknown as HTMLElement).hidden = true;
+    afficherVue("vue-accueil");
+  });
   $("#tri-mois").addEventListener("change", rendreMois);
   $("#btn-sens").addEventListener("click", () => {
     sensInverse = !sensInverse;
@@ -1487,22 +1389,6 @@ window.addEventListener("DOMContentLoaded", () => {
     rendreMois();
   });
   $("#masquer-faits").addEventListener("change", rendreMois);
-  $("#btn-corbeille").addEventListener("click", rendreCorbeille);
-  $("#btn-outils").addEventListener("click", () => { afficherVue("vue-outils"); rendreAlbum(); });
-  $("#btn-retour-outils").addEventListener("click", () => { afficherVue("vue-mois"); rendreMois(); });
-
-  // Onglets de la vue Organiser
-  for (const btn of document.querySelectorAll<HTMLButtonElement>(".onglet")) {
-    btn.addEventListener("click", () => {
-      for (const b of document.querySelectorAll<HTMLButtonElement>(".onglet")) {
-        b.classList.toggle("actif", b === btn);
-      }
-      for (const mod of document.querySelectorAll<HTMLElement>(".module-outil")) {
-        mod.hidden = mod.id !== btn.dataset.module;
-      }
-      if (btn.dataset.module === "mod-albums") rendreAlbum();
-    });
-  }
 
   // Rangement par date
   $("#btn-ranger").addEventListener("click", () => void lancerRangement());
@@ -1513,8 +1399,7 @@ window.addEventListener("DOMContentLoaded", () => {
     $("#chargement-jauge").style.width = total ? `${Math.round((100 * fait) / total)}%` : "0";
   });
 
-  // Favoris & albums
-  installerAlbums();
+  // Favoris
   $("#btn-favori").addEventListener("click", () => void basculerFavori());
 
   // Annulation des tâches longues (le programme repartira de zéro)
@@ -1533,7 +1418,6 @@ window.addEventListener("DOMContentLoaded", () => {
     $("#chargement-detail").textContent = t("chargement.progression", { a: fait, b: total });
     $("#chargement-jauge").style.width = total ? `${Math.round((100 * fait) / total)}%` : "0";
   });
-  $("#btn-reglages").addEventListener("click", ouvrirReglages);
   $("#btn-reset-tout").addEventListener("click", async () => {
     if (!(await confirmer(t("confirm.reset"), { danger: true }))) return;
     etat.decisions = {};

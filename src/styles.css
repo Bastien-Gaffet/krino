@@ -104,6 +104,10 @@ kbd {
 }
 .accueil-centre h1 { font-size: 3.2em; letter-spacing: 0.06em; }
 .sous-titre { color: var(--sourd); margin-bottom: 1em; }
+.liste-recents { display: flex; flex-direction: column; gap: 0.5em; align-items: stretch; width: 100%; }
+.recents-titre { color: var(--sourd); font-size: 0.85em; margin-top: 0.6em; text-align: left; }
+.recent-item { font-size: 0.92em; color: var(--sourd); padding: 0.5em 0.9em; }
+.recent-item:hover { color: inherit; }
 
 /* ── Barre du haut ── */
 .barre {

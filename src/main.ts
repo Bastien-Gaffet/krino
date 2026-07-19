@@ -5,7 +5,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { getVersion } from "@tauri-apps/api/app";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { check, type Update } from "@tauri-apps/plugin-updater";
-import { relaunch } from "@tauri-apps/plugin-process";
+import { relaunch, exit } from "@tauri-apps/plugin-process";
 import kofiBanniere from "./assets/kofi.jpg";
 import { t, appliquerTraductions, definirLangue, resoudreLangue, langue } from "./i18n";
 import { confirmer, demander, informer } from "./dialogues";
@@ -59,9 +59,10 @@ interface Prefs {
   parAnnee: boolean;
   tutoVu: boolean;
   cguAcceptees: boolean;
+  kofiApresMaj: boolean; // proposer Ko-fi au prochain démarrage (après une installation de maj)
 }
 const prefs: Prefs = {
-  theme: "auto", langue: "auto", parAnnee: true, tutoVu: false, cguAcceptees: false,
+  theme: "auto", langue: "auto", parAnnee: true, tutoVu: false, cguAcceptees: false, kofiApresMaj: false,
   ...JSON.parse(localStorage.getItem("krino-prefs") ?? "{}"),
 };
 function sauverPrefs() {
@@ -284,9 +285,64 @@ function ressembleBlocageWindows(err: unknown): boolean {
   return /os error (5|4551)|acc[eè]s refus|denied|application a bloqu/i.test(String(err));
 }
 
+/* ── Dossiers récents (accueil) ── */
+
+/** Liste des chemins récemment ouverts, plus récent en premier (max 5). */
+function lireRecents(): string[] {
+  try {
+    const brut = JSON.parse(localStorage.getItem("krino-recents") ?? "[]");
+    return Array.isArray(brut) ? brut.filter((c): c is string => typeof c === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Ajoute un chemin en tête, dédupliqué, limité à 5. */
+function ajouterRecent(chemin: string) {
+  const recents = [chemin, ...lireRecents().filter((c) => c !== chemin)].slice(0, 5);
+  localStorage.setItem("krino-recents", JSON.stringify(recents));
+}
+
+/** Migre l'ancienne clé unique krino-dernier vers la liste krino-recents. */
+function migrerRecents() {
+  const vieux = localStorage.getItem("krino-dernier");
+  if (!vieux) return;
+  ajouterRecent(vieux);
+  localStorage.removeItem("krino-dernier");
+}
+
+/** (Re)construit l'accueil : bouton principal « Reprendre » + liste secondaire. */
+function rendreRecentsAccueil() {
+  const recents = lireRecents();
+  const btn = $("#btn-dernier") as unknown as HTMLButtonElement;
+  const liste = $("#liste-recents");
+  liste.innerHTML = "";
+  if (!recents.length) {
+    btn.hidden = true;
+    return;
+  }
+  const [premier, ...suivants] = recents;
+  btn.hidden = false;
+  btn.textContent = t("accueil.reprendre", { d: premier });
+  btn.onclick = () => void ouvrirDossier(premier);
+  if (!suivants.length) return;
+  const titre = document.createElement("p");
+  titre.className = "recents-titre";
+  titre.textContent = t("accueil.recents");
+  liste.appendChild(titre);
+  for (const chemin of suivants) {
+    const b = document.createElement("button");
+    b.className = "btn recent-item";
+    b.textContent = chemin.split(/[\\/]/).pop() ?? chemin;
+    b.title = chemin;
+    b.onclick = () => void ouvrirDossier(chemin);
+    liste.appendChild(b);
+  }
+}
+
 async function ouvrirDossier(chemin: string) {
   racine = chemin;
-  localStorage.setItem("krino-dernier", chemin);
+  ajouterRecent(chemin);
   montrerChargement(t("chargement.analyse"), t("chargement.arborescence"), true);
   try {
     medias = await invoke<Media[]>("scanner", { racine });
@@ -2037,39 +2093,57 @@ function versionPlusRecente(distante: string, locale: string): boolean {
 
 let urlDerniereVersion = "";
 let majCourante: Update | null = null;
+let installerALaFermeture = false; // l'utilisateur a choisi « À la fermeture »
+let fermetureEnCours = false; // téléchargement/installation à la fermeture en cours
 
 /** Vérifie via le plugin updater (installation intégrée) ; en développement ou
     si le plugin échoue, retombe sur l'API GitHub (lien vers la page de release). */
 async function verifierMaj(silencieux: boolean) {
-  const locale = await getVersion();
-  try {
-    majCourante = await check();
-    if (majCourante) {
-      $("#maj-detail").textContent = t("maj.texte", { v: majCourante.version, l: locale });
-      $("#btn-maj-telecharger").textContent = t("maj.installer");
-      ($("#modale-maj") as unknown as HTMLDialogElement).showModal();
-    } else if (!silencieux) {
-      await informer(t("maj.aJour", { l: locale }));
-    }
-    return;
-  } catch {
-    majCourante = null;
+  // Retour visuel pendant la vérification manuelle (le check() peut être lent).
+  const btnVerif = $("#btn-verif-maj") as unknown as HTMLButtonElement;
+  if (!silencieux) {
+    btnVerif.disabled = true;
+    btnVerif.textContent = t("maj.verification");
   }
+  const locale = await getVersion();
+  const btnFermeture = $("#btn-maj-fermeture") as unknown as HTMLButtonElement;
   try {
-    const rep = await fetch("https://api.github.com/repos/Bastien-Gaffet/krino/releases/latest");
-    if (!rep.ok) throw new Error(String(rep.status));
-    const data = await rep.json();
-    const distante = String(data.tag_name ?? "").replace(/^v/, "");
-    if (distante && versionPlusRecente(distante, locale)) {
-      urlDerniereVersion = data.html_url ?? "https://github.com/Bastien-Gaffet/krino/releases";
-      $("#maj-detail").textContent = t("maj.texte", { v: distante, l: locale });
-      $("#btn-maj-telecharger").textContent = t("maj.telecharger");
-      ($("#modale-maj") as unknown as HTMLDialogElement).showModal();
-    } else if (!silencieux) {
-      await informer(t("maj.aJour", { l: locale }));
+    try {
+      majCourante = await check();
+      if (majCourante) {
+        $("#maj-detail").textContent = t("maj.texte", { v: majCourante.version, l: locale });
+        $("#btn-maj-telecharger").textContent = t("maj.installer");
+        btnFermeture.hidden = false; // installation intégrée : proposer « À la fermeture »
+        ($("#modale-maj") as unknown as HTMLDialogElement).showModal();
+      } else if (!silencieux) {
+        await informer(t("maj.aJour", { l: locale }));
+      }
+      return;
+    } catch {
+      majCourante = null;
     }
-  } catch {
-    if (!silencieux) await informer(t("maj.erreur"));
+    try {
+      const rep = await fetch("https://api.github.com/repos/Bastien-Gaffet/krino/releases/latest");
+      if (!rep.ok) throw new Error(String(rep.status));
+      const data = await rep.json();
+      const distante = String(data.tag_name ?? "").replace(/^v/, "");
+      if (distante && versionPlusRecente(distante, locale)) {
+        urlDerniereVersion = data.html_url ?? "https://github.com/Bastien-Gaffet/krino/releases";
+        $("#maj-detail").textContent = t("maj.texte", { v: distante, l: locale });
+        $("#btn-maj-telecharger").textContent = t("maj.telecharger");
+        btnFermeture.hidden = true; // pas d'installation intégrée en repli GitHub
+        ($("#modale-maj") as unknown as HTMLDialogElement).showModal();
+      } else if (!silencieux) {
+        await informer(t("maj.aJour", { l: locale }));
+      }
+    } catch {
+      if (!silencieux) await informer(t("maj.erreur"));
+    }
+  } finally {
+    if (!silencieux) {
+      btnVerif.disabled = false;
+      btnVerif.textContent = t("reglages.maj");
+    }
   }
 }
 
@@ -2082,6 +2156,10 @@ async function installerMaj() {
   }
   const btn = $("#btn-maj-telecharger") as unknown as HTMLButtonElement;
   btn.disabled = true;
+  ($("#btn-maj-fermeture") as unknown as HTMLButtonElement).disabled = true;
+  // Proposer Ko-fi au prochain démarrage, une fois la maj installée.
+  prefs.kofiApresMaj = true;
+  sauverPrefs();
   let total = 0, recu = 0;
   try {
     await majCourante.downloadAndInstall((ev) => {
@@ -2096,9 +2174,63 @@ async function installerMaj() {
     });
     await relaunch();
   } catch (err) {
+    // Échec : ne pas laisser le drapeau Ko-fi pour un démarrage qui n'a pas changé de version.
+    prefs.kofiApresMaj = false;
+    sauverPrefs();
     await informer(t("maj.erreurInstall", { e: String(err) }));
     btn.disabled = false;
+    ($("#btn-maj-fermeture") as unknown as HTMLButtonElement).disabled = false;
   }
+}
+
+/** Choix « À la fermeture » : mémorise la maj et diffère l'installation. */
+function programmerMajFermeture() {
+  if (!majCourante) return;
+  installerALaFermeture = true;
+  prefs.kofiApresMaj = true;
+  sauverPrefs();
+  ($("#modale-maj") as unknown as HTMLDialogElement).close();
+}
+
+/** Intercepte la fermeture pour installer la maj différée avant de quitter.
+    Flux : preventDefault → fenêtre de progression → downloadAndInstall → exit(0)
+    (l'installeur NSIS termine/relance seul sous Windows). En cas d'échec :
+    informer puis fermer quand même. Un second clic « fermer » pendant le
+    téléchargement est ignoré (pas d'empilement). */
+async function installerAFermeture() {
+  const fenetre = getCurrentWindow();
+  await fenetre.onCloseRequested(async (e) => {
+    if (!installerALaFermeture || !majCourante) return; // fermeture normale
+    e.preventDefault();
+    if (fermetureEnCours) return; // déjà en cours : ne pas empiler
+    fermetureEnCours = true;
+    const modale = $("#modale-maj") as unknown as HTMLDialogElement;
+    ($("#btn-maj-telecharger") as unknown as HTMLButtonElement).hidden = true;
+    ($("#btn-maj-fermeture") as unknown as HTMLButtonElement).hidden = true;
+    ($("#btn-maj-plus-tard") as unknown as HTMLButtonElement).hidden = true;
+    $("#maj-detail").textContent = t("maj.telechargement", { p: 0 });
+    if (!modale.open) modale.showModal();
+    let total = 0, recu = 0;
+    try {
+      await majCourante.downloadAndInstall((ev) => {
+        if (ev.event === "Started") total = ev.data.contentLength ?? 0;
+        else if (ev.event === "Progress") {
+          recu += ev.data.chunkLength;
+          const pct = total ? Math.round((100 * recu) / total) : 0;
+          $("#maj-detail").textContent = t("maj.telechargement", { p: pct });
+        } else if (ev.event === "Finished") {
+          $("#maj-detail").textContent = t("maj.installation");
+        }
+      });
+      await exit(0); // l'installeur NSIS prend le relais
+    } catch (err) {
+      // Échec du téléchargement : informer puis fermer quand même.
+      prefs.kofiApresMaj = false;
+      sauverPrefs();
+      await informer(t("maj.erreurFermeture", { e: String(err) }));
+      await fenetre.destroy();
+    }
+  });
 }
 
 /** Fenêtre de soutien Ko-fi — aux grandes étapes seulement. */
@@ -2430,13 +2562,8 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // Accueil
   $("#btn-choisir").addEventListener("click", choisirDossier);
-  const dernier = localStorage.getItem("krino-dernier");
-  if (dernier) {
-    const btn = $("#btn-dernier") as unknown as HTMLButtonElement;
-    btn.hidden = false;
-    btn.textContent = t("accueil.reprendre", { d: dernier });
-    btn.addEventListener("click", () => ouvrirDossier(dernier));
-  }
+  migrerRecents();
+  rendreRecentsAccueil();
 
   // Barre latérale
   for (const btn of document.querySelectorAll<HTMLButtonElement>(".nav-item[data-vue]")) {
@@ -2485,6 +2612,7 @@ window.addEventListener("DOMContentLoaded", () => {
   // Vue mois
   $("#btn-retour-accueil").addEventListener("click", () => {
     ($("#cadre-app") as unknown as HTMLElement).hidden = true;
+    rendreRecentsAccueil();
     afficherVue("vue-accueil");
   });
   $("#tri-mois").addEventListener("change", rendreMois);
@@ -2595,9 +2723,17 @@ window.addEventListener("DOMContentLoaded", () => {
     ($("#modale-kofi") as unknown as HTMLDialogElement).close();
   });
   $("#btn-maj-telecharger").addEventListener("click", () => void installerMaj());
+  $("#btn-maj-fermeture").addEventListener("click", programmerMajFermeture);
   $("#btn-verif-maj").addEventListener("click", () => verifierMaj(false));
   $("#btn-aide-blocage").addEventListener("click", () => void openUrl(URL_AIDE_BLOCAGE));
+  void installerAFermeture(); // intercepte la fermeture pour installer une maj différée
   void verifierMaj(true); // vérification silencieuse au démarrage
+  // Ko-fi après une installation de mise à jour (léger délai pour ne pas gêner le démarrage).
+  if (prefs.kofiApresMaj) {
+    prefs.kofiApresMaj = false;
+    sauverPrefs();
+    setTimeout(() => proposerSoutien(), 1500);
+  }
   ($("#modale-valide") as unknown as HTMLDialogElement).addEventListener("close", () => {
     if (jalonKofi) { jalonKofi = false; proposerSoutien(); }
   });

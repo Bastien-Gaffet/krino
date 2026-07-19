@@ -200,6 +200,23 @@ async function urlMiniature(m: { rel: string; video: boolean }, corbeille = fals
   return cacheMiniatures.get(cle)!;
 }
 
+/** Élément d'aperçu pour l'éventail des cartes (mois, albums) : une image pour
+   les photos, une balise vidéo (preload metadata, #t=0.1) pour les vidéos —
+   ainsi un mois/album ne contenant que des vidéos n'affiche plus une case vide. */
+async function elementApercuEventail(f: { rel: string; video: boolean }, corbeille = false): Promise<HTMLElement> {
+  if (f.video) {
+    const v = document.createElement("video");
+    v.preload = "metadata";
+    v.muted = true;
+    v.src = `${convertFileSrc(corbeille ? srcCorbeille(f.rel) : src(f.rel))}#t=0.1`;
+    return v;
+  }
+  const img = document.createElement("img");
+  img.loading = "lazy";
+  img.src = await urlMiniature(f, corbeille);
+  return img;
+}
+
 async function sauver() {
   await invoke("ecrire_etat", { racine, etat });
 }
@@ -400,7 +417,7 @@ function carteDeMois(s: StatsMois): HTMLElement {
   const carte = document.createElement("div");
   carte.className = "carte-mois" + (s.valide ? " fait" : "");
   const pct = s.fichiers.length ? Math.round((100 * s.decides) / s.fichiers.length) : 0;
-  const apercus = s.fichiers.filter((f) => !f.video).slice(0, 3);
+  const apercus = s.fichiers.slice(0, 3);
   carte.innerHTML = `
     <h3>${nomCle(s.cle)}</h3>
     <div class="eventail"></div>
@@ -413,10 +430,7 @@ function carteDeMois(s: StatsMois): HTMLElement {
   const eventail = carte.querySelector(".eventail") as HTMLElement;
   (async () => {
     for (const f of apercus) {
-      const img = document.createElement("img");
-      img.loading = "lazy";
-      img.src = await urlMiniature(f);
-      eventail.appendChild(img);
+      eventail.appendChild(await elementApercuEventail(f));
     }
   })();
   if (s.valide) {
@@ -1302,6 +1316,12 @@ function rendreNavAlbums() {
     b.className = "nav-item nav-album";
     b.dataset.album = nom;
     b.title = libelle;
+    if (nom === ALBUM_FAVORIS) {
+      const ico = document.createElement("span");
+      ico.className = "ico-nav coeur-nav";
+      ico.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.6-9.5-9C1 9 2.5 5 6 5c2 0 3.2 1.2 4 2.3C10.8 6.2 12 5 14 5c3.5 0 5 4 3.5 7-2.5 4.4-9.5 9-9.5 9z"/></svg>`;
+      b.appendChild(ico);
+    }
     const lib = document.createElement("span");
     lib.className = "nav-album-nom";
     lib.textContent = libelle;
@@ -1379,14 +1399,11 @@ function carteAlbum(nom: string, libelle: string, rels: string[], reordonnable: 
   const eventail = carte.querySelector(".eventail") as HTMLElement;
   const apercus = rels
     .map((r) => medias.find((m) => m.rel === r))
-    .filter((m): m is Media => !!m && !m.video)
+    .filter((m): m is Media => !!m)
     .slice(0, 3);
   (async () => {
     for (const f of apercus) {
-      const img = document.createElement("img");
-      img.loading = "lazy";
-      img.src = await urlMiniature(f);
-      eventail.appendChild(img);
+      eventail.appendChild(await elementApercuEventail(f));
     }
   })();
   carte.addEventListener("click", () => {
@@ -1788,7 +1805,12 @@ function majBadgeVignette(rel: string) {
   const badges = v?.querySelector<HTMLElement>(".badges-galerie");
   if (!badges) return;
   badges.textContent = "";
-  if (etat.favoris.includes(rel)) badges.append("★");
+  if (etat.favoris.includes(rel)) {
+    const c = document.createElement("span");
+    c.className = "coeur-badge";
+    c.textContent = "♥";
+    badges.append(c);
+  }
   if (!etat.decisions[rel]) badges.append(badges.textContent ? " · " : "", t("galerie.badgeNonTriee"));
 }
 
@@ -1925,7 +1947,12 @@ function vignetteGalerie(m: Media): HTMLElement {
   }
   const badges = document.createElement("span");
   badges.className = "badges-galerie";
-  if (etat.favoris.includes(m.rel)) badges.append("★");
+  if (etat.favoris.includes(m.rel)) {
+    const c = document.createElement("span");
+    c.className = "coeur-badge";
+    c.textContent = "♥";
+    badges.append(c);
+  }
   if (!etat.decisions[m.rel]) badges.append(badges.textContent ? " · " : "", t("galerie.badgeNonTriee"));
   v.appendChild(badges);
   v.addEventListener("click", (e) => clicVignette(m.rel, e));
@@ -2328,6 +2355,7 @@ window.addEventListener("DOMContentLoaded", () => {
     });
   }
   $("#nav-reglages").addEventListener("click", ouvrirReglages);
+  $("#nav-kofi").addEventListener("click", proposerSoutien);
   $("#nav-nouvel-album").addEventListener("click", () => void creerAlbum());
   $("#btn-retour-choix").addEventListener("click", () => {
     modeChoixAlbum = false;

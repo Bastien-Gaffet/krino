@@ -22,16 +22,17 @@
       <nav id="barre-laterale" class="barre-laterale">
         <div class="marque-krino">KRINO</div>
         <div id="nav-dossier" class="nav-dossier"></div>
-        <button class="nav-item actif" data-vue="vue-mois" data-i18n="nav.trier"></button>
-        <button class="nav-item" data-vue="vue-galerie" data-i18n="nav.galerie"></button>
-        <button class="nav-item nav-titre-albums" data-vue="vue-albums" data-i18n="nav.albums"></button>
+        <button class="nav-item actif" data-vue="vue-mois"><svg class="ico-nav" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M7 12h10M10 17h4"/></svg><span data-i18n="nav.trier"></span></button>
+        <button class="nav-item" data-vue="vue-galerie"><svg class="ico-nav" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg><span data-i18n="nav.galerie"></span></button>
+        <button class="nav-item nav-titre-albums" data-vue="vue-albums"><svg class="ico-nav" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg><span data-i18n="nav.albums"></span></button>
         <div id="nav-albums"></div>
         <button id="nav-nouvel-album" class="nav-item discret nav-nouvel-album"><span data-i18n="albums.nouveau"></span><span class="plus-nouvel-album">+</span></button>
-        <button class="nav-item" data-vue="vue-doublons" data-i18n="outils.ongletDoublons"></button>
-        <button class="nav-item" data-vue="vue-rangement" data-i18n="outils.ongletRangement"></button>
+        <button class="nav-item" data-vue="vue-doublons"><svg class="ico-nav" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg><span data-i18n="outils.ongletDoublons"></span></button>
+        <button class="nav-item" data-vue="vue-rangement"><svg class="ico-nav" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 4h18v4H3z"/><path d="M5 8v11a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1V8"/><path d="M10 12h4"/></svg><span data-i18n="outils.ongletRangement"></span></button>
         <span class="espace"></span>
-        <button class="nav-item" data-vue="vue-corbeille" data-i18n="mois.corbeille"></button>
-        <button id="nav-reglages" class="nav-item" data-i18n="mois.reglages"></button>
+        <button id="nav-kofi" class="nav-item nav-kofi"><svg class="ico-nav" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.6-9.5-9C1 9 2.5 5 6 5c2 0 3.2 1.2 4 2.3C10.8 6.2 12 5 14 5c3.5 0 5 4 3.5 7-2.5 4.4-9.5 9-9.5 9z"/></svg><span data-i18n="kofi.soutenir"></span></button>
+        <button class="nav-item" data-vue="vue-corbeille"><svg class="ico-nav" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6"/></svg><span data-i18n="mois.corbeille"></span></button>
+        <button id="nav-reglages" class="nav-item"><svg class="ico-nav" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span data-i18n="mois.reglages"></span></button>
       </nav>
       <main class="contenu-app">
     <!-- ═══ Liste des mois ═══ -->
@@ -74,7 +75,7 @@
       </div>
       <div id="barre-selection" class="barre-selection" hidden>
         <span id="bilan-selection"></span>
-        <button id="sel-favori" class="btn">&#9733; <span data-i18n="galerie.favori"></span></button>
+        <button id="sel-favori" class="btn"><svg class="ico-coeur" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.6-9.5-9C1 9 2.5 5 6 5c2 0 3.2 1.2 4 2.3C10.8 6.2 12 5 14 5c3.5 0 5 4 3.5 7-2.5 4.4-9.5 9-9.5 9z"/></svg> <span data-i18n="galerie.favori"></span></button>
         <button id="sel-deplacer" class="btn btn-primaire" data-i18n="albums.deplacer"></button>
         <button id="sel-retirer" class="btn" data-i18n="albums.retirer" hidden></button>
         <button id="sel-corbeille" class="btn btn-danger-leger" data-i18n="mois.corbeille"></button>
@@ -133,7 +134,7 @@
       </div>
       <footer id="pied-tri" class="pied-tri">
         <button id="btn-jeter" class="btn btn-jeter"><span data-i18n="tri.jeter"></span> <kbd id="kbd-jeter"></kbd></button>
-        <button id="btn-favori" class="btn btn-favori" data-i18n-title="tri.favoriTitre">&#9733; <kbd id="kbd-favori"></kbd></button>
+        <button id="btn-favori" class="btn btn-favori" data-i18n-title="tri.favoriTitre"><svg class="ico-coeur" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s-7-4.6-9.5-9C1 9 2.5 5 6 5c2 0 3.2 1.2 4 2.3C10.8 6.2 12 5 14 5c3.5 0 5 4 3.5 7-2.5 4.4-9.5 9-9.5 9z"/></svg> <kbd id="kbd-favori"></kbd></button>
         <span class="aide-zoom" data-i18n="tri.aideZoom"></span>
         <button id="btn-garder" class="btn btn-garder"><span data-i18n="tri.garder"></span> <kbd id="kbd-garder"></kbd></button>
       </footer>

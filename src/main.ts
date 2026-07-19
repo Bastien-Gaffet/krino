@@ -1053,6 +1053,7 @@ function rendreNavAlbums() {
       allerA("vue-galerie");
       b.classList.add("actif");
     });
+    installerDropAlbum(b, nom);
     conteneur.appendChild(b);
   };
   entree(ALBUM_FAVORIS, t("albums.favoris", { n: etat.favoris.length }));
@@ -1089,6 +1090,43 @@ function majSelectionVisuelle() {
     v.classList.toggle("selectionnee", selectionGalerie.has(v.dataset.rel!));
   }
   majBarreSelection();
+}
+
+/* ── Glisser-déposer de la sélection vers les albums de la barre latérale ── */
+let dragEnCours: string[] = [];
+
+function demarrerDrag(rel: string, e: DragEvent) {
+  if (!selectionGalerie.has(rel)) {
+    selectionGalerie = new Set([rel]);
+    majSelectionVisuelle();
+  }
+  dragEnCours = [...selectionGalerie];
+  const fantome = document.createElement("div");
+  fantome.className = "fantome-drag";
+  fantome.textContent = t("galerie.fantomeDrag", { n: dragEnCours.length });
+  document.body.appendChild(fantome);
+  e.dataTransfer!.setDragImage(fantome, 20, 20);
+  e.dataTransfer!.effectAllowed = "copy";
+  setTimeout(() => fantome.remove());
+}
+
+function installerDropAlbum(b: HTMLButtonElement, nom: string) {
+  b.addEventListener("dragover", (e) => { e.preventDefault(); b.classList.add("drop-cible"); });
+  b.addEventListener("dragleave", () => b.classList.remove("drop-cible"));
+  b.addEventListener("drop", async (e) => {
+    e.preventDefault();
+    b.classList.remove("drop-cible");
+    if (!dragEnCours.length) return;
+    if (nom === ALBUM_FAVORIS) {
+      etat.favoris = [...new Set([...etat.favoris, ...dragEnCours])];
+    } else {
+      const liste = etat.albums[nom] ?? (etat.albums[nom] = []);
+      for (const r of dragEnCours) if (!liste.includes(r)) liste.push(r);
+    }
+    dragEnCours = [];
+    await sauver();
+    rendreNavAlbums();
+  });
 }
 
 function installerRectangleSelection() {
@@ -1298,6 +1336,8 @@ function vignetteGalerie(m: Media): HTMLElement {
   v.appendChild(badges);
   v.addEventListener("click", (e) => clicVignette(m.rel, e));
   v.addEventListener("dblclick", () => void ouvrirVisionneuse(m.rel));
+  v.draggable = true;
+  v.addEventListener("dragstart", (e) => demarrerDrag(m.rel, e));
   return v;
 }
 

@@ -391,6 +391,8 @@ dialog h2 { margin-bottom: 0.6em; }
   color: var(--sourd); padding: 10px 10px 2px; }
 .nav-album.drop-cible { outline: 2px dashed var(--accent); }
 body.plein-ecran .barre-laterale { display: none; }
+.fantome-drag { position: fixed; top: -100px; padding: 6px 12px; background: var(--accent);
+  color: #fff; border-radius: 14px; font-size: .8rem; z-index: 70; }
 
 /* ═══ Galerie ═══ */
 #sections-galerie .grille-vignettes {

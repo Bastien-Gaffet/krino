@@ -16,6 +16,16 @@ const FR: Dico = {
   "nav.galerie": "Galerie",
   "nav.albums": "Albums",
 
+  "galerie.tout": "Tout",
+  "galerie.nonTriees": "Non triées",
+  "galerie.gardees": "Gardées",
+  "galerie.favoris": "Favoris",
+  "galerie.videos": "Vidéos",
+  "galerie.bilan": "{n} fichiers",
+  "galerie.badgeNonTriee": "à trier",
+  "galerie.favori": "Favori",
+  "galerie.annulerSel": "Annuler la sélection",
+
   "mois.dossier": "Dossier",
   "mois.inverser": "Inverser l'ordre",
   "tri.date": "Date",
@@ -227,6 +237,16 @@ const EN: Dico = {
   "nav.trier": "Sort",
   "nav.galerie": "Gallery",
   "nav.albums": "Albums",
+
+  "galerie.tout": "All",
+  "galerie.nonTriees": "Unsorted",
+  "galerie.gardees": "Kept",
+  "galerie.favoris": "Favorites",
+  "galerie.videos": "Videos",
+  "galerie.bilan": "{n} files",
+  "galerie.badgeNonTriee": "to sort",
+  "galerie.favori": "Favorite",
+  "galerie.annulerSel": "Clear selection",
 
   "mois.dossier": "Folder",
   "mois.inverser": "Reverse order",

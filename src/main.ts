@@ -225,6 +225,7 @@ function allerA(vue: string) {
   afficherVue(vue);
   activerNav(vue);
   if (vue === "vue-mois") rendreMois();
+  else if (vue === "vue-galerie") rendreGalerie();
   else if (vue === "vue-corbeille") void rendreCorbeille();
 }
 
@@ -1031,7 +1032,125 @@ const ALBUM_FAVORIS = "__favoris__";
 function contenuAlbum(nom: string): string[] {
   return nom === ALBUM_FAVORIS ? etat.favoris : (etat.albums[nom] ?? []);
 }
-void contenuAlbum;
+
+/* ═══ Galerie ═══ */
+let albumOuvert: string | null = null; // null = galerie complète ; sinon nom d'album ou ALBUM_FAVORIS
+let selectionGalerie = new Set<string>();
+let ancreSelection: string | null = null; // pour Maj+clic (Task 5)
+void ancreSelection;
+
+const observateurGalerie = new IntersectionObserver((entrees) => {
+  for (const e of entrees) {
+    if (!e.isIntersecting) continue;
+    const img = e.target as HTMLImageElement;
+    observateurGalerie.unobserve(img);
+    const rel = img.dataset.rel!;
+    const m = medias.find((x) => x.rel === rel);
+    if (m) void urlMiniature(m).then((u) => { img.src = u; });
+  }
+}, { rootMargin: "600px" });
+
+function mediasGalerie(): Media[] {
+  const filtre = ($("#filtre-galerie") as unknown as HTMLSelectElement).value;
+  let liste = [...medias];
+  if (albumOuvert) {
+    const contenu = new Set(contenuAlbum(albumOuvert));
+    liste = liste.filter((m) => contenu.has(m.rel));
+  }
+  switch (filtre) {
+    case "nontriees": liste = liste.filter((m) => !etat.decisions[m.rel]); break;
+    case "gardees": liste = liste.filter((m) => etat.decisions[m.rel] === "garder"); break;
+    case "favoris": liste = liste.filter((m) => etat.favoris.includes(m.rel)); break;
+    case "videos": liste = liste.filter((m) => m.video); break;
+  }
+  return liste.sort((a, b) => dateDe(a) - dateDe(b));
+}
+
+function rendreGalerie() {
+  observateurGalerie.disconnect();
+  selectionGalerie = new Set();
+  majBarreSelection();
+  const liste = mediasGalerie();
+  $("#titre-galerie").textContent = albumOuvert
+    ? (albumOuvert === ALBUM_FAVORIS ? t("albums.nomFavoris") : albumOuvert)
+    : t("nav.galerie");
+  $("#bilan-galerie").textContent = t("galerie.bilan", { n: liste.length });
+  const conteneur = $("#sections-galerie");
+  conteneur.innerHTML = "";
+  conteneur.style.setProperty("--taille-vignette",
+    `${($("#taille-galerie") as unknown as HTMLInputElement).value}px`);
+  const saut = $("#saut-galerie") as unknown as HTMLSelectElement;
+  saut.innerHTML = "";
+  let cleCourante = "";
+  let grille: HTMLElement | null = null;
+  for (const m of liste) {
+    const cle = cleDe(m);
+    if (cle !== cleCourante) {
+      cleCourante = cle;
+      const titre = document.createElement("h2");
+      titre.className = "titre-annee";
+      titre.id = `gal-${cle}`;
+      titre.textContent = nomCle(cle);
+      conteneur.appendChild(titre);
+      grille = document.createElement("div");
+      grille.className = "grille-vignettes marge";
+      conteneur.appendChild(grille);
+      const opt = document.createElement("option");
+      opt.value = `gal-${cle}`;
+      opt.textContent = nomCle(cle);
+      saut.appendChild(opt);
+    }
+    grille!.appendChild(vignetteGalerie(m));
+  }
+}
+
+function vignetteGalerie(m: Media): HTMLElement {
+  const v = document.createElement("div");
+  v.className = "vignette vignette-galerie";
+  v.dataset.rel = m.rel;
+  v.title = m.rel;
+  if (m.video) {
+    // preload=none : la première image n'est chargée qu'à l'apparition
+    v.innerHTML = `<video src="${convertFileSrc(src(m.rel))}#t=0.1" preload="none" muted></video><span class="marque">${t("vignette.video")}</span>`;
+    observateurVideo(v.querySelector("video")!);
+  } else {
+    const img = document.createElement("img");
+    img.decoding = "async";
+    img.dataset.rel = m.rel;
+    observateurGalerie.observe(img);
+    v.appendChild(img);
+  }
+  const badges = document.createElement("span");
+  badges.className = "badges-galerie";
+  if (etat.favoris.includes(m.rel)) badges.append("★");
+  if (!etat.decisions[m.rel]) badges.append(badges.textContent ? " · " : "", t("galerie.badgeNonTriee"));
+  v.appendChild(badges);
+  return v;
+}
+
+function observateurVideo(video: HTMLVideoElement) {
+  const obs = new IntersectionObserver((ent) => {
+    if (ent[0].isIntersecting) { video.preload = "metadata"; obs.disconnect(); }
+  }, { rootMargin: "600px" });
+  obs.observe(video);
+}
+
+function majBarreSelection() {
+  const barre = $("#barre-selection");
+  barre.hidden = selectionGalerie.size === 0;
+  $("#bilan-selection").textContent = t("albums.selection", { n: selectionGalerie.size });
+  ($("#sel-retirer") as unknown as HTMLButtonElement).hidden = !albumOuvert;
+  const cible = $("#sel-album-cible") as unknown as HTMLSelectElement;
+  cible.innerHTML = "";
+  const of = document.createElement("option");
+  of.value = ALBUM_FAVORIS; of.textContent = t("albums.nomFavoris");
+  cible.appendChild(of);
+  for (const nom of Object.keys(etat.albums).sort()) {
+    const o = document.createElement("option");
+    o.value = nom; o.textContent = nom;
+    cible.appendChild(o);
+  }
+}
 
 /* ═══ Mises à jour & soutien ═══ */
 
@@ -1367,7 +1486,10 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // Barre latérale
   for (const btn of document.querySelectorAll<HTMLButtonElement>(".nav-item[data-vue]")) {
-    btn.addEventListener("click", () => allerA(btn.dataset.vue!));
+    btn.addEventListener("click", () => {
+      if (btn.dataset.vue === "vue-galerie") albumOuvert = null;
+      allerA(btn.dataset.vue!);
+    });
   }
   $("#nav-reglages").addEventListener("click", ouvrirReglages);
   $("#nav-nouvel-album").addEventListener("click", async () => {
@@ -1397,6 +1519,22 @@ window.addEventListener("DOMContentLoaded", () => {
     const [fait, total] = e.payload;
     $("#chargement-detail").textContent = t("chargement.progression", { a: fait, b: total });
     $("#chargement-jauge").style.width = total ? `${Math.round((100 * fait) / total)}%` : "0";
+  });
+
+  // Galerie
+  $("#filtre-galerie").addEventListener("change", rendreGalerie);
+  $("#taille-galerie").addEventListener("input", () => {
+    const valeur = ($("#taille-galerie") as unknown as HTMLInputElement).value;
+    $("#sections-galerie").style.setProperty("--taille-vignette", `${valeur}px`);
+  });
+  $("#saut-galerie").addEventListener("change", () => {
+    const valeur = ($("#saut-galerie") as unknown as HTMLSelectElement).value;
+    document.getElementById(valeur)?.scrollIntoView({ behavior: "smooth" });
+  });
+  $("#sel-annuler").addEventListener("click", () => {
+    selectionGalerie = new Set();
+    majBarreSelection();
+    for (const v of document.querySelectorAll(".vignette-galerie.selectionnee")) v.classList.remove("selectionnee");
   });
 
   // Favoris

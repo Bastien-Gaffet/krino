@@ -52,7 +52,34 @@
     </section>
 
     <!-- ═══ Galerie (Task 4) ═══ -->
-    <section id="vue-galerie" class="vue" hidden></section>
+    <section id="vue-galerie" class="vue" hidden>
+      <header class="barre">
+        <span class="titre-dossier" id="titre-galerie"></span>
+        <select id="filtre-galerie" class="btn">
+          <option value="tout" data-i18n="galerie.tout"></option>
+          <option value="nontriees" data-i18n="galerie.nonTriees"></option>
+          <option value="gardees" data-i18n="galerie.gardees"></option>
+          <option value="favoris" data-i18n="galerie.favoris"></option>
+          <option value="videos" data-i18n="galerie.videos"></option>
+        </select>
+        <select id="saut-galerie" class="btn"></select>
+        <input id="taille-galerie" type="range" min="90" max="260" value="150" />
+        <span class="espace"></span>
+        <span id="bilan-galerie" class="progression"></span>
+      </header>
+      <div id="defil-galerie" class="defilable">
+        <div id="sections-galerie"></div>
+      </div>
+      <div id="barre-selection" class="barre-selection" hidden>
+        <span id="bilan-selection"></span>
+        <button id="sel-favori" class="btn">&#9733; <span data-i18n="galerie.favori"></span></button>
+        <select id="sel-album-cible" class="btn"></select>
+        <button id="sel-ajouter" class="btn" data-i18n="albums.ajouterA"></button>
+        <button id="sel-retirer" class="btn" data-i18n="albums.retirer" hidden></button>
+        <button id="sel-corbeille" class="btn btn-danger-leger" data-i18n="mois.corbeille"></button>
+        <button id="sel-annuler" class="btn" data-i18n="galerie.annulerSel"></button>
+      </div>
+    </section>
 
     <!-- ═══ Tri d'un mois ═══ -->
     <section id="vue-tri" class="vue" hidden>

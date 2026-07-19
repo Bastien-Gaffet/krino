@@ -391,3 +391,14 @@ dialog h2 { margin-bottom: 0.6em; }
   color: var(--sourd); padding: 10px 10px 2px; }
 .nav-album.drop-cible { outline: 2px dashed var(--accent); }
 body.plein-ecran .barre-laterale { display: none; }
+
+/* ═══ Galerie ═══ */
+#sections-galerie .grille-vignettes {
+  grid-template-columns: repeat(auto-fill, minmax(var(--taille-vignette, 150px), 1fr));
+}
+.vignette-galerie.selectionnee { outline: 3px solid var(--accent); }
+.badges-galerie { position: absolute; top: 4px; left: 6px; font-size: .68rem;
+  color: #fff; text-shadow: 0 1px 3px #000; pointer-events: none; }
+.barre-selection { display: flex; gap: 10px; align-items: center; justify-content: center;
+  padding: 10px; border-top: 1px solid var(--bord); background: var(--panneau); flex-wrap: wrap; }
+#defil-galerie { position: relative; }

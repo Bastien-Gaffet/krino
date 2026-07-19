@@ -356,15 +356,64 @@ dialog h2 { margin-bottom: 0.6em; }
   word-break: break-all; pointer-events: none;
 }
 
-/* ═══ Organiser : onglets, favoris, albums ═══ */
-.onglets { display: flex; gap: 4px; }
-.onglet { opacity: 0.65; }
-.onglet.actif {
-  opacity: 1;
-  border-color: var(--accent);
-  color: var(--accent);
-}
-.module-outil { padding-top: 0.4rem; }
+/* ═══ Organiser : favoris, albums ═══ */
 .grille-vignettes.marge { margin: 0 1.2rem 1.2rem; }
 .btn-favori { font-size: 1.05rem; }
 .btn-favori.actif { color: #f5c518; border-color: #f5c518; }
+
+/* ═══ Dialogue Krino ═══ */
+.dialogue-krino { min-width: min(420px, 90vw); max-width: 560px; }
+.dialogue-krino .dialogue-texte { white-space: pre-line; margin: 0 0 1rem; line-height: 1.45; }
+.dialogue-krino .dialogue-champ {
+  width: 100%; box-sizing: border-box; margin-bottom: 1rem;
+  padding: 8px 10px; border-radius: 8px;
+  border: 1px solid var(--bord); background: var(--fond); color: var(--texte);
+}
+
+/* ═══ Barre latérale ═══ */
+.cadre-app { display: flex; height: 100vh; }
+.barre-laterale {
+  width: 200px; flex-shrink: 0; display: flex; flex-direction: column;
+  gap: 2px; padding: 12px 8px; border-right: 1px solid var(--bord);
+  background: var(--panneau); overflow-y: auto;
+}
+.contenu-app { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; }
+.contenu-app .vue { flex: 1; height: auto; min-height: 0; display: flex; flex-direction: column; }
+.marque-krino { font-weight: 800; letter-spacing: 2px; padding: 4px 10px; }
+.nav-dossier { font-size: .72rem; color: var(--sourd); padding: 0 10px 10px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nav-item { text-align: left; border: none; background: none; color: var(--texte);
+  padding: 7px 10px; border-radius: 8px; cursor: pointer; font-size: .92rem; }
+.nav-item:hover { background: var(--voile); }
+.nav-item.actif { background: var(--accent); color: #fff; }
+.nav-item.discret { color: var(--sourd); font-size: .8rem; }
+.nav-titre { font-size: .7rem; text-transform: uppercase; letter-spacing: 1px;
+  color: var(--sourd); padding: 10px 10px 2px; }
+.nav-album.drop-cible { outline: 2px dashed var(--accent); }
+body.plein-ecran .barre-laterale { display: none; }
+.fantome-drag { position: fixed; top: -100px; padding: 6px 12px; background: var(--accent);
+  color: #fff; border-radius: 14px; font-size: .8rem; z-index: 70; }
+
+/* ═══ Galerie ═══ */
+#sections-galerie .grille-vignettes {
+  grid-template-columns: repeat(auto-fill, minmax(var(--taille-vignette, 150px), 1fr));
+}
+.vignette-galerie.selectionnee { outline: 3px solid var(--accent); }
+.badges-galerie { position: absolute; top: 4px; left: 6px; font-size: .68rem;
+  color: #fff; text-shadow: 0 1px 3px #000; pointer-events: none; }
+.barre-selection { display: flex; gap: 10px; align-items: center; justify-content: center;
+  padding: 10px; border-top: 1px solid var(--bord); background: var(--panneau); flex-wrap: wrap; }
+#defil-galerie { position: relative; }
+
+/* ═══ Visionneuse & rectangle ═══ */
+.visionneuse { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.92);
+  display: flex; align-items: center; justify-content: center; }
+.visionneuse[hidden] { display: none; }
+.visionneuse img, .visionneuse video { max-width: 92vw; max-height: 88vh; }
+.vis-fermer { position: absolute; top: 14px; right: 18px; }
+.vis-nav { position: absolute; top: 50%; transform: translateY(-50%); }
+.vis-prec { left: 14px; } .vis-suiv { right: 14px; }
+.vis-legende { position: absolute; bottom: 12px; left: 0; right: 0;
+  text-align: center; color: #ddd; font-size: .85rem; }
+.rectangle-selection { position: absolute; border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent); z-index: 5; pointer-events: none; }

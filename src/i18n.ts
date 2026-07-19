@@ -12,6 +12,22 @@ const FR: Dico = {
   "accueil.reprendre": "Reprendre : {d}",
   "accueil.titreDialogue": "Dossier de photos à trier",
 
+  "nav.trier": "Trier",
+  "nav.galerie": "Galerie",
+  "nav.albums": "Albums",
+
+  "galerie.tout": "Tout",
+  "galerie.nonTriees": "Non triées",
+  "galerie.gardees": "Gardées",
+  "galerie.favoris": "Favoris",
+  "galerie.videos": "Vidéos",
+  "galerie.bilan": "{n} fichiers",
+  "galerie.badgeNonTriee": "à trier",
+  "galerie.favori": "Favori",
+  "galerie.annulerSel": "Annuler la sélection",
+  "galerie.vide": "Aucun fichier ne correspond au filtre.",
+  "galerie.fantomeDrag": "{n} photo(s)",
+
   "mois.dossier": "Dossier",
   "mois.inverser": "Inverser l'ordre",
   "tri.date": "Date",
@@ -126,11 +142,13 @@ const FR: Dico = {
   "tuto.4": "La molette zoome dans l'image, le double-clic réinitialise. « Annuler » (ou Retour arrière) rattrape une erreur. Si des photos ont été prises en rafale, un bouton « Comparer la rafale » apparaît.",
   "tuto.5": "Quand toutes les décisions sont prises, la Revue du mois (Entrée) récapitule tout : clique sur une vignette pour changer d'avis, puis « Valider le mois ».",
   "tuto.6": "À la validation, les photos jetées sont DÉPLACÉES dans la corbeille interne de Krino — rien n'est encore supprimé. L'écran Corbeille permet de tout vérifier, restaurer fichier par fichier, ou vider définitivement pour libérer l'espace.",
-  "tuto.7": "C'est tout ! Réglages te permet de changer le thème, la langue, les raccourcis, le regroupement, et de revoir ce tutoriel. Bon tri !",
+  "tuto.7": "La barre latérale est le cœur de Krino : Trier pour le tri par cartes, Galerie pour tout revoir sans refaire le tri (sélection multiple, glisser vers un album), tes Albums, les Doublons, le Rangement et la Corbeille.",
+  "tuto.8": "C'est tout ! Réglages te permet de changer le thème, la langue, les raccourcis, le regroupement, et de revoir ce tutoriel. Bon tri !",
 
   "erreur.dejaPresent": "Un fichier existe déjà à l'emplacement d'origine",
 
   "chargement.corbeille": "Chargement de la corbeille…",
+  "chargement.galerie": "Préparation de la galerie…",
   "chargement.vignettes": "{a} / {b} aperçus",
 
   "maj.titre": "Mise à jour disponible",
@@ -209,6 +227,9 @@ const FR: Dico = {
 
   "chargement.annuler": "Annuler la tâche",
   "confirm.annulerTache": "Annuler la tâche en cours ?\nSi tu la relances plus tard, elle devra recommencer de zéro.",
+
+  "dialogue.ok": "OK",
+  "dialogue.annuler": "Annuler",
 };
 
 const EN: Dico = {
@@ -216,6 +237,22 @@ const EN: Dico = {
   "accueil.choisir": "Choose a folder",
   "accueil.reprendre": "Resume: {d}",
   "accueil.titreDialogue": "Photo folder to sort",
+
+  "nav.trier": "Sort",
+  "nav.galerie": "Gallery",
+  "nav.albums": "Albums",
+
+  "galerie.tout": "All",
+  "galerie.nonTriees": "Unsorted",
+  "galerie.gardees": "Kept",
+  "galerie.favoris": "Favorites",
+  "galerie.videos": "Videos",
+  "galerie.bilan": "{n} files",
+  "galerie.badgeNonTriee": "to sort",
+  "galerie.favori": "Favorite",
+  "galerie.annulerSel": "Clear selection",
+  "galerie.vide": "No file matches the filter.",
+  "galerie.fantomeDrag": "{n} photo(s)",
 
   "mois.dossier": "Folder",
   "mois.inverser": "Reverse order",
@@ -331,11 +368,13 @@ const EN: Dico = {
   "tuto.4": "The wheel zooms into the picture, double-click resets. “Undo” (or Backspace) fixes a mistake. If photos were shot in a burst, a “Compare burst” button appears.",
   "tuto.5": "Once every decision is made, the Month review (Enter) sums everything up: click a thumbnail to change your mind, then “Confirm month”.",
   "tuto.6": "On confirmation, trashed photos are MOVED to Krino's internal trash — nothing is deleted yet. The Trash screen lets you check everything, restore file by file, or empty permanently to free space.",
-  "tuto.7": "That's it! Settings lets you change the theme, language, shortcuts, grouping, and replay this tutorial. Happy sorting!",
+  "tuto.7": "The sidebar is the heart of Krino: Sort for card-based sorting, Gallery to review everything without re-sorting (multi-select, drag to an album), your Albums, Duplicates, Organizing and the Trash.",
+  "tuto.8": "That's it! Settings lets you change the theme, language, shortcuts, grouping, and replay this tutorial. Happy sorting!",
 
   "erreur.dejaPresent": "A file already exists at the original location",
 
   "chargement.corbeille": "Loading the trash…",
+  "chargement.galerie": "Preparing the gallery…",
   "chargement.vignettes": "{a} / {b} previews",
 
   "maj.titre": "Update available",
@@ -414,6 +453,9 @@ const EN: Dico = {
 
   "chargement.annuler": "Cancel task",
   "confirm.annulerTache": "Cancel the current task?\nIf you run it again later, it will have to start over from scratch.",
+
+  "dialogue.ok": "OK",
+  "dialogue.annuler": "Cancel",
 };
 
 const DICOS: Record<Langue, Dico> = { fr: FR, en: EN };

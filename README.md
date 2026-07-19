@@ -36,7 +36,8 @@ démarrage instantané, aucune dépendance à installer pour l'utilisateur final
 - **Tutoriel intégré** au premier lancement, sur un dossier d'images de démonstration — revisionnable depuis les Réglages.
 - **Comparateur de rafales**, **zoom** à la molette, regroupement par **date EXIF ou date de fichier**, HEIC/TIFF via Windows Imaging Component.
 - **Regroupement par événement** (séances de prise de vue) en plus du mois calendaire.
-- **Partie Organiser** : recherche interactive de **doublons exacts et de photos semblables** (choix vignette par vignette, envoi vers la corbeille interne), **rangement automatique en Année/Mois** avec journal d'annulation, **favoris** (★ pendant le tri) et **albums** par thème/projet exportables en dossiers.
+- **Deux modes** reliés par une barre latérale : **Trier** (cartes swipe) et **Organiser** — **Galerie** chronologique de toute la photothèque (filtres, sélection multiple Ctrl/Maj/rectangle, visionneuse, re-décision sans reset), **albums** par thème/projet (glisser-déposer, export en dossier), **doublons** interactifs, **rangement** Année/Mois avec journal d'annulation.
+- **Dialogues intégrés** (plus aucun popup natif du navigateur).
 - **Tâches longues annulables** (scan, analyse de doublons, rangement).
 
 ## 🚀 Développement

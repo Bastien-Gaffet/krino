@@ -18,6 +18,22 @@
       </div>
     </section>
 
+    <div id="cadre-app" class="cadre-app" hidden>
+      <nav id="barre-laterale" class="barre-laterale">
+        <div class="marque-krino">KRINO</div>
+        <div id="nav-dossier" class="nav-dossier"></div>
+        <button class="nav-item actif" data-vue="vue-mois" data-i18n="nav.trier"></button>
+        <button class="nav-item" data-vue="vue-galerie" data-i18n="nav.galerie"></button>
+        <div class="nav-titre" data-i18n="nav.albums"></div>
+        <div id="nav-albums"></div>
+        <button id="nav-nouvel-album" class="nav-item discret" data-i18n="albums.nouveau"></button>
+        <button class="nav-item" data-vue="vue-doublons" data-i18n="outils.ongletDoublons"></button>
+        <button class="nav-item" data-vue="vue-rangement" data-i18n="outils.ongletRangement"></button>
+        <span class="espace"></span>
+        <button class="nav-item" data-vue="vue-corbeille" data-i18n="mois.corbeille"></button>
+        <button id="nav-reglages" class="nav-item" data-i18n="mois.reglages"></button>
+      </nav>
+      <main class="contenu-app">
     <!-- ═══ Liste des mois ═══ -->
     <section id="vue-mois" class="vue" hidden>
       <header class="barre">
@@ -31,13 +47,40 @@
         </select>
         <span id="btn-sens" class="sens" data-i18n-title="mois.inverser" role="button" tabindex="0"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3v10M4 7l4-4 4 4"/></svg></span>
         <label class="filtre-faits"><input type="checkbox" id="masquer-faits" /> <span data-i18n="mois.masquerFaits"></span></label>
-        <span class="espace"></span>
-        <button id="btn-outils" class="btn" data-i18n="mois.outils"></button>
-        <button id="btn-corbeille" class="btn" data-i18n="mois.corbeille"></button>
-        <button id="btn-reglages" class="btn" data-i18n="mois.reglages"></button>
-        <button id="btn-reset-tout" class="btn btn-danger-leger" data-i18n="mois.reset" data-i18n-title="mois.resetTitre"></button>
       </header>
       <div id="conteneur-mois" class="conteneur-mois"></div>
+    </section>
+
+    <!-- ═══ Galerie (Task 4) ═══ -->
+    <section id="vue-galerie" class="vue" hidden>
+      <header class="barre">
+        <span class="titre-dossier" id="titre-galerie"></span>
+        <select id="filtre-galerie" class="btn">
+          <option value="tout" data-i18n="galerie.tout"></option>
+          <option value="nontriees" data-i18n="galerie.nonTriees"></option>
+          <option value="gardees" data-i18n="galerie.gardees"></option>
+          <option value="favoris" data-i18n="galerie.favoris"></option>
+          <option value="videos" data-i18n="galerie.videos"></option>
+        </select>
+        <select id="saut-galerie" class="btn"></select>
+        <input id="taille-galerie" type="range" min="90" max="260" value="150" />
+        <button id="btn-exporter-album2" class="btn" data-i18n="albums.exporter" hidden></button>
+        <button id="btn-supprimer-album2" class="btn btn-danger-leger" data-i18n="albums.supprimer" hidden></button>
+        <span class="espace"></span>
+        <span id="bilan-galerie" class="progression"></span>
+      </header>
+      <div id="defil-galerie" class="defilable">
+        <div id="sections-galerie"></div>
+      </div>
+      <div id="barre-selection" class="barre-selection" hidden>
+        <span id="bilan-selection"></span>
+        <button id="sel-favori" class="btn">&#9733; <span data-i18n="galerie.favori"></span></button>
+        <select id="sel-album-cible" class="btn"></select>
+        <button id="sel-ajouter" class="btn" data-i18n="albums.ajouterA"></button>
+        <button id="sel-retirer" class="btn" data-i18n="albums.retirer" hidden></button>
+        <button id="sel-corbeille" class="btn btn-danger-leger" data-i18n="mois.corbeille"></button>
+        <button id="sel-annuler" class="btn" data-i18n="galerie.annulerSel"></button>
+      </div>
     </section>
 
     <!-- ═══ Tri d'un mois ═══ -->
@@ -131,22 +174,15 @@
       </div>
     </section>
 
-    <!-- ═══ Organiser : doublons, rangement, albums ═══ -->
-    <section id="vue-outils" class="vue" hidden>
+    <!-- ═══ Doublons & similaires ═══ -->
+    <section id="vue-doublons" class="vue" hidden>
       <header class="barre">
-        <button id="btn-retour-outils" class="btn btn-ico">&larr;</button>
-        <span class="titre-dossier" data-i18n="outils.titre"></span>
-        <nav class="onglets">
-          <button class="btn onglet actif" data-module="mod-doublons" data-i18n="outils.ongletDoublons"></button>
-          <button class="btn onglet" data-module="mod-rangement" data-i18n="outils.ongletRangement"></button>
-          <button class="btn onglet" data-module="mod-albums" data-i18n="outils.ongletAlbums"></button>
-        </nav>
+        <span class="titre-dossier" data-i18n="outils.ongletDoublons"></span>
         <span id="bilan-doublons" class="progression"></span>
         <span class="espace"></span>
         <button id="btn-appliquer-doublons" class="btn btn-danger" hidden></button>
       </header>
       <div class="defilable">
-      <div id="mod-doublons" class="module-outil">
         <p class="aide-revue" data-i18n="outils.aide"></p>
         <div class="params-outils">
           <label class="ligne-radio"><input type="radio" name="mode-doublons" value="exact" checked /> <span data-i18n="outils.exact"></span></label>
@@ -163,8 +199,14 @@
         <p id="avertissement-doublons" class="aide-revue" data-i18n="outils.avertissement" hidden></p>
         <div id="groupes-doublons"></div>
       </div>
+    </section>
 
-      <div id="mod-rangement" class="module-outil" hidden>
+    <!-- ═══ Rangement par date ═══ -->
+    <section id="vue-rangement" class="vue" hidden>
+      <header class="barre">
+        <span class="titre-dossier" data-i18n="outils.ongletRangement"></span>
+      </header>
+      <div class="defilable">
         <p class="aide-revue" data-i18n="rangement.aide"></p>
         <div class="params-outils">
           <button id="btn-ranger" class="btn btn-primaire" data-i18n="rangement.lancer"></button>
@@ -172,25 +214,9 @@
           <span id="resultat-rangement" class="progression"></span>
         </div>
       </div>
-
-      <div id="mod-albums" class="module-outil" hidden>
-        <p class="aide-revue" data-i18n="albums.aide"></p>
-        <div class="params-outils">
-          <select id="choix-album" class="btn"></select>
-          <button id="btn-nouvel-album" class="btn" data-i18n="albums.nouveau"></button>
-          <button id="btn-supprimer-album" class="btn" data-i18n="albums.supprimer"></button>
-          <button id="btn-exporter-album" class="btn btn-primaire" data-i18n="albums.exporter"></button>
-        </div>
-        <div class="params-outils" id="actions-selection-album" hidden>
-          <span id="bilan-selection-album" class="progression"></span>
-          <select id="album-cible" class="btn"></select>
-          <button id="btn-ajouter-album" class="btn" data-i18n="albums.ajouterA"></button>
-          <button id="btn-retirer-album" class="btn btn-danger-leger" data-i18n="albums.retirer"></button>
-        </div>
-        <div id="grille-album" class="grille-vignettes marge"></div>
-      </div>
-      </div>
     </section>
+      </main>
+    </div>
 
     <!-- ═══ Modale réglages ═══ -->
     <dialog id="modale-reglages">
@@ -220,6 +246,7 @@
       <h3 class="titre-reglage" data-i18n="reglages.aide"></h3>
       <div class="rangee-boutons gauche">
         <button id="btn-revoir-tuto" class="btn" data-i18n="reglages.tuto"></button>
+        <button id="btn-reset-tout" class="btn btn-danger-leger" data-i18n="mois.reset" data-i18n-title="mois.resetTitre"></button>
         <button id="btn-voir-cgu" class="btn" data-i18n="reglages.cgu"></button>
         <button id="btn-verif-maj" class="btn" data-i18n="reglages.maj"></button>
         <button id="btn-aide-blocage" class="btn" data-i18n="reglages.bloquee"></button>
@@ -266,6 +293,26 @@
       <div class="rangee-boutons">
         <button id="btn-valide-menu" class="btn"><span data-i18n="valide.menu"></span> <kbd id="kbd-valide-menu"></kbd></button>
         <button id="btn-valide-suivant" class="btn btn-primaire"><span data-i18n="valide.suivant"></span> <kbd id="kbd-valide-suivant"></kbd></button>
+      </div>
+    </dialog>
+
+    <!-- ═══ Visionneuse ═══ -->
+    <div id="visionneuse" class="visionneuse" hidden>
+      <button id="vis-fermer" class="btn btn-ico vis-fermer">&times;</button>
+      <button id="vis-prec" class="btn btn-ico vis-nav vis-prec">&larr;</button>
+      <img id="vis-img" alt="" hidden />
+      <video id="vis-video" controls hidden></video>
+      <button id="vis-suiv" class="btn btn-ico vis-nav vis-suiv">&rarr;</button>
+      <div id="vis-legende" class="vis-legende"></div>
+    </div>
+
+    <!-- ═══ Dialogue Krino (confirmations, saisies, messages) ═══ -->
+    <dialog id="dialogue-krino" class="dialogue-krino">
+      <p class="dialogue-texte"></p>
+      <input class="dialogue-champ" type="text" hidden />
+      <div class="rangee-boutons">
+        <button class="btn dialogue-annuler" data-i18n="dialogue.annuler"></button>
+        <button class="btn btn-primaire dialogue-ok" data-i18n="dialogue.ok"></button>
       </div>
     </dialog>
 

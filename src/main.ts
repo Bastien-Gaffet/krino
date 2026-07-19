@@ -228,8 +228,17 @@ function allerA(vue: string) {
   afficherVue(vue);
   activerNav(vue);
   if (vue === "vue-mois") rendreMois();
-  else if (vue === "vue-galerie") rendreGalerie();
+  else if (vue === "vue-galerie") afficherGalerie();
   else if (vue === "vue-corbeille") void rendreCorbeille();
+}
+
+function afficherGalerie() {
+  if (medias.length > 2000) {
+    montrerChargement(t("chargement.galerie"));
+    setTimeout(() => { rendreGalerie(); cacherChargement(); });
+  } else {
+    rendreGalerie();
+  }
 }
 
 function montrerChargement(titre: string, detail = "", annulable = false) {
@@ -1585,6 +1594,7 @@ const ETAPES_TUTO: EtapeTuto[] = [
   { cible: "#pied-tri" },
   { cible: "#btn-revue" },
   { cible: "#btn-revue" },
+  { cible: "#barre-laterale" },
   {},
 ];
 

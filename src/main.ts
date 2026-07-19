@@ -2191,6 +2191,44 @@ const ETAPES_TUTO: EtapeTuto[] = [
   { cible: "#btn-revue" },
   { cible: "#btn-revue" },
   { cible: "#barre-laterale" },
+  {
+    avant: () => allerA("vue-galerie"),
+    cible: "#defil-galerie",
+  },
+  {
+    avant: () => {
+      allerA("vue-galerie");
+      const premier = mediasGalerie()[0];
+      if (premier) selectionGalerie = new Set([premier.rel]);
+      majSelectionVisuelle();
+    },
+    cible: "#barre-selection",
+  },
+  {
+    avant: () => allerA("vue-albums"),
+    cible: "#grille-albums",
+  },
+  {
+    avant: () => {
+      allerA("vue-galerie");
+      const premier = mediasGalerie()[0];
+      if (premier) selectionGalerie = new Set([premier.rel]);
+      majSelectionVisuelle();
+    },
+    cible: "#sel-deplacer",
+  },
+  {
+    avant: () => allerA("vue-doublons"),
+    cible: "#vue-doublons .params-outils",
+  },
+  {
+    avant: () => allerA("vue-rangement"),
+    cible: "#apercu-rangement",
+  },
+  {
+    avant: () => allerA("vue-corbeille"),
+    cible: "#defil-corbeille",
+  },
   {},
 ];
 

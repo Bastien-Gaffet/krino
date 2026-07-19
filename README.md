@@ -36,8 +36,12 @@ démarrage instantané, aucune dépendance à installer pour l'utilisateur final
 - **Tutoriel intégré** au premier lancement, sur un dossier d'images de démonstration — revisionnable depuis les Réglages.
 - **Comparateur de rafales**, **zoom** à la molette, regroupement par **date EXIF ou date de fichier**, HEIC/TIFF via Windows Imaging Component.
 - **Regroupement par événement** (séances de prise de vue) en plus du mois calendaire.
-- **Deux modes** reliés par une barre latérale : **Trier** (cartes swipe) et **Organiser** — **Galerie** chronologique de toute la photothèque (filtres, sélection multiple Ctrl/Maj/rectangle, visionneuse, re-décision sans reset), **albums** par thème/projet (glisser-déposer, export en dossier), **doublons** interactifs, **rangement** Année/Mois avec journal d'annulation.
-- **Dialogues intégrés** (plus aucun popup natif du navigateur).
+- **Deux modes** reliés par une barre latérale : **Trier** (cartes swipe) et **Organiser** — **Galerie** optimisée (chargement/déchargement des vignettes hors écran, cache d'affichage, tri par défaut du plus récent au plus ancien), avec filtres, sélection multiple Ctrl/Maj/rectangle, favoris en **cœur**, et **visionneuse** (swipe souris/tactile, clic extérieur pour fermer).
+- **Albums** : page d'accueil dédiée avec aperçu façon carte de mois, sidebar limitée à 3 albums réordonnables par glisser-déposer (+ Favoris toujours visible), bouton **« Déplacer dans l'album »** depuis la Galerie qui revient au même défilement.
+- **Doublons** interactifs (exacts ou semblables par empreinte perceptuelle, tolérance réglable) avec un **écran de vérification** récapitulatif avant tout envoi à la corbeille.
+- **Rangement** Année/Mois avec **aperçu de l'arborescence** créée avant confirmation, et journal d'annulation.
+- **Corbeille** en grille façon galerie : sélection multiple (Ctrl/Maj/rectangle), **Restaurer** ou **Supprimer définitivement**.
+- **Dialogues intégrés** (plus aucun popup natif du navigateur), scrollbars et menus déroulants custom (clair/sombre).
 - **Tâches longues annulables** (scan, analyse de doublons, rangement).
 
 ## 🚀 Développement

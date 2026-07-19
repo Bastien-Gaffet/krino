@@ -233,6 +233,13 @@ function allerA(vue: string) {
 }
 
 function afficherGalerie() {
+  // DOM déjà construit pour ce même contenu : réaffichage instantané, on se
+  // contente de restaurer la position de défilement (les vignettes visibles se
+  // rechargent seules via l'observateur, le reste reste déchargé).
+  if (signatureGalerie() === galerieSignature && $("#sections-galerie").childElementCount) {
+    $("#defil-galerie").scrollTop = galerieScroll;
+    return;
+  }
   if (medias.length > 2000) {
     montrerChargement(t("chargement.galerie"));
     setTimeout(() => { rendreGalerie(); cacherChargement(); });
@@ -289,6 +296,7 @@ async function ouvrirDossier(chemin: string) {
   etat.albums ??= {};
   await purgerDisparus();
   construireEvenements();
+  invaliderGalerie();
   $("#titre-dossier").textContent = t("mois.entete", { d: chemin, n: medias.length });
   ($("#cadre-app") as unknown as HTMLElement).hidden = false;
   const nd = $("#nav-dossier");
@@ -327,6 +335,7 @@ async function rafraichir() {
     dernierScanMs = Date.now();
     await purgerDisparus();
     construireEvenements();
+    invaliderGalerie();
     $("#titre-dossier").textContent = t("mois.entete", { d: racine, n: medias.length });
     if (vueActive() === "vue-mois") rendreMois();
   } catch {
@@ -815,6 +824,7 @@ async function validerMois() {
   }
   const relsJetes = new Set(jetees.map((m) => m.rel));
   medias = medias.filter((m) => !relsJetes.has(m.rel));
+  invaliderGalerie();
 
   // Jalons de soutien : tous les 6 mois validés, ou dernier mois du dossier
   jalonKofi = etat.mois_valides.length % 6 === 0 || !prochainMois();
@@ -832,17 +842,8 @@ async function rendreCorbeille() {
   afficherVue("vue-corbeille");
   montrerChargement(t("chargement.corbeille"));
   let liste: { rel: string; taille: number; video: boolean; wic: boolean }[] = [];
-  const urls = new Map<string, string>();
   try {
     liste = await invoke<typeof liste>("lister_corbeille", { racine });
-    // Prépare toutes les miniatures AVANT l'affichage (sinon vignettes grises)
-    let faites = 0;
-    await Promise.all(liste.filter((f) => !f.video).map(async (f) => {
-      urls.set(f.rel, await urlMiniature(f, true));
-      faites++;
-      $("#chargement-detail").textContent = t("chargement.vignettes", { a: faites, b: liste.length });
-      $("#chargement-jauge").style.width = `${Math.round((100 * faites) / Math.max(1, liste.length))}%`;
-    }));
   } finally {
     cacherChargement();
   }
@@ -852,25 +853,23 @@ async function rendreCorbeille() {
     : t("corbeille.vide");
   const grille = $("#grille-corbeille");
   grille.innerHTML = "";
-  let rang = 0;
   for (const f of liste) {
     const v = document.createElement("div");
     v.className = "vignette";
     v.title = f.rel;
     if (f.video) {
-      v.innerHTML = `<video src="${convertFileSrc(srcCorbeille(f.rel))}#t=0.1" preload="metadata" muted></video><span class="marque">${t("vignette.video")}</span>`;
+      // Chargement paresseux comme la galerie (métadonnées à l'apparition)
+      v.innerHTML = `<video preload="none" muted></video><span class="marque">${t("vignette.video")}</span>`;
+      const vid = v.querySelector("video")!;
+      vid.dataset.src = `${convertFileSrc(srcCorbeille(f.rel))}#t=0.1`;
+      observateurVignettes.observe(vid);
     } else {
+      // Vignettes chargées/déchargées à l'écran : premiers aperçus instantanés,
+      // mémoire maîtrisée même sur une grosse corbeille.
       const img = document.createElement("img");
-      // Premier écran en priorité haute, le reste en chargement paresseux
-      if (rang < 18) {
-        img.fetchPriority = "high";
-      } else {
-        img.loading = "lazy";
-      }
       img.decoding = "async";
-      img.src = urls.get(f.rel) ?? "";
+      observerVignette(img, () => urlMiniature(f, true));
       v.appendChild(img);
-      rang++;
     }
     const btn = document.createElement("button");
     btn.className = "btn-restaurer-un";
@@ -1086,6 +1085,19 @@ function rendreNavAlbums() {
 /* ═══ Galerie ═══ */
 let albumOuvert: string | null = null; // null = galerie complète ; sinon nom d'album ou ALBUM_FAVORIS
 let selectionGalerie = new Set<string>();
+// Cache de rendu de la galerie : évite de tout reconstruire à chaque affichage
+// et restaure la position de défilement au retour d'une autre vue/album.
+let galerieSignature = "";
+let galerieScroll = 0;
+
+/** Signature du contenu affiché : si inchangée, on réaffiche le DOM existant. */
+function signatureGalerie(): string {
+  const filtre = ($("#filtre-galerie") as unknown as HTMLSelectElement).value;
+  return `${albumOuvert ?? ""}|${filtre}|${etat.regroupement}|${etat.source_date}|${medias.length}`;
+}
+
+/** Force la reconstruction de la galerie au prochain affichage. */
+function invaliderGalerie() { galerieSignature = ""; }
 let ancreSelection: string | null = null; // pour Maj+clic (Task 5)
 
 function clicVignette(rel: string, e: MouseEvent) {
@@ -1229,21 +1241,41 @@ function visNaviguer(delta: number) {
 async function actionSelection(action: "favori" | "ajouter" | "retirer" | "corbeille") {
   const rels = [...selectionGalerie];
   if (!rels.length) return;
+  // Reconstruction complète nécessaire seulement si l'action change les médias
+  // affichés dans la vue courante ; sinon on met à jour de façon incrémentale.
+  let reconstruire = false;
   if (action === "favori") {
     const tousFavoris = rels.every((r) => etat.favoris.includes(r));
     etat.favoris = tousFavoris
       ? etat.favoris.filter((r) => !rels.includes(r))
       : [...new Set([...etat.favoris, ...rels])];
+    // Badges ★ mis à jour sur place ; reconstruire seulement si la vue elle-même
+    // dépend des favoris (album Favoris ou filtre « favoris »).
+    for (const r of rels) majBadgeVignette(r);
+    reconstruire = albumOuvert === ALBUM_FAVORIS
+      || ($("#filtre-galerie") as unknown as HTMLSelectElement).value === "favoris";
   } else if (action === "ajouter") {
     const cible = ($("#sel-album-cible") as unknown as HTMLSelectElement).value;
-    if (cible === ALBUM_FAVORIS) etat.favoris = [...new Set([...etat.favoris, ...rels])];
-    else {
+    if (cible === ALBUM_FAVORIS) {
+      etat.favoris = [...new Set([...etat.favoris, ...rels])];
+      for (const r of rels) majBadgeVignette(r);
+    } else {
       const liste = etat.albums[cible] ?? (etat.albums[cible] = []);
       for (const r of rels) if (!liste.includes(r)) liste.push(r);
     }
+    // La galerie ne montre pas l'appartenance à un album ordinaire : rien à
+    // reconstruire sauf si l'album affiché est justement la cible.
+    reconstruire = albumOuvert === cible;
   } else if (action === "retirer" && albumOuvert) {
     if (albumOuvert === ALBUM_FAVORIS) etat.favoris = etat.favoris.filter((r) => !rels.includes(r));
     else etat.albums[albumOuvert] = (etat.albums[albumOuvert] ?? []).filter((r) => !rels.includes(r));
+    // On retire directement les vignettes concernées du DOM (pas de rebuild).
+    for (const r of rels) {
+      document.querySelector(`.vignette-galerie[data-rel="${CSS.escape(r)}"]`)?.remove();
+    }
+    selectionGalerie = new Set();
+    invaliderGalerie();
+    $("#bilan-galerie").textContent = t("galerie.bilan", { n: mediasGalerie().length });
   } else if (action === "corbeille") {
     const octets = medias.filter((m) => selectionGalerie.has(m.rel))
       .reduce((s, m) => s + m.taille, 0);
@@ -1254,22 +1286,70 @@ async function actionSelection(action: "favori" | "ajouter" | "retirer" | "corbe
     finally { cacherChargement(); }
     medias = medias.filter((m) => !selectionGalerie.has(m.rel));
     construireEvenements();
+    reconstruire = true;
   }
   await sauver();
   rendreNavAlbums();
-  rendreGalerie();
+  if (reconstruire) { invaliderGalerie(); rendreGalerie(); }
+  else majBarreSelection();
 }
 
-const observateurGalerie = new IntersectionObserver((entrees) => {
+/** Met à jour le badge (★ / non triée) d'une vignette de la galerie sur place. */
+function majBadgeVignette(rel: string) {
+  const v = document.querySelector<HTMLElement>(`.vignette-galerie[data-rel="${CSS.escape(rel)}"]`);
+  const badges = v?.querySelector<HTMLElement>(".badges-galerie");
+  if (!badges) return;
+  badges.textContent = "";
+  if (etat.favoris.includes(rel)) badges.append("★");
+  if (!etat.decisions[rel]) badges.append(badges.textContent ? " · " : "", t("galerie.badgeNonTriee"));
+}
+
+/* ── Chargement paresseux des vignettes (galerie, albums, corbeille) ──
+   On charge à l'apparition et on DÉCHARGE à la sortie de l'écran : la mémoire
+   reste basse et, en défilant vite, un élément qui ressort du viewport avant
+   d'avoir chargé voit son chargement ignoré (priorité au visible). Le rootMargin
+   réduit évite de charger loin devant/derrière la zone vue. */
+const chargeurVignette = new WeakMap<HTMLImageElement, () => Promise<string>>();
+
+const observateurVignettes = new IntersectionObserver((entrees) => {
   for (const e of entrees) {
-    if (!e.isIntersecting) continue;
-    const img = e.target as HTMLImageElement;
-    observateurGalerie.unobserve(img);
-    const rel = img.dataset.rel!;
-    const m = medias.find((x) => x.rel === rel);
-    if (m) void urlMiniature(m).then((u) => { img.src = u; });
+    const el = e.target as HTMLElement;
+    if (el.tagName === "VIDEO") {
+      const v = el as HTMLVideoElement;
+      if (e.isIntersecting) {
+        v.preload = "metadata";
+        if (v.dataset.src && !v.getAttribute("src")) v.src = v.dataset.src;
+      } else {
+        v.preload = "none";
+      }
+    } else if (e.isIntersecting) {
+      chargerVignette(el as HTMLImageElement);
+    } else {
+      dechargerVignette(el as HTMLImageElement);
+    }
   }
-}, { rootMargin: "600px" });
+}, { rootMargin: "200px" });
+
+function observerVignette(img: HTMLImageElement, chargeur: () => Promise<string>) {
+  chargeurVignette.set(img, chargeur);
+  observateurVignettes.observe(img);
+}
+
+function chargerVignette(img: HTMLImageElement) {
+  img.dataset.visible = "1";
+  if (img.dataset.charge === "1") return; // déjà chargée
+  const chargeur = chargeurVignette.get(img);
+  if (!chargeur) return;
+  void chargeur().then((u) => {
+    // Ignore si la vignette est ressortie de l'écran entre-temps
+    if (img.dataset.visible === "1") { img.src = u; img.dataset.charge = "1"; }
+  });
+}
+
+function dechargerVignette(img: HTMLImageElement) {
+  img.dataset.visible = "";
+  if (img.dataset.charge === "1") { img.removeAttribute("src"); img.dataset.charge = ""; }
+}
 
 function mediasGalerie(): Media[] {
   const filtre = ($("#filtre-galerie") as unknown as HTMLSelectElement).value;
@@ -1284,11 +1364,13 @@ function mediasGalerie(): Media[] {
     case "favoris": liste = liste.filter((m) => etat.favoris.includes(m.rel)); break;
     case "videos": liste = liste.filter((m) => m.video); break;
   }
-  return liste.sort((a, b) => dateDe(a) - dateDe(b));
+  // Ordre par défaut : plus récentes en haut (descendre = remonter le temps)
+  return liste.sort((a, b) => dateDe(b) - dateDe(a));
 }
 
 function rendreGalerie() {
-  observateurGalerie.disconnect();
+  galerieSignature = signatureGalerie();
+  galerieScroll = 0;
   selectionGalerie = new Set();
   majBarreSelection();
   const liste = mediasGalerie();
@@ -1332,6 +1414,7 @@ function rendreGalerie() {
     }
     grille!.appendChild(vignetteGalerie(m));
   }
+  $("#defil-galerie").scrollTop = 0;
 }
 
 function vignetteGalerie(m: Media): HTMLElement {
@@ -1341,13 +1424,15 @@ function vignetteGalerie(m: Media): HTMLElement {
   v.title = m.rel;
   if (m.video) {
     // preload=none : la première image n'est chargée qu'à l'apparition
-    v.innerHTML = `<video src="${convertFileSrc(src(m.rel))}#t=0.1" preload="none" muted></video><span class="marque">${t("vignette.video")}</span>`;
-    observateurVideo(v.querySelector("video")!);
+    v.innerHTML = `<video preload="none" muted></video><span class="marque">${t("vignette.video")}</span>`;
+    const vid = v.querySelector("video")!;
+    vid.dataset.src = `${convertFileSrc(src(m.rel))}#t=0.1`;
+    observateurVignettes.observe(vid);
   } else {
     const img = document.createElement("img");
     img.decoding = "async";
     img.dataset.rel = m.rel;
-    observateurGalerie.observe(img);
+    observerVignette(img, () => urlMiniature(m));
     v.appendChild(img);
   }
   const badges = document.createElement("span");
@@ -1360,13 +1445,6 @@ function vignetteGalerie(m: Media): HTMLElement {
   v.draggable = true;
   v.addEventListener("dragstart", (e) => demarrerDrag(m.rel, e));
   return v;
-}
-
-function observateurVideo(video: HTMLVideoElement) {
-  const obs = new IntersectionObserver((ent) => {
-    if (ent[0].isIntersecting) { video.preload = "metadata"; obs.disconnect(); }
-  }, { rootMargin: "600px" });
-  obs.observe(video);
 }
 
 function majBarreSelection() {
@@ -1810,6 +1888,9 @@ window.addEventListener("DOMContentLoaded", () => {
   });
 
   // Galerie
+  $("#defil-galerie").addEventListener("scroll", () => {
+    galerieScroll = ($("#defil-galerie") as unknown as HTMLElement).scrollTop;
+  }, { passive: true });
   $("#filtre-galerie").addEventListener("change", rendreGalerie);
   $("#taille-galerie").addEventListener("input", () => {
     const valeur = ($("#taille-galerie") as unknown as HTMLInputElement).value;

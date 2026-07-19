@@ -1,11 +1,24 @@
 # Krino
 
+![Krino](docs/apercu-social.png)
+
 > Du grec κρίνω — *juger, trier, décider*.
+
+[![Soutenir sur Ko-fi](https://img.shields.io/badge/Ko--fi-Soutenir%20le%20projet-8833ff?logo=ko-fi&logoColor=white)](https://ko-fi.com/G2G71YFHWX)
 
 Application de bureau pour **épurer sa photothèque** : on parcourt ses photos et
 vidéos mois par mois, et pour chacune on décide — **garder** ou **jeter** — au
 clavier, à la souris ou d'un **swipe**. Rien n'est supprimé sans une revue et
 une validation explicites, et tout passe d'abord par une corbeille interne.
+
+## 🏁 Démarrer
+
+Krino travaille sur **un seul dossier de départ** : réunissez d'abord vos photos
+et vidéos au même endroit (par exemple `D:\Photos`). Peu importe l'organisation
+interne — fichiers **en vrac**, sous-dossiers, mélange des deux — Krino scanne
+tout récursivement, regroupe par mois et n'a besoin de rien d'autre. Ouvrez ce
+dossier au premier lancement, et c'est parti : le tri, les albums et le
+rangement se font ensuite depuis l'application.
 
 Construit avec [Tauri 2](https://tauri.app) (Rust + WebView) : exécutable léger,
 démarrage instantané, aucune dépendance à installer pour l'utilisateur final.

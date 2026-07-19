@@ -213,6 +213,7 @@ async function elementApercuEventail(f: { rel: string; video: boolean }, corbeil
   }
   const img = document.createElement("img");
   img.loading = "lazy";
+  img.decoding = "async";
   img.src = await urlMiniature(f, corbeille);
   return img;
 }
@@ -260,12 +261,7 @@ function afficherGalerie() {
     $("#defil-galerie").scrollTop = galerieScroll;
     return;
   }
-  if (medias.length > 2000) {
-    montrerChargement(t("chargement.galerie"));
-    setTimeout(() => { rendreGalerie(); cacherChargement(); });
-  } else {
-    rendreGalerie();
-  }
+  rendreGalerieAvecVoile();
 }
 
 function montrerChargement(titre: string, detail = "", annulable = false) {
@@ -741,7 +737,7 @@ async function ouvrirRafale() {
     div.className = "carte-rafale " + decisionsRafale.get(x.rel);
     const url = await urlAffichable(src(x.rel), x.wic);
     div.innerHTML = `
-      <img src="${url}" alt="" loading="lazy">
+      <img src="${url}" alt="" loading="lazy" decoding="async">
       <div class="legende">
         <span>${x.rel.split("/").pop()} &middot; ${tailleLisible(x.taille)}</span>
         <span class="etat-rafale"></span>
@@ -802,6 +798,7 @@ async function rendreRevue() {
         } else {
           const img = document.createElement("img");
           img.loading = "lazy";
+          img.decoding = "async";
           urlMiniature(m).then((url) => { img.src = url; });
           v.appendChild(img);
         }
@@ -912,6 +909,7 @@ function vignetteCorbeille(f: FichierCorbeille): HTMLElement {
   } else {
     const img = document.createElement("img");
     img.decoding = "async";
+    img.loading = "lazy";
     observerVignette(img, () => urlMiniature(f, true));
     v.appendChild(img);
   }
@@ -1908,6 +1906,10 @@ function rendreGalerie() {
       : t("galerie.vide")}</p>`;
     return;
   }
+  // Construction hors document : un seul reflow à l'insertion finale, aucune
+  // lecture de layout dans la boucle.
+  const fragment = document.createDocumentFragment();
+  const fragmentSaut = document.createDocumentFragment();
   let cleCourante = "";
   let grille: HTMLElement | null = null;
   for (const m of liste) {
@@ -1918,18 +1920,34 @@ function rendreGalerie() {
       titre.className = "titre-annee";
       titre.id = `gal-${cle}`;
       titre.textContent = nomCle(cle);
-      conteneur.appendChild(titre);
+      fragment.appendChild(titre);
       grille = document.createElement("div");
       grille.className = "grille-vignettes marge";
-      conteneur.appendChild(grille);
+      fragment.appendChild(grille);
       const opt = document.createElement("option");
       opt.value = `gal-${cle}`;
       opt.textContent = nomCle(cle);
-      saut.appendChild(opt);
+      fragmentSaut.appendChild(opt);
     }
     grille!.appendChild(vignetteGalerie(m));
   }
+  conteneur.appendChild(fragment);
+  saut.appendChild(fragmentSaut);
   $("#defil-galerie").scrollTop = 0;
+}
+
+function montrerVoileGalerie() { $("#voile-galerie").hidden = false; }
+function cacherVoileGalerie() { $("#voile-galerie").hidden = true; }
+
+/** Construit la galerie en montrant un voile discret le temps du rendu.
+    Double rAF : le navigateur peint le voile avant le travail bloquant, puis on
+    le retire une fois la grille en place (les miniatures continuent d'arriver). */
+function rendreGalerieAvecVoile() {
+  montrerVoileGalerie();
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    rendreGalerie();
+    cacherVoileGalerie();
+  }));
 }
 
 function vignetteGalerie(m: Media): HTMLElement {
@@ -1946,6 +1964,7 @@ function vignetteGalerie(m: Media): HTMLElement {
   } else {
     const img = document.createElement("img");
     img.decoding = "async";
+    img.loading = "lazy";
     img.dataset.rel = m.rel;
     observerVignette(img, () => urlMiniature(m));
     v.appendChild(img);
@@ -2461,7 +2480,7 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#defil-galerie").addEventListener("scroll", () => {
     galerieScroll = ($("#defil-galerie") as unknown as HTMLElement).scrollTop;
   }, { passive: true });
-  $("#filtre-galerie").addEventListener("change", rendreGalerie);
+  $("#filtre-galerie").addEventListener("change", rendreGalerieAvecVoile);
   $("#taille-galerie").addEventListener("input", () => {
     const valeur = ($("#taille-galerie") as unknown as HTMLInputElement).value;
     $("#sections-galerie").style.setProperty("--taille-vignette", `${valeur}px`);

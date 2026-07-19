@@ -450,6 +450,25 @@ body.plein-ecran .barre-laterale { display: none; }
 }
 .vignette-galerie.selectionnee,
 .vignette-corbeille.selectionnee { outline: 3px solid var(--accent); }
+/* Saute la mise en page et le rendu des vignettes hors écran : gain majeur sur
+   les grosses grilles (galerie, corbeille). La taille intrinsèque réserve la
+   place pour un défilement fluide, « auto » mémorise la taille réelle rendue. */
+#sections-galerie .vignette,
+#grille-corbeille .vignette {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 150px;
+}
+/* Ancrage du petit voile de chargement de la galerie. */
+#defil-galerie { position: relative; }
+/* Voile discret pendant la construction de la galerie / un changement de filtre. */
+#voile-galerie {
+  position: absolute; inset: 0; z-index: 5;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 0.7em; color: var(--sourd); font-size: 0.9em;
+  background: color-mix(in srgb, var(--fond) 78%, transparent);
+}
+#voile-galerie[hidden] { display: none; }
+#voile-galerie .loader { margin: 0; }
 /* La corbeille est une grille type galerie : la zone défilable occupe l'espace
    restant pour ancrer la barre de sélection en bas de la vue. */
 #defil-corbeille { position: relative; flex: 1; min-height: 0; }

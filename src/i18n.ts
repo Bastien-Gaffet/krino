@@ -26,6 +26,7 @@ const FR: Dico = {
   "galerie.favori": "Favori",
   "galerie.annulerSel": "Annuler la sélection",
   "galerie.vide": "Aucun fichier ne correspond au filtre.",
+  "galerie.chargement": "Chargement de la galerie…",
   "galerie.fantomeDrag": "{n} photo(s)",
 
   "mois.dossier": "Dossier",
@@ -279,6 +280,7 @@ const EN: Dico = {
   "galerie.favori": "Favorite",
   "galerie.annulerSel": "Clear selection",
   "galerie.vide": "No file matches the filter.",
+  "galerie.chargement": "Loading gallery…",
   "galerie.fantomeDrag": "{n} photo(s)",
 
   "mois.dossier": "Folder",

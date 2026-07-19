@@ -448,6 +448,8 @@ body.plein-ecran .barre-laterale { display: none; }
   display: flex; align-items: center; justify-content: center; }
 .visionneuse[hidden] { display: none; }
 .visionneuse img, .visionneuse video { max-width: 92vw; max-height: 88vh; }
+.visionneuse img { touch-action: none; transition: transform .25s ease; cursor: grab; }
+.visionneuse img.vis-saisi { transition: none; cursor: grabbing; }
 .vis-fermer { position: absolute; top: 14px; right: 18px; }
 .vis-nav { position: absolute; top: 50%; transform: translateY(-50%); }
 .vis-prec { left: 14px; } .vis-suiv { right: 14px; }

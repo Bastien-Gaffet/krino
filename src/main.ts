@@ -1346,6 +1346,12 @@ async function montrerVis() {
   if (!m) { fermerVisionneuse(); return; }
   const img = $("#vis-img") as unknown as HTMLImageElement;
   const video = $("#vis-video") as unknown as HTMLVideoElement;
+  // Réinitialise tout déplacement de swipe résiduel.
+  img.style.transform = "";
+  // Bornes : masquer la flèche inexistante en début/fin de liste.
+  const n = mediasVis().length;
+  ($("#vis-prec") as HTMLElement).hidden = visIndex <= 0;
+  ($("#vis-suiv") as HTMLElement).hidden = visIndex >= n - 1;
   if (m.video) {
     img.hidden = true; video.hidden = false;
     video.src = convertFileSrc(src(m.rel));
@@ -1368,6 +1374,65 @@ function visNaviguer(delta: number) {
   const n = mediasVis().length;
   visIndex = Math.max(0, Math.min(n - 1, visIndex + delta));
   void montrerVis();
+}
+
+// Swipe horizontal (souris via pointer events + tactile) sur la visionneuse :
+// glisser = média précédent/suivant, avec déplacement visuel et seuil ; clic sur
+// le fond sombre (hors média) = fermer.
+function installerSwipeVisionneuse() {
+  const vue = $("#visionneuse");
+  const img = $("#vis-img") as unknown as HTMLImageElement;
+  const video = $("#vis-video") as unknown as HTMLVideoElement;
+  let x0 = 0, y0 = 0, dx = 0, actif = false, pris = false, surMedia = false, ptr = -1;
+  const SEUIL_DECLENCHE = 90; // déplacement mini pour changer de média
+  const SEUIL_PRISE = 10;     // mouvement mini avant de prendre la main sur le glissement
+
+  vue.addEventListener("pointerdown", (e) => {
+    const cible = e.target as HTMLElement;
+    if (cible.closest(".btn")) return;   // laisser les boutons de navigation/fermeture
+    if (cible === video) return;         // laisser les contrôles de lecture vidéo
+    actif = true; pris = false; ptr = e.pointerId;
+    x0 = e.clientX; y0 = e.clientY; dx = 0;
+    surMedia = cible === img;
+  });
+
+  vue.addEventListener("pointermove", (e) => {
+    if (!actif || e.pointerId !== ptr) return;
+    dx = e.clientX - x0;
+    const dy = e.clientY - y0;
+    if (!pris) {
+      // Ne prend la main que sur un mouvement franchement horizontal.
+      if (Math.abs(dx) < SEUIL_PRISE || Math.abs(dx) < Math.abs(dy)) return;
+      pris = true;
+      img.classList.add("vis-saisi");
+      vue.setPointerCapture(ptr); // suivre le pointeur même hors média
+    }
+    e.preventDefault();
+    // Résistance visuelle aux bornes (pas de boucle circulaire).
+    const n = mediasVis().length;
+    let d = dx;
+    if ((visIndex <= 0 && d > 0) || (visIndex >= n - 1 && d < 0)) d *= 0.25;
+    img.style.transform = `translateX(${d}px)`;
+  });
+
+  const relacher = () => {
+    if (!actif) return;
+    const etaitPris = pris;
+    actif = false; pris = false;
+    if (ptr >= 0 && vue.hasPointerCapture(ptr)) vue.releasePointerCapture(ptr);
+    img.classList.remove("vis-saisi");
+    if (etaitPris) {
+      const n = mediasVis().length;
+      if (dx <= -SEUIL_DECLENCHE && visIndex < n - 1) visNaviguer(1);
+      else if (dx >= SEUIL_DECLENCHE && visIndex > 0) visNaviguer(-1);
+      else img.style.transform = ""; // sous le seuil ou borne : retour en place
+    } else if (!surMedia) {
+      // Simple clic hors média (fond sombre) : fermer.
+      fermerVisionneuse();
+    }
+  };
+  vue.addEventListener("pointerup", relacher);
+  vue.addEventListener("pointercancel", relacher);
 }
 
 async function actionSelection(action: "favori" | "ajouter" | "retirer" | "corbeille") {
@@ -2049,6 +2114,7 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#vis-prec").addEventListener("click", () => visNaviguer(-1));
   $("#vis-suiv").addEventListener("click", () => visNaviguer(1));
   $("#vis-fermer").addEventListener("click", fermerVisionneuse);
+  installerSwipeVisionneuse();
 
   // Favoris
   $("#btn-favori").addEventListener("click", () => void basculerFavori());

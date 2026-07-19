@@ -249,19 +249,32 @@ async fn miniature(racine: String, rel: String, corbeille: bool) -> Result<Strin
     rel.hash(&mut hacheur);
     mtime.hash(&mut hacheur);
     // Version du rendu : bump pour régénérer toutes les miniatures (orientation EXIF).
-    "_o2".hash(&mut hacheur);
+    "_o3".hash(&mut hacheur);
     let dossier = racine_p.join(DOSSIER_ETAT).join("miniatures");
-    let cible = dossier.join(format!("{:016x}.jpg", hacheur.finish()));
+    let cle = hacheur.finish();
+    let cible = dossier.join(format!("{cle:016x}.jpg"));
     // Course bénigne assumée : si deux appels simultanés demandent la même
     // miniature, tous deux voient `!exists()` et la génèrent. La clé de cache
     // étant déterministe (rel + mtime + version), ils écrivent le même contenu
     // au même endroit — le second écrase le premier à l'identique. Pas de verrou
     // par clé : le coût d'un décodage WIC redondant occasionnel est négligeable
     // devant la complexité d'un registre de verrous partagé.
+    // Un échec ou une interruption pendant l'encodage laisserait un JPEG tronqué
+    // sur disque, resservi ensuite comme s'il était valide : on génère donc dans
+    // un fichier temporaire puis on renomme (atomique) une fois complet.
     if !cible.exists() {
         fs::create_dir_all(&dossier).map_err(|e| e.to_string())?;
-        wic::generer_miniature(&source.to_string_lossy(), &cible.to_string_lossy(), 320)
-            .map_err(|e| format!("miniature : {e}"))?;
+        // Nom temporaire propre à la clé : deux clés différentes ne se marchent
+        // jamais dessus ; deux appels simultanés de la MÊME clé écrivent le même
+        // contenu (course bénigne, comme pour la cible).
+        let tmp = dossier.join(format!("{cle:016x}.tmp"));
+        let res = wic::generer_miniature(&source.to_string_lossy(), &tmp.to_string_lossy(), 320)
+            .map_err(|e| format!("miniature : {e}"))
+            .and_then(|()| fs::rename(&tmp, &cible).map_err(|e| e.to_string()));
+        if res.is_err() {
+            let _ = fs::remove_file(&tmp);
+            res?;
+        }
     }
     Ok(cible.to_string_lossy().into_owned())
 }

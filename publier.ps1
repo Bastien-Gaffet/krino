@@ -1,4 +1,4 @@
-# Publie une release Krino sur GitHub avec artefacts de mise à jour signés.
+﻿# Publie une release Krino sur GitHub avec artefacts de mise à jour signés.
 # Usage :  .\publier.ps1 [-Notes "Description de la version"]
 # Prérequis : gh (GitHub CLI) connecté, clé privée dans ~\.tauri\krino.key
 param([string]$Notes = "")
@@ -7,13 +7,16 @@ $ErrorActionPreference = "Stop"
 $cle = Join-Path $env:USERPROFILE ".tauri\krino.key"
 if (-not (Test-Path $cle)) { throw "Clé de signature introuvable : $cle" }
 $env:TAURI_SIGNING_PRIVATE_KEY = Get-Content $cle -Raw
-$env:TAURI_SIGNING_PRIVATE_KEY_PASSWORD = ""
+# Attention : sous Windows, une variable d'environnement vide est SUPPRIMÉE
+# ($env:X = "" équivaut à unset) — tauri redemande alors le mot de passe et
+# bloque en session non interactive. On passe donc par bash, qui sait
+# transmettre une variable vide au processus enfant.
 
 $conf = Get-Content "src-tauri\tauri.conf.json" -Raw | ConvertFrom-Json
 $version = $conf.version
 Write-Host "Construction de Krino v$version..." -ForegroundColor Cyan
 
-npm run tauri build
+bash -c 'export TAURI_SIGNING_PRIVATE_KEY_PASSWORD=""; npm run tauri build'
 if ($LASTEXITCODE -ne 0) { throw "Échec du build" }
 
 $bundle = "src-tauri\target\release\bundle"

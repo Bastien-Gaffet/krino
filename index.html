@@ -180,7 +180,7 @@
         <span class="titre-dossier" data-i18n="outils.ongletDoublons"></span>
         <span id="bilan-doublons" class="progression"></span>
         <span class="espace"></span>
-        <button id="btn-appliquer-doublons" class="btn btn-danger" hidden></button>
+        <button id="btn-appliquer-doublons" class="btn btn-primaire" hidden></button>
       </header>
       <div class="defilable">
         <p class="aide-revue" data-i18n="outils.aide"></p>
@@ -198,6 +198,21 @@
         </div>
         <p id="avertissement-doublons" class="aide-revue" data-i18n="outils.avertissement" hidden></p>
         <div id="groupes-doublons"></div>
+      </div>
+
+      <!-- Écran de vérification récapitulatif avant envoi à la corbeille -->
+      <div id="verif-doublons" class="verif-doublons" hidden>
+        <header class="barre">
+          <button id="btn-retour-verif" class="btn btn-ico">&larr;</button>
+          <span class="titre-dossier" data-i18n="outils.verifTitre"></span>
+          <span id="bilan-verif-doublons" class="progression"></span>
+          <span class="espace"></span>
+          <button id="btn-valider-verif" class="btn btn-danger"></button>
+        </header>
+        <div class="defilable">
+          <p class="aide-revue" data-i18n="outils.verifAide"></p>
+          <div id="grille-verif-doublons" class="grille-vignettes marge"></div>
+        </div>
       </div>
     </section>
 

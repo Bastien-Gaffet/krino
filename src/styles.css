@@ -57,6 +57,7 @@
 body { height: 100vh; overflow: hidden; user-select: none; color: var(--texte); background: var(--fond); }
 
 .vue { height: 100vh; display: flex; flex-direction: column; }
+#vue-doublons { position: relative; }
 [hidden] { display: none !important; }
 
 /* ── Boutons ── */
@@ -344,11 +345,25 @@ dialog h2 { margin-bottom: 0.6em; }
   border-bottom: 1px solid var(--bord);
 }
 .groupe-doublons h3 { margin: 0.3rem 0 0.6rem; font-size: 0.95rem; color: var(--sourd); }
+/* La photo reste toujours pleinement visible (aucune opacité) : l'état se lit
+   à la bordure et à la pastille coche / croix. */
 .vignette.sel-garder { outline: 3px solid #4caf50; }
-.vignette.sel-jeter { outline: 3px solid #e6a23c; opacity: 0.7; }
-.vignette .marque-sel { left: 6px; right: auto; }
-.vignette.sel-garder .marque-sel { color: #4caf50; }
-.vignette.sel-jeter .marque-sel { color: #e6a23c; }
+.vignette.sel-jeter { outline: 3px solid #e5484d; }
+.vignette .marque-sel {
+  top: 6px; left: 6px; right: auto; bottom: auto;
+  width: 1.5em; height: 1.5em; padding: 0; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.9em; font-weight: 700; line-height: 1; color: #fff;
+}
+.vignette.sel-garder .marque-sel { background: #4caf50; }
+.vignette.sel-jeter .marque-sel { background: #e5484d; }
+
+/* Écran de vérification récapitulatif (avant envoi à la corbeille) */
+.verif-doublons {
+  position: absolute; inset: 0; z-index: 5;
+  background: var(--fond);
+  display: flex; flex-direction: column;
+}
 .legende-doublon {
   position: absolute; left: 0; right: 0; bottom: 0;
   padding: 3px 6px; font-size: 0.68rem; line-height: 1.25;

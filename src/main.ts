@@ -909,7 +909,7 @@ function majBilanDoublons() {
     : "";
   const btn = $("#btn-appliquer-doublons") as unknown as HTMLButtonElement;
   btn.hidden = jetes === 0;
-  btn.textContent = t("outils.appliquer", { n: jetes });
+  btn.textContent = t("outils.verifier", { n: jetes });
 }
 
 async function analyserDoublons() {
@@ -968,7 +968,10 @@ function rendreGroupesDoublons() {
       const maj = () => {
         const sel = selectionDoublons.get(f.rel);
         v.className = "vignette sel-" + sel;
-        marque.textContent = sel === "garder" ? t("rafale.garder") : t("rafale.jeter");
+        // Coche = conservé, croix = part à la corbeille (pas d'opacité : la
+        // photo reste pleinement lisible pour la comparaison).
+        marque.textContent = sel === "garder" ? "✓" : "✗";
+        marque.title = sel === "garder" ? t("rafale.garder") : t("rafale.jeter");
       };
       maj();
       v.append(img, marque, legende);
@@ -978,6 +981,10 @@ function rendreGroupesDoublons() {
         maj();
         majBilanDoublons();
       });
+      // Double-clic : ouvrir la photo en grand pour comparer, navigation dans
+      // le groupe.
+      const listeVis: Media[] = g.map((x) => ({ ...x, exif_ms: null }));
+      v.addEventListener("dblclick", () => void ouvrirVisionneuse(f.rel, listeVis));
       grille.appendChild(v);
     }
     bloc.appendChild(grille);
@@ -986,14 +993,76 @@ function rendreGroupesDoublons() {
   majBilanDoublons();
 }
 
-async function appliquerDoublons() {
-  const rels = [...selectionDoublons.entries()]
-    .filter(([, v]) => v === "jeter")
-    .map(([rel]) => rel);
+/** Fichiers actuellement marqués « à jeter », dans l'ordre des groupes. */
+function fichiersAJeter(): FichierDoublon[] {
+  return groupesDoublons.flat().filter((f) => selectionDoublons.get(f.rel) === "jeter");
+}
+
+/** Ouvre l'écran de vérification récapitulatif avant l'envoi à la corbeille. */
+function ouvrirVerifDoublons() {
+  if (!fichiersAJeter().length) return;
+  $("#verif-doublons").hidden = false;
+  rendreVerifDoublons();
+}
+
+function fermerVerifDoublons() {
+  $("#verif-doublons").hidden = true;
+}
+
+function rendreVerifDoublons() {
+  const aJeter = fichiersAJeter();
+  const octets = aJeter.reduce((s, f) => s + f.taille, 0);
+  $("#bilan-verif-doublons").textContent =
+    t("outils.verifBilan", { n: aJeter.length, t: tailleLisible(octets) });
+  const btn = $("#btn-valider-verif") as unknown as HTMLButtonElement;
+  btn.disabled = aJeter.length === 0;
+  btn.textContent = t("outils.appliquer", { n: aJeter.length });
+
+  const grille = $("#grille-verif-doublons");
+  grille.innerHTML = "";
+  if (!aJeter.length) {
+    grille.innerHTML = `<p class="aide-revue">${t("outils.verifVide")}</p>`;
+    return;
+  }
+  const listeVis: Media[] = aJeter.map((x) => ({ ...x, exif_ms: null }));
+  for (const f of aJeter) {
+    const v = document.createElement("div");
+    v.className = "vignette sel-jeter";
+    v.title = f.rel;
+    const img = document.createElement("img");
+    img.loading = "lazy";
+    img.decoding = "async";
+    urlMiniature(f).then((u) => { img.src = u; });
+    const marque = document.createElement("span");
+    marque.className = "marque marque-sel";
+    marque.textContent = "✗";
+    const legende = document.createElement("span");
+    legende.className = "legende-doublon";
+    legende.textContent =
+      `${f.rel.split("/").pop()} · ${tailleLisible(f.taille)} · ` +
+      new Date(f.mtime_ms).toLocaleDateString(localeDate());
+    v.append(img, marque, legende);
+    // Un clic retire le fichier de la liste (il sera conservé).
+    v.addEventListener("click", () => {
+      selectionDoublons.set(f.rel, "garder");
+      majBilanDoublons();
+      rendreGroupesDoublons();
+      rendreVerifDoublons();
+    });
+    // Double-clic : agrandir pour comparer sans quitter la vérification.
+    v.addEventListener("dblclick", (e) => {
+      e.stopPropagation();
+      void ouvrirVisionneuse(f.rel, listeVis);
+    });
+    grille.appendChild(v);
+  }
+}
+
+async function validerDoublons() {
+  const aJeter = fichiersAJeter();
+  const rels = aJeter.map((f) => f.rel);
   if (!rels.length) return;
-  const octets = groupesDoublons.flat()
-    .filter((f) => selectionDoublons.get(f.rel) === "jeter")
-    .reduce((s, f) => s + f.taille, 0);
+  const octets = aJeter.reduce((s, f) => s + f.taille, 0);
   if (!(await confirmer(t("confirm.doublons", { n: rels.length, t: tailleLisible(octets) }), { danger: true }))) return;
   montrerChargement(t("chargement.validation"));
   try {
@@ -1002,6 +1071,7 @@ async function appliquerDoublons() {
     cacherChargement();
   }
   await informer(t("outils.deplaces", { n: rels.length }));
+  fermerVerifDoublons();
   groupesDoublons = [];
   selectionDoublons = new Map();
   rendreGroupesDoublons();
@@ -1201,17 +1271,25 @@ function installerRectangleSelection() {
 
 /* ═══ Visionneuse ═══ */
 let visIndex = -1;
+// Liste parcourue par la visionneuse. `null` = galerie courante ; sinon une
+// liste explicite (ex. les fichiers d'un groupe de doublons).
+let visListe: Media[] | null = null;
 
-async function ouvrirVisionneuse(rel: string) {
-  const liste = mediasGalerie();
-  visIndex = liste.findIndex((m) => m.rel === rel);
+function mediasVis(): Media[] {
+  return visListe ?? mediasGalerie();
+}
+
+async function ouvrirVisionneuse(rel: string, liste?: Media[]) {
+  visListe = liste ?? null;
+  const l = mediasVis();
+  visIndex = l.findIndex((m) => m.rel === rel);
   if (visIndex < 0) return;
   $("#visionneuse").hidden = false;
   await montrerVis();
 }
 
 async function montrerVis() {
-  const m = mediasGalerie()[visIndex];
+  const m = mediasVis()[visIndex];
   if (!m) { fermerVisionneuse(); return; }
   const img = $("#vis-img") as unknown as HTMLImageElement;
   const video = $("#vis-video") as unknown as HTMLVideoElement;
@@ -1230,10 +1308,11 @@ async function montrerVis() {
 function fermerVisionneuse() {
   ($("#vis-video") as unknown as HTMLVideoElement).pause();
   $("#visionneuse").hidden = true;
+  visListe = null;
 }
 
 function visNaviguer(delta: number) {
-  const n = mediasGalerie().length;
+  const n = mediasVis().length;
   visIndex = Math.max(0, Math.min(n - 1, visIndex + delta));
   void montrerVis();
 }
@@ -1729,7 +1808,7 @@ function installerClavier() {
       else if (e.key === "ArrowRight") { e.preventDefault(); visNaviguer(1); }
       else if (e.key === "Escape") fermerVisionneuse();
       else if (e.key === raccourci("favori")) {
-        const m = mediasGalerie()[visIndex];
+        const m = mediasVis()[visIndex];
         if (m) {
           if (etat.favoris.includes(m.rel)) etat.favoris = etat.favoris.filter((r) => r !== m.rel);
           else etat.favoris.push(m.rel);
@@ -1770,6 +1849,8 @@ function installerClavier() {
         if (selectionGalerie.size > 0) { selectionGalerie = new Set(); majSelectionVisuelle(); }
         else allerA("vue-mois");
       }
+    } else if (vue === "vue-doublons" && !$("#verif-doublons").hidden && k === "Escape") {
+      fermerVerifDoublons();
     } else if (
       (vue === "vue-doublons" || vue === "vue-rangement" || vue === "vue-corbeille") &&
       k === "Escape"
@@ -1923,7 +2004,9 @@ window.addEventListener("DOMContentLoaded", () => {
     if (await confirmer(t("confirm.annulerTache"))) void invoke("annuler_tache");
   });
   $("#btn-analyser-doublons").addEventListener("click", () => void analyserDoublons());
-  $("#btn-appliquer-doublons").addEventListener("click", () => void appliquerDoublons());
+  $("#btn-appliquer-doublons").addEventListener("click", () => ouvrirVerifDoublons());
+  $("#btn-retour-verif").addEventListener("click", () => fermerVerifDoublons());
+  $("#btn-valider-verif").addEventListener("click", () => void validerDoublons());
   for (const radio of document.querySelectorAll<HTMLInputElement>("input[name=mode-doublons]")) {
     radio.addEventListener("change", () => {
       $("#ligne-seuil").hidden = radio.value !== "similaires" || !radio.checked;

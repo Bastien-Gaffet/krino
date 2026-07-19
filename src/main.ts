@@ -1037,7 +1037,140 @@ function contenuAlbum(nom: string): string[] {
 let albumOuvert: string | null = null; // null = galerie complète ; sinon nom d'album ou ALBUM_FAVORIS
 let selectionGalerie = new Set<string>();
 let ancreSelection: string | null = null; // pour Maj+clic (Task 5)
-void ancreSelection;
+
+function clicVignette(rel: string, e: MouseEvent) {
+  const visibles = mediasGalerie().map((m) => m.rel);
+  if (e.shiftKey && ancreSelection) {
+    const a = visibles.indexOf(ancreSelection), b = visibles.indexOf(rel);
+    if (a >= 0 && b >= 0) {
+      for (const r of visibles.slice(Math.min(a, b), Math.max(a, b) + 1)) selectionGalerie.add(r);
+    }
+  } else if (e.ctrlKey || e.metaKey) {
+    if (selectionGalerie.has(rel)) selectionGalerie.delete(rel);
+    else selectionGalerie.add(rel);
+    ancreSelection = rel;
+  } else {
+    selectionGalerie = new Set([rel]);
+    ancreSelection = rel;
+  }
+  majSelectionVisuelle();
+}
+
+function majSelectionVisuelle() {
+  for (const v of document.querySelectorAll<HTMLElement>(".vignette-galerie")) {
+    v.classList.toggle("selectionnee", selectionGalerie.has(v.dataset.rel!));
+  }
+  majBarreSelection();
+}
+
+function installerRectangleSelection() {
+  const zone = $("#defil-galerie");
+  let x0 = 0, y0 = 0, rect: HTMLElement | null = null, additive = false;
+  let base = new Set<string>();
+  zone.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    if ((e.target as HTMLElement).closest(".vignette-galerie")) return; // clic sur vignette = sélection normale
+    additive = e.ctrlKey || e.metaKey;
+    base = new Set(selectionGalerie);
+    const cadre = zone.getBoundingClientRect();
+    x0 = e.clientX - cadre.left; y0 = e.clientY - cadre.top + zone.scrollTop;
+    rect = document.createElement("div");
+    rect.className = "rectangle-selection";
+    zone.appendChild(rect);
+    zone.setPointerCapture(e.pointerId);
+  });
+  zone.addEventListener("pointermove", (e) => {
+    if (!rect) return;
+    const cadre = zone.getBoundingClientRect();
+    const x1 = e.clientX - cadre.left, y1 = e.clientY - cadre.top + zone.scrollTop;
+    const [gx, gy] = [Math.min(x0, x1), Math.min(y0, y1)];
+    const [lx, ly] = [Math.abs(x1 - x0), Math.abs(y1 - y0)];
+    Object.assign(rect.style, { left: `${gx}px`, top: `${gy}px`, width: `${lx}px`, height: `${ly}px` });
+    selectionGalerie = additive ? new Set(base) : new Set();
+    const zr = rect.getBoundingClientRect();
+    for (const v of document.querySelectorAll<HTMLElement>(".vignette-galerie")) {
+      const vr = v.getBoundingClientRect();
+      const chevauche = !(vr.right < zr.left || vr.left > zr.right || vr.bottom < zr.top || vr.top > zr.bottom);
+      if (chevauche) selectionGalerie.add(v.dataset.rel!);
+    }
+    majSelectionVisuelle();
+  });
+  const fin = () => { rect?.remove(); rect = null; };
+  zone.addEventListener("pointerup", fin);
+  zone.addEventListener("pointercancel", fin);
+}
+
+/* ═══ Visionneuse ═══ */
+let visIndex = -1;
+
+async function ouvrirVisionneuse(rel: string) {
+  const liste = mediasGalerie();
+  visIndex = liste.findIndex((m) => m.rel === rel);
+  if (visIndex < 0) return;
+  $("#visionneuse").hidden = false;
+  await montrerVis();
+}
+
+async function montrerVis() {
+  const m = mediasGalerie()[visIndex];
+  if (!m) { fermerVisionneuse(); return; }
+  const img = $("#vis-img") as unknown as HTMLImageElement;
+  const video = $("#vis-video") as unknown as HTMLVideoElement;
+  if (m.video) {
+    img.hidden = true; video.hidden = false;
+    video.src = convertFileSrc(src(m.rel));
+  } else {
+    video.pause(); video.hidden = true; img.hidden = false;
+    img.src = await urlAffichable(src(m.rel), m.wic);
+  }
+  $("#vis-legende").textContent =
+    `${m.rel.split("/").pop()} · ${tailleLisible(m.taille)} · ${dateLisible(m)}` +
+    (etat.favoris.includes(m.rel) ? " · ★" : "");
+}
+
+function fermerVisionneuse() {
+  ($("#vis-video") as unknown as HTMLVideoElement).pause();
+  $("#visionneuse").hidden = true;
+}
+
+function visNaviguer(delta: number) {
+  const n = mediasGalerie().length;
+  visIndex = Math.max(0, Math.min(n - 1, visIndex + delta));
+  void montrerVis();
+}
+
+async function actionSelection(action: "favori" | "ajouter" | "retirer" | "corbeille") {
+  const rels = [...selectionGalerie];
+  if (!rels.length) return;
+  if (action === "favori") {
+    const tousFavoris = rels.every((r) => etat.favoris.includes(r));
+    etat.favoris = tousFavoris
+      ? etat.favoris.filter((r) => !rels.includes(r))
+      : [...new Set([...etat.favoris, ...rels])];
+  } else if (action === "ajouter") {
+    const cible = ($("#sel-album-cible") as unknown as HTMLSelectElement).value;
+    if (cible === ALBUM_FAVORIS) etat.favoris = [...new Set([...etat.favoris, ...rels])];
+    else {
+      const liste = etat.albums[cible] ?? (etat.albums[cible] = []);
+      for (const r of rels) if (!liste.includes(r)) liste.push(r);
+    }
+  } else if (action === "retirer" && albumOuvert) {
+    if (albumOuvert === ALBUM_FAVORIS) etat.favoris = etat.favoris.filter((r) => !rels.includes(r));
+    else etat.albums[albumOuvert] = (etat.albums[albumOuvert] ?? []).filter((r) => !rels.includes(r));
+  } else if (action === "corbeille") {
+    const octets = medias.filter((m) => selectionGalerie.has(m.rel))
+      .reduce((s, m) => s + m.taille, 0);
+    if (!(await confirmer(t("confirm.doublons", { n: rels.length, t: tailleLisible(octets) }),
+                          { danger: true }))) return;
+    montrerChargement(t("chargement.validation"));
+    try { await invoke("valider_mois", { racine, rels }); }
+    finally { cacherChargement(); }
+    medias = medias.filter((m) => !selectionGalerie.has(m.rel));
+    construireEvenements();
+  }
+  await sauver();
+  rendreGalerie();
+}
 
 const observateurGalerie = new IntersectionObserver((entrees) => {
   for (const e of entrees) {
@@ -1125,6 +1258,8 @@ function vignetteGalerie(m: Media): HTMLElement {
   if (etat.favoris.includes(m.rel)) badges.append("★");
   if (!etat.decisions[m.rel]) badges.append(badges.textContent ? " · " : "", t("galerie.badgeNonTriee"));
   v.appendChild(badges);
+  v.addEventListener("click", (e) => clicVignette(m.rel, e));
+  v.addEventListener("dblclick", () => void ouvrirVisionneuse(m.rel));
   return v;
 }
 
@@ -1411,6 +1546,21 @@ async function basculerPleinEcran() {
 
 function installerClavier() {
   window.addEventListener("keydown", (e) => {
+    if (!$("#visionneuse").hidden) {
+      if (e.key === "ArrowLeft") { e.preventDefault(); visNaviguer(-1); }
+      else if (e.key === "ArrowRight") { e.preventDefault(); visNaviguer(1); }
+      else if (e.key === "Escape") fermerVisionneuse();
+      else if (e.key === raccourci("favori")) {
+        const m = mediasGalerie()[visIndex];
+        if (m) {
+          if (etat.favoris.includes(m.rel)) etat.favoris = etat.favoris.filter((r) => r !== m.rel);
+          else etat.favoris.push(m.rel);
+          void sauver();
+          void montrerVis();
+        }
+      }
+      return;
+    }
     if (e.key === "F11") { e.preventDefault(); basculerPleinEcran(); return; }
     if (e.key === "F5") {
       e.preventDefault();
@@ -1433,9 +1583,18 @@ function installerClavier() {
     } else if (vue === "vue-rafale") {
       if (k === raccourci("valider")) { e.preventDefault(); appliquerRafale(); }
       else if (k === "Escape") { afficherVue("vue-tri"); rendreCarte(); }
+    } else if (vue === "vue-galerie") {
+      if (e.ctrlKey && k.toLowerCase() === "a") {
+        e.preventDefault();
+        selectionGalerie = new Set(mediasGalerie().map((m) => m.rel));
+        majSelectionVisuelle();
+      } else if (k === "Escape") {
+        if (selectionGalerie.size > 0) { selectionGalerie = new Set(); majSelectionVisuelle(); }
+        else allerA("vue-mois");
+      }
     } else if (
-      (vue === "vue-galerie" || vue === "vue-doublons" || vue === "vue-rangement" ||
-        vue === "vue-corbeille") && k === "Escape"
+      (vue === "vue-doublons" || vue === "vue-rangement" || vue === "vue-corbeille") &&
+      k === "Escape"
     ) {
       allerA("vue-mois");
     }
@@ -1533,9 +1692,18 @@ window.addEventListener("DOMContentLoaded", () => {
   });
   $("#sel-annuler").addEventListener("click", () => {
     selectionGalerie = new Set();
-    majBarreSelection();
-    for (const v of document.querySelectorAll(".vignette-galerie.selectionnee")) v.classList.remove("selectionnee");
+    majSelectionVisuelle();
   });
+  $("#sel-favori").addEventListener("click", () => void actionSelection("favori"));
+  $("#sel-ajouter").addEventListener("click", () => void actionSelection("ajouter"));
+  $("#sel-retirer").addEventListener("click", () => void actionSelection("retirer"));
+  $("#sel-corbeille").addEventListener("click", () => void actionSelection("corbeille"));
+  installerRectangleSelection();
+
+  // Visionneuse
+  $("#vis-prec").addEventListener("click", () => visNaviguer(-1));
+  $("#vis-suiv").addEventListener("click", () => visNaviguer(1));
+  $("#vis-fermer").addEventListener("click", fermerVisionneuse);
 
   // Favoris
   $("#btn-favori").addEventListener("click", () => void basculerFavori());

@@ -402,3 +402,16 @@ body.plein-ecran .barre-laterale { display: none; }
 .barre-selection { display: flex; gap: 10px; align-items: center; justify-content: center;
   padding: 10px; border-top: 1px solid var(--bord); background: var(--panneau); flex-wrap: wrap; }
 #defil-galerie { position: relative; }
+
+/* ═══ Visionneuse & rectangle ═══ */
+.visionneuse { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.92);
+  display: flex; align-items: center; justify-content: center; }
+.visionneuse[hidden] { display: none; }
+.visionneuse img, .visionneuse video { max-width: 92vw; max-height: 88vh; }
+.vis-fermer { position: absolute; top: 14px; right: 18px; }
+.vis-nav { position: absolute; top: 50%; transform: translateY(-50%); }
+.vis-prec { left: 14px; } .vis-suiv { right: 14px; }
+.vis-legende { position: absolute; bottom: 12px; left: 0; right: 0;
+  text-align: center; color: #ddd; font-size: .85rem; }
+.rectangle-selection { position: absolute; border: 1px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent); z-index: 5; pointer-events: none; }

@@ -248,8 +248,16 @@ async fn miniature(racine: String, rel: String, corbeille: bool) -> Result<Strin
     let mut hacheur = std::collections::hash_map::DefaultHasher::new();
     rel.hash(&mut hacheur);
     mtime.hash(&mut hacheur);
+    // Version du rendu : bump pour régénérer toutes les miniatures (orientation EXIF).
+    "_o2".hash(&mut hacheur);
     let dossier = racine_p.join(DOSSIER_ETAT).join("miniatures");
     let cible = dossier.join(format!("{:016x}.jpg", hacheur.finish()));
+    // Course bénigne assumée : si deux appels simultanés demandent la même
+    // miniature, tous deux voient `!exists()` et la génèrent. La clé de cache
+    // étant déterministe (rel + mtime + version), ils écrivent le même contenu
+    // au même endroit — le second écrase le premier à l'identique. Pas de verrou
+    // par clé : le coût d'un décodage WIC redondant occasionnel est négligeable
+    // devant la complexité d'un registre de verrous partagé.
     if !cible.exists() {
         fs::create_dir_all(&dossier).map_err(|e| e.to_string())?;
         wic::generer_miniature(&source.to_string_lossy(), &cible.to_string_lossy(), 320)
@@ -856,13 +864,60 @@ mod wic {
     use windows::core::{Interface, HSTRING};
     use windows::Win32::Foundation::{GENERIC_READ, GENERIC_WRITE};
     use windows::Win32::Graphics::Imaging::*;
+    use windows::Win32::System::Com::StructuredStorage::{
+        PropVariantToUInt16WithDefault, PROPVARIANT,
+    };
     use windows::Win32::System::Com::*;
     use windows::Win32::UI::Shell::SHCreateMemStream;
+
+    /// Lit l'orientation EXIF (tag 274) du cadre décodé via le lecteur de
+    /// métadonnées WIC. Renvoie une valeur 1..=8 (défaut 1 = aucune rotation).
+    unsafe fn lire_orientation_exif(cadre: &IWICBitmapFrameDecode) -> u16 {
+        unsafe {
+            let Ok(lecteur) = cadre.GetMetadataQueryReader() else {
+                return 1;
+            };
+            // JPEG : /app1/ifd/... ; TIFF/HEIF : /ifd/... — première requête qui réussit.
+            for requete in ["/app1/ifd/{ushort=274}", "/ifd/{ushort=274}"] {
+                let mut pv = PROPVARIANT::default();
+                if lecteur
+                    .GetMetadataByName(&HSTRING::from(requete), &mut pv)
+                    .is_ok()
+                {
+                    let v = PropVariantToUInt16WithDefault(&pv, 1);
+                    if (1..=8).contains(&v) {
+                        return v;
+                    }
+                }
+            }
+            1
+        }
+    }
+
+    /// Mappe une orientation EXIF (1..=8) sur les options de transformation WIC
+    /// (rotations dans le sens horaire).
+    fn transformation_orientation(exif: u16) -> WICBitmapTransformOptions {
+        match exif {
+            2 => WICBitmapTransformFlipHorizontal,
+            3 => WICBitmapTransformRotate180,
+            4 => WICBitmapTransformFlipVertical,
+            5 => WICBitmapTransformOptions(
+                WICBitmapTransformRotate90.0 | WICBitmapTransformFlipHorizontal.0,
+            ),
+            6 => WICBitmapTransformRotate90,
+            7 => WICBitmapTransformOptions(
+                WICBitmapTransformRotate270.0 | WICBitmapTransformFlipHorizontal.0,
+            ),
+            8 => WICBitmapTransformRotate270,
+            _ => WICBitmapTransformRotate0,
+        }
+    }
 
     unsafe fn source_redimensionnee(
         fabrique: &IWICImagingFactory,
         chemin: &str,
         largeur_max: u32,
+        orienter: bool,
     ) -> windows::core::Result<IWICBitmapSource> {
         unsafe {
             let decodeur = fabrique.CreateDecoderFromFilename(
@@ -872,15 +927,29 @@ mod wic {
                 WICDecodeMetadataCacheOnDemand,
             )?;
             let cadre = decodeur.GetFrame(0)?;
+            // Applique l'orientation EXIF (miniatures uniquement) avant la mise à l'échelle.
+            let options = if orienter {
+                transformation_orientation(lire_orientation_exif(&cadre))
+            } else {
+                WICBitmapTransformRotate0
+            };
+            let base: IWICBitmapSource = if options != WICBitmapTransformRotate0 {
+                let rotateur = fabrique.CreateBitmapFlipRotator()?;
+                rotateur.Initialize(&cadre, options)?;
+                rotateur.cast()?
+            } else {
+                cadre.cast()?
+            };
+            // Dimensions APRÈS rotation.
             let (mut l, mut h) = (0u32, 0u32);
-            cadre.GetSize(&mut l, &mut h)?;
+            base.GetSize(&mut l, &mut h)?;
             if largeur_max > 0 && l > largeur_max {
                 let echelle = fabrique.CreateBitmapScaler()?;
                 let nh = (h as u64 * largeur_max as u64 / l as u64) as u32;
-                echelle.Initialize(&cadre, largeur_max, nh, WICBitmapInterpolationModeFant)?;
+                echelle.Initialize(&base, largeur_max, nh, WICBitmapInterpolationModeFant)?;
                 echelle.cast()
             } else {
-                cadre.cast()
+                Ok(base)
             }
         }
     }
@@ -895,7 +964,7 @@ mod wic {
             let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
             let fabrique: IWICImagingFactory =
                 CoCreateInstance(&CLSID_WICImagingFactory, None, CLSCTX_INPROC_SERVER)?;
-            let source = source_redimensionnee(&fabrique, source_chemin, largeur_max)?;
+            let source = source_redimensionnee(&fabrique, source_chemin, largeur_max, true)?;
             let flux = fabrique.CreateStream()?;
             flux.InitializeFromFilename(&HSTRING::from(cible), GENERIC_WRITE.0)?;
             let encodeur = fabrique.CreateEncoder(&GUID_ContainerFormatJpeg, std::ptr::null())?;
@@ -958,7 +1027,7 @@ mod wic {
             let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
             let fabrique: IWICImagingFactory =
                 CoCreateInstance(&CLSID_WICImagingFactory, None, CLSCTX_INPROC_SERVER)?;
-            let source = source_redimensionnee(&fabrique, chemin, largeur_max)?;
+            let source = source_redimensionnee(&fabrique, chemin, largeur_max, false)?;
 
             let flux = SHCreateMemStream(None).ok_or_else(windows::core::Error::empty)?;
             let encodeur = fabrique.CreateEncoder(&GUID_ContainerFormatPng, std::ptr::null())?;

@@ -104,6 +104,10 @@ kbd {
 }
 .accueil-centre h1 { font-size: 3.2em; letter-spacing: 0.06em; }
 .sous-titre { color: var(--sourd); margin-bottom: 1em; }
+.liste-recents { display: flex; flex-direction: column; gap: 0.5em; align-items: stretch; width: 100%; }
+.recents-titre { color: var(--sourd); font-size: 0.85em; margin-top: 0.6em; text-align: left; }
+.recent-item { font-size: 0.92em; color: var(--sourd); padding: 0.5em 0.9em; }
+.recent-item:hover { color: inherit; }
 
 /* ── Barre du haut ── */
 .barre {
@@ -126,6 +130,8 @@ kbd {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
   gap: 1em;
 }
+/* Espace entre la barre supérieure et les cartes sur la page des albums. */
+#grille-albums { padding-top: 1em; }
 .carte-mois {
   background: var(--panneau); border: 1px solid var(--bord); border-radius: 14px;
   padding: 1.1em; cursor: pointer; transition: border-color 0.15s, transform 0.1s;
@@ -450,6 +456,25 @@ body.plein-ecran .barre-laterale { display: none; }
 }
 .vignette-galerie.selectionnee,
 .vignette-corbeille.selectionnee { outline: 3px solid var(--accent); }
+/* Saute la mise en page et le rendu des vignettes hors écran : gain majeur sur
+   les grosses grilles (galerie, corbeille). La taille intrinsèque réserve la
+   place pour un défilement fluide, « auto » mémorise la taille réelle rendue. */
+#sections-galerie .vignette,
+#grille-corbeille .vignette {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 150px;
+}
+/* Ancrage du petit voile de chargement de la galerie. */
+#defil-galerie { position: relative; }
+/* Voile discret pendant la construction de la galerie / un changement de filtre. */
+#voile-galerie {
+  position: absolute; inset: 0; z-index: 5;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 0.7em; color: var(--sourd); font-size: 0.9em;
+  background: color-mix(in srgb, var(--fond) 78%, transparent);
+}
+#voile-galerie[hidden] { display: none; }
+#voile-galerie .loader { margin: 0; }
 /* La corbeille est une grille type galerie : la zone défilable occupe l'espace
    restant pour ancrer la barre de sélection en bas de la vue. */
 #defil-corbeille { position: relative; flex: 1; min-height: 0; }
@@ -560,9 +585,10 @@ input[type="range"]::-moz-range-track { height: 6px; border-radius: 3px; backgro
 }
 .ligne-radio input[type="checkbox"]:checked::after,
 .filtre-faits input[type="checkbox"]:checked::after {
-  content: ""; position: absolute; left: 4px; top: 1px;
+  content: ""; position: absolute; left: 50%; top: 45%;
   width: 4px; height: 8px; border: solid #fff;
-  border-width: 0 2px 2px 0; transform: rotate(45deg);
+  border-width: 0 2px 2px 0;
+  transform: translate(-50%, -50%) rotate(45deg);
 }
 .ligne-radio input[type="radio"]:checked { border-color: var(--accent); }
 .ligne-radio input[type="radio"]:checked::after {

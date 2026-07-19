@@ -36,7 +36,9 @@ démarrage instantané, aucune dépendance à installer pour l'utilisateur final
 - **Tutoriel intégré** au premier lancement, sur un dossier d'images de démonstration — revisionnable depuis les Réglages.
 - **Comparateur de rafales**, **zoom** à la molette, regroupement par **date EXIF ou date de fichier**, HEIC/TIFF via Windows Imaging Component.
 - **Regroupement par événement** (séances de prise de vue) en plus du mois calendaire.
-- **Deux modes** reliés par une barre latérale : **Trier** (cartes swipe) et **Organiser** — **Galerie** optimisée (chargement/déchargement des vignettes hors écran, cache d'affichage, tri par défaut du plus récent au plus ancien), avec filtres, sélection multiple Ctrl/Maj/rectangle, favoris en **cœur**, et **visionneuse** (swipe souris/tactile, clic extérieur pour fermer).
+- **Deux modes** reliés par une barre latérale : **Trier** (cartes swipe) et **Organiser** — **Galerie** optimisée (chargement/déchargement des vignettes hors écran, saut du rendu hors écran via **content-visibility**, cache d'affichage, tri par défaut du plus récent au plus ancien), avec filtres, sélection multiple Ctrl/Maj/rectangle, favoris en **cœur**, et **visionneuse** (swipe souris/tactile, clic extérieur pour fermer).
+- **Miniatures fidèles** : l'**orientation EXIF** est appliquée à la génération, les photos prises en portrait s'affichent droites.
+- **Dossiers récents à l'accueil** : la page d'ouverture propose le dernier dossier trié et les précédents, rouvrables en un clic.
 - **Albums** : page d'accueil dédiée avec aperçu façon carte de mois, sidebar limitée à 3 albums réordonnables par glisser-déposer (+ Favoris toujours visible), bouton **« Déplacer dans l'album »** depuis la Galerie qui revient au même défilement.
 - **Doublons** interactifs (exacts ou semblables par empreinte perceptuelle, tolérance réglable) avec un **écran de vérification** récapitulatif avant tout envoi à la corbeille.
 - **Rangement** Année/Mois avec **aperçu de l'arborescence** créée avant confirmation, et journal d'annulation.
@@ -61,7 +63,9 @@ Krino vérifie au démarrage si une version plus récente est publiée sur GitHu
 (manifeste `latest.json` attaché à la dernière release) et propose de la
 **télécharger et l'installer directement depuis l'application**. Les paquets
 sont signés (clé minisign) : l'updater refuse tout binaire dont la signature
-ne correspond pas à la clé publique embarquée.
+ne correspond pas à la clé publique embarquée. La mise à jour peut être
+installée **maintenant**, **à la fermeture** de l'application (téléchargée puis
+posée au moment où vous quittez, sans interrompre votre tri) ou **plus tard**.
 
 ## 🗂️ Données
 
@@ -69,8 +73,8 @@ ne correspond pas à la clé publique embarquée.
   `<dossier>/.krino/etat.json` — le dossier trié est autonome, l'état voyage avec lui.
 - Formats reconnus : jpg, jpeg, png, gif, webp, bmp, tiff, avif / mp4, mov,
   m4v, webm, mkv, avi, 3gp.
-- Limitation actuelle : le regroupement utilise la **date de modification** des
-  fichiers (pas l'EXIF), et le format HEIC n'est pas affiché par la WebView.
+- Le regroupement utilise la **date EXIF** (ou la date de fichier, au choix dans
+  les Réglages) ; HEIC/TIFF sont décodés côté Rust via Windows Imaging Component.
 
 ## 🛡️ Sécurité des données
 

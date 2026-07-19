@@ -927,29 +927,49 @@ mod wic {
                 WICDecodeMetadataCacheOnDemand,
             )?;
             let cadre = decodeur.GetFrame(0)?;
-            // Applique l'orientation EXIF (miniatures uniquement) avant la mise à l'échelle.
             let options = if orienter {
                 transformation_orientation(lire_orientation_exif(&cadre))
             } else {
                 WICBitmapTransformRotate0
             };
-            let base: IWICBitmapSource = if options != WICBitmapTransformRotate0 {
-                let rotateur = fabrique.CreateBitmapFlipRotator()?;
-                rotateur.Initialize(&cadre, options)?;
-                rotateur.cast()?
+            // Une rotation 90/270 échange largeur et hauteur : la borne s'applique
+            // au côté qui deviendra la largeur FINALE.
+            let pivote = (options.0 & WICBitmapTransformRotate90.0 != 0)
+                || (options.0 & WICBitmapTransformRotate270.0 != 0);
+            let (mut l, mut h) = (0u32, 0u32);
+            cadre.GetSize(&mut l, &mut h)?;
+            let cote = if pivote { h } else { l };
+            // Réduire D'ABORD, tourner ENSUITE : le FlipRotator relit sa source
+            // scanline par scanline — appliqué à l'image pleine résolution avec un
+            // décodeur JPEG en amont, il redécodait l'image entière à chaque ligne
+            // (quasi O(n²), plusieurs secondes par photo). Sur la miniature 320 px
+            // mise en tampon mémoire, la rotation est instantanée.
+            let reduite: IWICBitmapSource = if largeur_max > 0 && cote > largeur_max {
+                let echelle = fabrique.CreateBitmapScaler()?;
+                let (nl, nh) = if pivote {
+                    ((l as u64 * largeur_max as u64 / h as u64) as u32, largeur_max)
+                } else {
+                    (largeur_max, (h as u64 * largeur_max as u64 / l as u64) as u32)
+                };
+                echelle.Initialize(&cadre, nl.max(1), nh.max(1), WICBitmapInterpolationModeFant)?;
+                echelle.cast()?
             } else {
                 cadre.cast()?
             };
-            // Dimensions APRÈS rotation.
-            let (mut l, mut h) = (0u32, 0u32);
-            base.GetSize(&mut l, &mut h)?;
-            if largeur_max > 0 && l > largeur_max {
-                let echelle = fabrique.CreateBitmapScaler()?;
-                let nh = (h as u64 * largeur_max as u64 / l as u64) as u32;
-                echelle.Initialize(&base, largeur_max, nh, WICBitmapInterpolationModeFant)?;
-                echelle.cast()
-            } else {
-                Ok(base)
+            if options == WICBitmapTransformRotate0 {
+                return Ok(reduite);
+            }
+            // Tampon mémoire (décodage unique) puis rotation ; si le rotateur
+            // échoue sur ce format, on garde la miniature non tournée.
+            let tampon = fabrique.CreateBitmapFromSource(&reduite, WICBitmapCacheOnLoad)?;
+            let rotation = (|| -> windows::core::Result<IWICBitmapSource> {
+                let rotateur = fabrique.CreateBitmapFlipRotator()?;
+                rotateur.Initialize(&tampon, options)?;
+                rotateur.cast()
+            })();
+            match rotation {
+                Ok(s) => Ok(s),
+                Err(_) => tampon.cast(),
             }
         }
     }

@@ -209,6 +209,9 @@ const FR: Dico = {
 
   "chargement.annuler": "Annuler la tâche",
   "confirm.annulerTache": "Annuler la tâche en cours ?\nSi tu la relances plus tard, elle devra recommencer de zéro.",
+
+  "dialogue.ok": "OK",
+  "dialogue.annuler": "Annuler",
 };
 
 const EN: Dico = {
@@ -414,6 +417,9 @@ const EN: Dico = {
 
   "chargement.annuler": "Cancel task",
   "confirm.annulerTache": "Cancel the current task?\nIf you run it again later, it will have to start over from scratch.",
+
+  "dialogue.ok": "OK",
+  "dialogue.annuler": "Cancel",
 };
 
 const DICOS: Record<Langue, Dico> = { fr: FR, en: EN };

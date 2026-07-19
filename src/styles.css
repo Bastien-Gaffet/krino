@@ -368,3 +368,12 @@ dialog h2 { margin-bottom: 0.6em; }
 .grille-vignettes.marge { margin: 0 1.2rem 1.2rem; }
 .btn-favori { font-size: 1.05rem; }
 .btn-favori.actif { color: #f5c518; border-color: #f5c518; }
+
+/* ═══ Dialogue Krino ═══ */
+.dialogue-krino { min-width: min(420px, 90vw); max-width: 560px; }
+.dialogue-krino .dialogue-texte { white-space: pre-line; margin: 0 0 1rem; line-height: 1.45; }
+.dialogue-krino .dialogue-champ {
+  width: 100%; box-sizing: border-box; margin-bottom: 1rem;
+  padding: 8px 10px; border-radius: 8px;
+  border: 1px solid var(--bord); background: var(--fond); color: var(--texte);
+}

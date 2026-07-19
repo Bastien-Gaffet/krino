@@ -160,7 +160,6 @@ const FR: Dico = {
   "erreur.dejaPresent": "Un fichier existe déjà à l'emplacement d'origine",
 
   "chargement.corbeille": "Chargement de la corbeille…",
-  "chargement.galerie": "Préparation de la galerie…",
   "chargement.vignettes": "{a} / {b} aperçus",
 
   "maj.titre": "Mise à jour disponible",
@@ -419,7 +418,6 @@ const EN: Dico = {
   "erreur.dejaPresent": "A file already exists at the original location",
 
   "chargement.corbeille": "Loading the trash…",
-  "chargement.galerie": "Preparing the gallery…",
   "chargement.vignettes": "{a} / {b} previews",
 
   "maj.titre": "Update available",

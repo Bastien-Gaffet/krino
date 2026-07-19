@@ -37,6 +37,24 @@ struct Etat {
     source_date: String, // "exif" (défaut) ou "fichier"
     #[serde(default)]
     ordre: Vec<String>, // ordre chronologique des décisions (annulation inter-sessions)
+    #[serde(default)]
+    regroupement: String, // "mois" (défaut) ou "evenement"
+    #[serde(default)]
+    favoris: Vec<String>,
+    #[serde(default)]
+    albums: HashMap<String, Vec<String>>, // nom d'album -> rels
+}
+
+/// Drapeau d'annulation des tâches longues (scan, doublons, rangement).
+static ANNULE: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+fn annulation_demandee() -> bool {
+    ANNULE.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+#[tauri::command]
+fn annuler_tache() {
+    ANNULE.store(true, std::sync::atomic::Ordering::Relaxed);
 }
 
 fn chemin_etat(racine: &Path) -> PathBuf {
@@ -97,6 +115,7 @@ async fn scanner(fenetre: tauri::Window, racine: String) -> Result<Vec<Media>, S
     if !racine.is_dir() {
         return Err("Dossier introuvable".into());
     }
+    ANNULE.store(false, std::sync::atomic::Ordering::Relaxed);
 
     // 1) Parcours rapide de l'arborescence (métadonnées seules)
     let mut entrees = Vec::new();
@@ -136,6 +155,9 @@ async fn scanner(fenetre: tauri::Window, racine: String) -> Result<Vec<Media>, S
     let medias: Vec<Media> = entrees
         .par_iter()
         .filter_map(|(chemin, ext, video)| {
+            if annulation_demandee() {
+                return None;
+            }
             let meta = fs::metadata(chemin).ok()?;
             let mtime_ms = meta
                 .modified()
@@ -170,6 +192,9 @@ async fn scanner(fenetre: tauri::Window, racine: String) -> Result<Vec<Media>, S
             })
         })
         .collect();
+    if annulation_demandee() {
+        return Err("Annulé".into());
+    }
 
     // 3) Réécriture du cache pour le prochain lancement
     let nouveau_cache: CacheExif = medias
@@ -420,6 +445,7 @@ async fn chercher_doublons(
 
     let racine_p = PathBuf::from(&racine);
     let similaires = mode == "similaires";
+    ANNULE.store(false, std::sync::atomic::Ordering::Relaxed);
 
     let mut fichiers: Vec<(PathBuf, FichierDoublon)> = Vec::new();
     for e in WalkDir::new(&racine_p)
@@ -484,6 +510,9 @@ async fn chercher_doublons(
         let hashes: Vec<(u64, &FichierDoublon)> = fichiers
             .par_iter()
             .filter_map(|(chemin, f)| {
+                if annulation_demandee() {
+                    return None;
+                }
                 let h = wic::dhash(&chemin.to_string_lossy());
                 progres(fait.fetch_add(1, Ordering::Relaxed) + 1);
                 // Empreintes dégénérées (image quasi uniforme) : inexploitables
@@ -553,6 +582,9 @@ async fn chercher_doublons(
         let hashes: Vec<([u8; 32], &FichierDoublon)> = candidats
             .par_iter()
             .filter_map(|(chemin, f)| {
+                if annulation_demandee() {
+                    return None;
+                }
                 use sha2::{Digest, Sha256};
                 let r = (|| -> std::io::Result<[u8; 32]> {
                     let mut h = Sha256::new();
@@ -571,12 +603,196 @@ async fn chercher_doublons(
         par_hash.into_values().filter(|g| g.len() > 1).collect()
     };
 
+    if annulation_demandee() {
+        return Err("Annulé".into());
+    }
+
     // Plus gros fichier d'abord dans chaque groupe ; gros groupes en premier
     for g in &mut groupes {
         g.sort_by(|a, b| b.taille.cmp(&a.taille).then(a.rel.cmp(&b.rel)));
     }
     groupes.sort_by_key(|g| std::cmp::Reverse(g.iter().skip(1).map(|f| f.taille).sum::<u64>()));
     Ok(groupes)
+}
+
+const MOIS_FR: [&str; 12] = [
+    "01_Janvier", "02_Février", "03_Mars", "04_Avril", "05_Mai", "06_Juin",
+    "07_Juillet", "08_Août", "09_Septembre", "10_Octobre", "11_Novembre", "12_Décembre",
+];
+
+/// (année, mois) d'un instant epoch ms (algorithme civil inverse de Hinnant).
+fn annee_mois(epoch_ms: i64) -> (i64, u32) {
+    let jours = epoch_ms.div_euclid(86_400_000);
+    let z = jours + 719_468;
+    let ere = z.div_euclid(146_097);
+    let doe = z - ere * 146_097;
+    let yoe = (doe - doe / 1460 + doe / 36_524 - doe / 146_096) / 365;
+    let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
+    let mp = (5 * doy + 2) / 153;
+    let mois = if mp < 10 { mp + 3 } else { mp - 9 };
+    let annee = yoe + ere * 400 + i64::from(mois <= 2);
+    (annee, mois as u32)
+}
+
+/// Range les fichiers médias en arborescence `AAAA/MM_Mois/` (date EXIF si
+/// `source_date == "exif"`, sinon date de fichier). Chaque déplacement est
+/// consigné dans un journal pour pouvoir annuler le dernier rangement.
+#[tauri::command]
+async fn ranger_par_date(
+    fenetre: tauri::Window,
+    racine: String,
+    source_date: String,
+) -> Result<(u32, u32), String> {
+    use tauri::Emitter;
+    ANNULE.store(false, std::sync::atomic::Ordering::Relaxed);
+    let racine_p = PathBuf::from(&racine);
+
+    let mut fichiers = Vec::new();
+    for e in WalkDir::new(&racine_p)
+        .into_iter()
+        .filter_entry(|e| e.file_name().to_string_lossy() != DOSSIER_ETAT)
+        .filter_map(|e| e.ok())
+    {
+        if !e.file_type().is_file() {
+            continue;
+        }
+        let ext = e
+            .path()
+            .extension()
+            .map(|x| x.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        if EXT_IMAGES.contains(&ext.as_str()) || EXT_VIDEOS.contains(&ext.as_str()) {
+            fichiers.push(e.into_path());
+        }
+    }
+
+    let total = fichiers.len();
+    let mut journal: Vec<(String, String)> = Vec::new();
+    let (mut deplaces, mut ignores) = (0u32, 0u32);
+    for (n, chemin) in fichiers.iter().enumerate() {
+        if annulation_demandee() {
+            break; // les déplacements déjà faits restent consignés
+        }
+        if n % 20 == 0 || n + 1 == total {
+            let _ = fenetre.emit("rangement-progres", (n + 1, total));
+        }
+        let meta = match fs::metadata(chemin) {
+            Ok(m) => m,
+            Err(_) => continue,
+        };
+        let mtime_ms = meta
+            .modified()
+            .ok()
+            .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+            .map(|d| d.as_millis() as i64)
+            .unwrap_or(0);
+        let date_ms = if source_date == "exif" {
+            date_exif(chemin).unwrap_or(mtime_ms)
+        } else {
+            mtime_ms
+        };
+        let (annee, mois) = annee_mois(date_ms);
+        let dossier_cible = racine_p
+            .join(annee.to_string())
+            .join(MOIS_FR[(mois as usize).saturating_sub(1).min(11)]);
+        let nom = chemin.file_name().unwrap().to_os_string();
+        if chemin.parent() == Some(dossier_cible.as_path()) {
+            ignores += 1;
+            continue; // déjà au bon endroit
+        }
+        let mut cible = dossier_cible.join(&nom);
+        let mut n_suffixe = 2;
+        while cible.exists() {
+            let tige = Path::new(&nom).file_stem().unwrap().to_string_lossy().into_owned();
+            let ext = Path::new(&nom)
+                .extension()
+                .map(|e| format!(".{}", e.to_string_lossy()))
+                .unwrap_or_default();
+            cible = dossier_cible.join(format!("{tige}_{n_suffixe}{ext}"));
+            n_suffixe += 1;
+        }
+        if fs::create_dir_all(&dossier_cible).is_err() || fs::rename(chemin, &cible).is_err() {
+            ignores += 1;
+            continue;
+        }
+        journal.push((
+            chemin.strip_prefix(&racine_p).unwrap().to_string_lossy().replace('\\', "/"),
+            cible.strip_prefix(&racine_p).unwrap().to_string_lossy().replace('\\', "/"),
+        ));
+        deplaces += 1;
+    }
+
+    if !journal.is_empty() {
+        let chemin_journal = racine_p.join(DOSSIER_ETAT).join("rangement_journal.json");
+        let _ = fs::create_dir_all(chemin_journal.parent().unwrap());
+        let _ = fs::write(
+            &chemin_journal,
+            serde_json::to_string(&journal).map_err(|e| e.to_string())?,
+        );
+    }
+    // Supprime les dossiers devenus vides
+    for e in WalkDir::new(&racine_p)
+        .contents_first(true)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
+        if e.file_type().is_dir() && e.path() != racine_p {
+            let _ = fs::remove_dir(e.path()); // n'aboutit que si vide
+        }
+    }
+    Ok((deplaces, ignores))
+}
+
+/// Annule le dernier rangement en rejouant le journal à l'envers.
+#[tauri::command]
+fn annuler_rangement(racine: String) -> Result<u32, String> {
+    let racine_p = PathBuf::from(&racine);
+    let chemin_journal = racine_p.join(DOSSIER_ETAT).join("rangement_journal.json");
+    let brut = fs::read_to_string(&chemin_journal)
+        .map_err(|_| "Aucun rangement à annuler".to_string())?;
+    let journal: Vec<(String, String)> =
+        serde_json::from_str(&brut).map_err(|e| e.to_string())?;
+    let mut restaures = 0u32;
+    for (origine, cible) in journal.iter().rev() {
+        let de = racine_p.join(cible);
+        let vers = racine_p.join(origine);
+        if !de.is_file() || vers.exists() {
+            continue;
+        }
+        let _ = fs::create_dir_all(vers.parent().unwrap());
+        if fs::rename(&de, &vers).is_ok() {
+            restaures += 1;
+        }
+    }
+    let _ = fs::remove_file(&chemin_journal);
+    Ok(restaures)
+}
+
+/// Copie les fichiers d'un album dans `<racine>/Albums/<nom>/` (jamais de
+/// déplacement : l'arborescence par date reste intacte).
+#[tauri::command]
+async fn exporter_album(racine: String, nom: String, rels: Vec<String>) -> Result<u32, String> {
+    let racine_p = PathBuf::from(&racine);
+    let nom_sain: String = nom
+        .chars()
+        .map(|c| if r#"\/:*?"<>|"#.contains(c) { '_' } else { c })
+        .collect();
+    let dossier = racine_p.join("Albums").join(nom_sain.trim());
+    fs::create_dir_all(&dossier).map_err(|e| e.to_string())?;
+    let mut copies = 0u32;
+    for rel in rels {
+        let source = racine_p.join(&rel);
+        if !source.is_file() {
+            continue;
+        }
+        let cible = dossier.join(source.file_name().unwrap());
+        if cible.exists() {
+            continue; // déjà exporté
+        }
+        fs::copy(&source, &cible).map_err(|e| format!("{rel} : {e}"))?;
+        copies += 1;
+    }
+    Ok(copies)
 }
 
 mod wic {
@@ -735,6 +951,10 @@ pub fn run() {
             apercu_png,
             miniature,
             chercher_doublons,
+            annuler_tache,
+            ranger_par_date,
+            annuler_rangement,
+            exporter_album,
             creer_dossier_demo
         ])
         .run(tauri::generate_context!())

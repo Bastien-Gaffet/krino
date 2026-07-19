@@ -355,3 +355,16 @@ dialog h2 { margin-bottom: 0.6em; }
   background: var(--voile); color: var(--texte);
   word-break: break-all; pointer-events: none;
 }
+
+/* ═══ Organiser : onglets, favoris, albums ═══ */
+.onglets { display: flex; gap: 4px; }
+.onglet { opacity: 0.65; }
+.onglet.actif {
+  opacity: 1;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.module-outil { padding-top: 0.4rem; }
+.grille-vignettes.marge { margin: 0 1.2rem 1.2rem; }
+.btn-favori { font-size: 1.05rem; }
+.btn-favori.actif { color: #f5c518; border-color: #f5c518; }

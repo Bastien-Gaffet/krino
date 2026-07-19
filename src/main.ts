@@ -26,13 +26,19 @@ interface Etat {
   raccourcis: Record<string, string>;
   source_date: string;
   ordre: string[]; // ordre chronologique des décisions (pour Annuler entre sessions)
+  regroupement: string; // "mois" ou "evenement"
+  favoris: string[];
+  albums: Record<string, string[]>;
 }
 
 /* ═══ État global ═══ */
 
 let racine = "";
 let medias: Media[] = [];
-let etat: Etat = { decisions: {}, mois_valides: [], raccourcis: {}, source_date: "exif", ordre: [] };
+let etat: Etat = {
+  decisions: {}, mois_valides: [], raccourcis: {}, source_date: "exif", ordre: [],
+  regroupement: "mois", favoris: [], albums: {},
+};
 let moisCourant = "";
 let file: Media[] = []; // restants à trier dans le mois courant
 let historique: string[] = [];
@@ -76,6 +82,7 @@ const RACCOURCIS_DEFAUT: Record<string, string> = {
   jeter: "ArrowLeft",
   annuler: "Backspace",
   valider: "Enter",
+  favori: "f",
 };
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string) =>
@@ -101,6 +108,48 @@ function dateDe(m: Media): number {
 function moisDe(m: Media): string {
   const d = new Date(dateDe(m));
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+/* ── Regroupement par événement : séances de prise de vue séparées de plus de
+   6 h. Clé stable = horodatage de la première photo de l'événement. ── */
+
+const ECART_EVENEMENT_MS = 6 * 3600 * 1000;
+let evenements = new Map<string, string>(); // rel -> clé d'événement
+let nomsEvenements = new Map<string, string>(); // clé -> libellé
+
+function construireEvenements() {
+  evenements = new Map();
+  nomsEvenements = new Map();
+  const tris = [...medias].sort((a, b) => dateDe(a) - dateDe(b));
+  let groupe: Media[] = [];
+  const clore = () => {
+    if (!groupe.length) return;
+    const d0 = new Date(dateDe(groupe[0]));
+    const d1 = new Date(dateDe(groupe[groupe.length - 1]));
+    const cle = `${d0.getFullYear()}-${String(d0.getMonth() + 1).padStart(2, "0")}-` +
+      `${String(d0.getDate()).padStart(2, "0")}T${String(d0.getHours()).padStart(2, "0")}-` +
+      `${String(d0.getMinutes()).padStart(2, "0")}`;
+    const opts = { day: "numeric", month: "short", year: "numeric" } as const;
+    const l0 = d0.toLocaleDateString(localeDate(), opts);
+    const l1 = d1.toLocaleDateString(localeDate(), opts);
+    nomsEvenements.set(cle, l0 === l1 ? l0 : `${l0} – ${l1}`);
+    for (const m of groupe) evenements.set(m.rel, cle);
+    groupe = [];
+  };
+  for (const m of tris) {
+    if (groupe.length && dateDe(m) - dateDe(groupe[groupe.length - 1]) > ECART_EVENEMENT_MS) clore();
+    groupe.push(m);
+  }
+  clore();
+}
+
+/** Clé de regroupement du média : mois calendaire ou événement, selon réglage. */
+function cleDe(m: Media): string {
+  return etat.regroupement === "evenement" ? (evenements.get(m.rel) ?? moisDe(m)) : moisDe(m);
+}
+
+function nomCle(cle: string): string {
+  return nomsEvenements.get(cle) ?? nomMois(cle);
 }
 
 function nomMois(cle: string): string {
@@ -167,10 +216,11 @@ function vueActive(): string {
   return document.querySelector<HTMLElement>(".vue:not([hidden])")?.id ?? "";
 }
 
-function montrerChargement(titre: string, detail = "") {
+function montrerChargement(titre: string, detail = "", annulable = false) {
   $("#chargement-titre").textContent = titre;
   $("#chargement-detail").textContent = detail;
   $("#chargement-jauge").style.width = "0";
+  ($("#btn-annuler-tache") as unknown as HTMLButtonElement).hidden = !annulable;
   $("#chargement").hidden = false;
 }
 function cacherChargement() {
@@ -189,12 +239,14 @@ function ressembleBlocageWindows(err: unknown): boolean {
 async function ouvrirDossier(chemin: string) {
   racine = chemin;
   localStorage.setItem("krino-dernier", chemin);
-  montrerChargement(t("chargement.analyse"), t("chargement.arborescence"));
+  montrerChargement(t("chargement.analyse"), t("chargement.arborescence"), true);
   try {
     medias = await invoke<Media[]>("scanner", { racine });
   } catch (err) {
     cacherChargement();
-    if (ressembleBlocageWindows(err) && confirm(t("bloquee.detecte"))) {
+    if (String(err).includes("Annulé")) {
+      afficherVue("vue-accueil");
+    } else if (ressembleBlocageWindows(err) && confirm(t("bloquee.detecte"))) {
       void openUrl(URL_AIDE_BLOCAGE);
     } else {
       alert(String(err));
@@ -207,7 +259,11 @@ async function ouvrirDossier(chemin: string) {
   etat = await invoke<Etat>("lire_etat", { racine });
   if (!etat.source_date) etat.source_date = "exif";
   etat.ordre ??= [];
+  etat.regroupement ||= "mois";
+  etat.favoris ??= [];
+  etat.albums ??= {};
   await purgerDisparus();
+  construireEvenements();
   $("#titre-dossier").textContent = t("mois.entete", { d: chemin, n: medias.length });
   afficherVue("vue-mois");
   rendreMois();
@@ -231,6 +287,7 @@ async function rafraichir() {
     medias = await invoke<Media[]>("scanner", { racine });
     dernierScanMs = Date.now();
     await purgerDisparus();
+    construireEvenements();
     $("#titre-dossier").textContent = t("mois.entete", { d: racine, n: medias.length });
     if (vueActive() === "vue-mois") rendreMois();
   } catch {
@@ -256,7 +313,7 @@ interface StatsMois {
 function statsParMois(): StatsMois[] {
   const groupes = new Map<string, Media[]>();
   for (const m of medias) {
-    const cle = moisDe(m);
+    const cle = cleDe(m);
     if (!groupes.has(cle)) groupes.set(cle, []);
     groupes.get(cle)!.push(m);
   }
@@ -292,7 +349,7 @@ function carteDeMois(s: StatsMois): HTMLElement {
   const pct = s.fichiers.length ? Math.round((100 * s.decides) / s.fichiers.length) : 0;
   const apercus = s.fichiers.filter((f) => !f.video).slice(0, 3);
   carte.innerHTML = `
-    <h3>${nomMois(s.cle)}</h3>
+    <h3>${nomCle(s.cle)}</h3>
     <div class="eventail"></div>
     <div class="stats">${t("mois.fichiers", { n: s.fichiers.length, t: tailleLisible(s.taille) })}</div>
     <div class="jauge"><div style="width:${pct}%"></div></div>
@@ -315,7 +372,7 @@ function carteDeMois(s: StatsMois): HTMLElement {
     btn.textContent = t("mois.refaire");
     btn.addEventListener("click", async (e) => {
       e.stopPropagation();
-      if (!confirm(t("confirm.refaireMois", { m: nomMois(s.cle) }))) return;
+      if (!confirm(t("confirm.refaireMois", { m: nomCle(s.cle) }))) return;
       etat.mois_valides = etat.mois_valides.filter((m) => m !== s.cle);
       for (const f of s.fichiers) delete etat.decisions[f.rel];
       etat.ordre = etat.ordre.filter((rel) => etat.decisions[rel]);
@@ -369,12 +426,12 @@ function ouvrirMois(cle: string) {
   moisCourant = cle;
   // L'historique d'annulation est reconstruit depuis l'ordre persisté des
   // décisions : « Annuler » fonctionne donc aussi après avoir quitté le mois.
-  const duMois = new Set(medias.filter((m) => moisDe(m) === cle).map((m) => m.rel));
+  const duMois = new Set(medias.filter((m) => cleDe(m) === cle).map((m) => m.rel));
   historique = etat.ordre.filter((rel) => duMois.has(rel) && etat.decisions[rel]);
   file = medias
-    .filter((m) => moisDe(m) === cle && !etat.decisions[m.rel])
+    .filter((m) => cleDe(m) === cle && !etat.decisions[m.rel])
     .sort((a, b) => dateDe(a) - dateDe(b));
-  $("#titre-tri").textContent = nomMois(cle);
+  $("#titre-tri").textContent = nomCle(cle);
   afficherVue("vue-tri");
   rendreCarte();
 }
@@ -384,7 +441,7 @@ function courant(): Media | undefined { return file[0]; }
 /** Groupe de photos prises à moins de 5 s d'écart autour du média courant. */
 function rafaleDe(m: Media): Media[] {
   const duMois = medias
-    .filter((x) => moisDe(x) === moisCourant && !x.video)
+    .filter((x) => cleDe(x) === moisCourant && !x.video)
     .sort((a, b) => dateDe(a) - dateDe(b));
   const i = duMois.findIndex((x) => x.rel === m.rel);
   if (i < 0) return [m];
@@ -405,7 +462,7 @@ function appliquerZoom() {
 }
 
 async function rendreCarte() {
-  const total = medias.filter((m) => moisDe(m) === moisCourant).length;
+  const total = medias.filter((m) => cleDe(m) === moisCourant).length;
   $("#progression-tri").textContent = `${total - file.length}/${total}`;
   const img = $("#apercu-img") as unknown as HTMLImageElement;
   const video = $("#apercu-video") as unknown as HTMLVideoElement;
@@ -438,6 +495,9 @@ async function rendreCarte() {
     img.hidden = false;
     img.src = await urlAffichable(src(m.rel), m.wic);
   }
+
+  // État du bouton favori
+  $("#btn-favori").classList.toggle("actif", etat.favoris.includes(m.rel));
 
   // Bouton rafale si des photos quasi simultanées existent
   const rafale = m.video ? [m] : rafaleDe(m);
@@ -487,6 +547,18 @@ function noterDecision(rel: string, action: "garder" | "jeter") {
   etat.ordre = etat.ordre.filter((r) => r !== rel);
   etat.ordre.push(rel);
   historique.push(rel);
+}
+
+async function basculerFavori() {
+  const m = courant();
+  if (!m) return;
+  if (etat.favoris.includes(m.rel)) {
+    etat.favoris = etat.favoris.filter((r) => r !== m.rel);
+  } else {
+    etat.favoris.push(m.rel);
+  }
+  $("#btn-favori").classList.toggle("actif", etat.favoris.includes(m.rel));
+  await sauver();
 }
 
 async function decider(action: "garder" | "jeter", animer = true) {
@@ -643,10 +715,10 @@ function appliquerRafale() {
 async function rendreRevue() {
   montrerChargement(t("chargement.revue"));
   try {
-    const fichiers = medias.filter((m) => moisDe(m) === moisCourant);
+    const fichiers = medias.filter((m) => cleDe(m) === moisCourant);
     const gardees = fichiers.filter((m) => etat.decisions[m.rel] === "garder");
     const jetees = fichiers.filter((m) => etat.decisions[m.rel] === "jeter");
-    $("#titre-revue").textContent = t("revue.titre", { m: nomMois(moisCourant) });
+    $("#titre-revue").textContent = t("revue.titre", { m: nomCle(moisCourant) });
     const octetsJetes = jetees.reduce((s, f) => s + f.taille, 0);
     $("#bilan-revue").textContent =
       t("revue.bilan", { g: gardees.length, j: jetees.length, t: tailleLisible(octetsJetes) });
@@ -681,7 +753,7 @@ async function rendreRevue() {
 }
 
 async function validerMois() {
-  const fichiers = medias.filter((m) => moisDe(m) === moisCourant);
+  const fichiers = medias.filter((m) => cleDe(m) === moisCourant);
   const nonDecides = fichiers.filter((m) => !etat.decisions[m.rel]);
   if (nonDecides.length) {
     alert(t("revue.nonDecides", { n: nonDecides.length }));
@@ -690,7 +762,7 @@ async function validerMois() {
   const jetees = fichiers.filter((m) => etat.decisions[m.rel] === "jeter");
   const octets = jetees.reduce((s, f) => s + f.taille, 0);
   if (!confirm(t("confirm.validerMois", {
-    m: nomMois(moisCourant), n: jetees.length, t: tailleLisible(octets),
+    m: nomCle(moisCourant), n: jetees.length, t: tailleLisible(octets),
   }))) return;
 
   montrerChargement(t("chargement.validation"));
@@ -804,13 +876,13 @@ function majBilanDoublons() {
 async function analyserDoublons() {
   const mode = document.querySelector<HTMLInputElement>("input[name=mode-doublons]:checked")!.value;
   const seuil = Number(($("#seuil-doublons") as unknown as HTMLSelectElement).value);
-  montrerChargement(t("outils.analyse"));
+  montrerChargement(t("outils.analyse"), "", true);
   try {
     groupesDoublons = await invoke<FichierDoublon[][]>("chercher_doublons", {
       racine, mode, seuil,
     });
   } catch (err) {
-    alert(String(err));
+    if (!String(err).includes("Annulé")) alert(String(err));
     return;
   } finally {
     cacherChargement();
@@ -896,6 +968,181 @@ async function appliquerDoublons() {
   rendreGroupesDoublons();
   dernierScanMs = 0;
   void rafraichir();
+}
+
+/* ═══ Organiser : rangement par date ═══ */
+
+async function lancerRangement() {
+  if (!confirm(t("confirm.rangement"))) return;
+  montrerChargement(t("rangement.enCours"), "", true);
+  let deplaces = 0, ignores = 0;
+  try {
+    [deplaces, ignores] = await invoke<[number, number]>("ranger_par_date", {
+      racine, sourceDate: etat.source_date || "exif",
+    });
+  } catch (err) {
+    alert(String(err));
+    return;
+  } finally {
+    cacherChargement();
+  }
+  $("#resultat-rangement").textContent = t("rangement.resultat", { d: deplaces, i: ignores });
+  dernierScanMs = 0;
+  void rafraichir();
+}
+
+async function annulerDernierRangement() {
+  if (!confirm(t("confirm.annulerRangement"))) return;
+  montrerChargement(t("rangement.annulation"));
+  let n = 0;
+  try {
+    n = await invoke<number>("annuler_rangement", { racine });
+  } catch (err) {
+    alert(String(err));
+    return;
+  } finally {
+    cacherChargement();
+  }
+  $("#resultat-rangement").textContent = t("rangement.annule", { n });
+  dernierScanMs = 0;
+  void rafraichir();
+}
+
+/* ═══ Organiser : favoris & albums ═══ */
+
+const ALBUM_FAVORIS = "__favoris__";
+let albumCourant = ALBUM_FAVORIS;
+let selectionAlbum = new Set<string>();
+
+function contenuAlbum(nom: string): string[] {
+  return nom === ALBUM_FAVORIS ? etat.favoris : (etat.albums[nom] ?? []);
+}
+
+function rendreChoixAlbums() {
+  const remplir = (sel: HTMLSelectElement, avecFavoris: boolean) => {
+    sel.innerHTML = "";
+    if (avecFavoris) {
+      const o = document.createElement("option");
+      o.value = ALBUM_FAVORIS;
+      o.textContent = t("albums.favoris", { n: etat.favoris.length });
+      sel.appendChild(o);
+    }
+    for (const nom of Object.keys(etat.albums).sort()) {
+      const o = document.createElement("option");
+      o.value = nom;
+      o.textContent = `${nom} (${etat.albums[nom].length})`;
+      sel.appendChild(o);
+    }
+  };
+  remplir($("#choix-album") as unknown as HTMLSelectElement, true);
+  remplir($("#album-cible") as unknown as HTMLSelectElement, false);
+  ($("#choix-album") as unknown as HTMLSelectElement).value = albumCourant;
+}
+
+function majActionsAlbum() {
+  const bloc = $("#actions-selection-album");
+  bloc.hidden = selectionAlbum.size === 0;
+  $("#bilan-selection-album").textContent = t("albums.selection", { n: selectionAlbum.size });
+  ($("#btn-ajouter-album") as unknown as HTMLButtonElement).hidden =
+    !Object.keys(etat.albums).length;
+  ($("#album-cible") as unknown as HTMLSelectElement).hidden =
+    !Object.keys(etat.albums).length;
+  ($("#btn-supprimer-album") as unknown as HTMLButtonElement).hidden =
+    albumCourant === ALBUM_FAVORIS;
+}
+
+function rendreAlbum() {
+  rendreChoixAlbums();
+  selectionAlbum = new Set();
+  const rels = contenuAlbum(albumCourant);
+  const presentes = new Set(medias.map((m) => m.rel));
+  const grille = $("#grille-album");
+  grille.innerHTML = "";
+  for (const rel of rels) {
+    if (!presentes.has(rel)) continue;
+    const m = medias.find((x) => x.rel === rel)!;
+    const v = document.createElement("div");
+    v.className = "vignette";
+    v.title = rel;
+    const img = document.createElement("img");
+    img.loading = "lazy";
+    img.decoding = "async";
+    urlMiniature(m).then((u) => { img.src = u; });
+    v.appendChild(img);
+    v.addEventListener("click", () => {
+      if (selectionAlbum.has(rel)) selectionAlbum.delete(rel);
+      else selectionAlbum.add(rel);
+      v.classList.toggle("sel-garder", selectionAlbum.has(rel));
+      majActionsAlbum();
+    });
+    grille.appendChild(v);
+  }
+  if (!rels.length) {
+    grille.innerHTML = `<p class="aide-revue">${
+      albumCourant === ALBUM_FAVORIS ? t("albums.videFavoris") : t("albums.videAlbum")}</p>`;
+  }
+  majActionsAlbum();
+}
+
+function installerAlbums() {
+  ($("#choix-album") as unknown as HTMLSelectElement).addEventListener("change", () => {
+    albumCourant = ($("#choix-album") as unknown as HTMLSelectElement).value;
+    rendreAlbum();
+  });
+  $("#btn-nouvel-album").addEventListener("click", async () => {
+    const nom = prompt(t("albums.nomNouveau"))?.trim();
+    if (!nom || nom === ALBUM_FAVORIS) return;
+    etat.albums[nom] ??= [];
+    albumCourant = nom;
+    await sauver();
+    rendreAlbum();
+  });
+  $("#btn-supprimer-album").addEventListener("click", async () => {
+    if (albumCourant === ALBUM_FAVORIS) return;
+    if (!confirm(t("confirm.supprimerAlbum", { a: albumCourant }))) return;
+    delete etat.albums[albumCourant];
+    albumCourant = ALBUM_FAVORIS;
+    await sauver();
+    rendreAlbum();
+  });
+  $("#btn-ajouter-album").addEventListener("click", async () => {
+    const cible = ($("#album-cible") as unknown as HTMLSelectElement).value;
+    if (!cible || !selectionAlbum.size) return;
+    const liste = etat.albums[cible] ?? (etat.albums[cible] = []);
+    for (const rel of selectionAlbum) {
+      if (!liste.includes(rel)) liste.push(rel);
+    }
+    await sauver();
+    rendreAlbum();
+  });
+  $("#btn-retirer-album").addEventListener("click", async () => {
+    if (!selectionAlbum.size) return;
+    if (albumCourant === ALBUM_FAVORIS) {
+      etat.favoris = etat.favoris.filter((r) => !selectionAlbum.has(r));
+    } else {
+      etat.albums[albumCourant] =
+        (etat.albums[albumCourant] ?? []).filter((r) => !selectionAlbum.has(r));
+    }
+    await sauver();
+    rendreAlbum();
+  });
+  $("#btn-exporter-album").addEventListener("click", async () => {
+    const rels = contenuAlbum(albumCourant);
+    if (!rels.length) return;
+    const nom = albumCourant === ALBUM_FAVORIS ? t("albums.nomFavoris") : albumCourant;
+    if (!confirm(t("confirm.exporterAlbum", { n: rels.length, a: nom }))) return;
+    montrerChargement(t("albums.exportEnCours"));
+    let copies = 0;
+    try {
+      copies = await invoke<number>("exporter_album", { racine, nom, rels });
+    } catch (err) {
+      alert(String(err));
+      return;
+    } finally {
+      cacherChargement();
+    }
+    alert(t("albums.exportes", { n: copies, a: nom }));
+  });
 }
 
 /* ═══ Mises à jour & soutien ═══ */
@@ -1001,6 +1248,7 @@ function rendreEtiquettesRaccourcis() {
   // Fenêtre « mois validé » : mêmes touches que garder/jeter — intuitif
   $("#kbd-valide-suivant").textContent = joli(raccourci("garder"));
   $("#kbd-valide-menu").textContent = joli(raccourci("jeter"));
+  $("#kbd-favori").textContent = joli(raccourci("favori"));
   for (const btn of document.querySelectorAll<HTMLButtonElement>(".touche")) {
     btn.textContent = joli(raccourci(btn.dataset.action!));
   }
@@ -1028,6 +1276,15 @@ function installerModaleReglages() {
   for (const radio of document.querySelectorAll<HTMLInputElement>("input[name=source-date]")) {
     radio.addEventListener("change", async () => {
       etat.source_date = radio.value;
+      construireEvenements();
+      await sauver();
+      rendreMois();
+    });
+  }
+  for (const radio of document.querySelectorAll<HTMLInputElement>("input[name=regroupement]")) {
+    radio.addEventListener("change", async () => {
+      etat.regroupement = radio.value;
+      construireEvenements();
       await sauver();
       rendreMois();
     });
@@ -1068,6 +1325,9 @@ function installerModaleReglages() {
 function ouvrirReglages() {
   for (const radio of document.querySelectorAll<HTMLInputElement>("input[name=source-date]")) {
     radio.checked = radio.value === (etat.source_date || "exif");
+  }
+  for (const radio of document.querySelectorAll<HTMLInputElement>("input[name=regroupement]")) {
+    radio.checked = radio.value === (etat.regroupement || "mois");
   }
   for (const radio of document.querySelectorAll<HTMLInputElement>("input[name=theme]")) {
     radio.checked = radio.value === prefs.theme;
@@ -1158,6 +1418,7 @@ function installerClavier() {
       if (k === raccourci("garder")) { e.preventDefault(); decider("garder"); }
       else if (k === raccourci("jeter")) { e.preventDefault(); decider("jeter"); }
       else if (k === raccourci("annuler")) { e.preventDefault(); annuler(); }
+      else if (k === raccourci("favori")) { e.preventDefault(); void basculerFavori(); }
       else if (k === raccourci("valider")) { e.preventDefault(); afficherVue("vue-revue"); rendreRevue(); }
       else if (k === "Escape") { afficherVue("vue-mois"); rendreMois(); }
     } else if (vue === "vue-revue") {
@@ -1224,8 +1485,39 @@ window.addEventListener("DOMContentLoaded", () => {
   });
   $("#masquer-faits").addEventListener("change", rendreMois);
   $("#btn-corbeille").addEventListener("click", rendreCorbeille);
-  $("#btn-outils").addEventListener("click", () => afficherVue("vue-outils"));
+  $("#btn-outils").addEventListener("click", () => { afficherVue("vue-outils"); rendreAlbum(); });
   $("#btn-retour-outils").addEventListener("click", () => { afficherVue("vue-mois"); rendreMois(); });
+
+  // Onglets de la vue Organiser
+  for (const btn of document.querySelectorAll<HTMLButtonElement>(".onglet")) {
+    btn.addEventListener("click", () => {
+      for (const b of document.querySelectorAll<HTMLButtonElement>(".onglet")) {
+        b.classList.toggle("actif", b === btn);
+      }
+      for (const mod of document.querySelectorAll<HTMLElement>(".module-outil")) {
+        mod.hidden = mod.id !== btn.dataset.module;
+      }
+      if (btn.dataset.module === "mod-albums") rendreAlbum();
+    });
+  }
+
+  // Rangement par date
+  $("#btn-ranger").addEventListener("click", () => void lancerRangement());
+  $("#btn-annuler-rangement").addEventListener("click", () => void annulerDernierRangement());
+  listen<[number, number]>("rangement-progres", (e) => {
+    const [fait, total] = e.payload;
+    $("#chargement-detail").textContent = t("chargement.progression", { a: fait, b: total });
+    $("#chargement-jauge").style.width = total ? `${Math.round((100 * fait) / total)}%` : "0";
+  });
+
+  // Favoris & albums
+  installerAlbums();
+  $("#btn-favori").addEventListener("click", () => void basculerFavori());
+
+  // Annulation des tâches longues (le programme repartira de zéro)
+  $("#btn-annuler-tache").addEventListener("click", () => {
+    if (confirm(t("confirm.annulerTache"))) void invoke("annuler_tache");
+  });
   $("#btn-analyser-doublons").addEventListener("click", () => void analyserDoublons());
   $("#btn-appliquer-doublons").addEventListener("click", () => void appliquerDoublons());
   for (const radio of document.querySelectorAll<HTMLInputElement>("input[name=mode-doublons]")) {

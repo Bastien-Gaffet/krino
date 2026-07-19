@@ -171,6 +171,45 @@ const FR: Dico = {
   "outils.aucun": "Aucun doublon trouvé.",
   "outils.deplaces": "{n} fichiers déplacés vers la corbeille interne — récupérables tant qu'elle n'est pas vidée.",
   "confirm.doublons": "Déplacer {n} fichiers ({t}) vers la corbeille de Krino ?\nRien n'est supprimé tant que la corbeille n'est pas vidée.",
+
+  "outils.ongletDoublons": "Doublons",
+  "outils.ongletRangement": "Rangement",
+  "outils.ongletAlbums": "Favoris & albums",
+
+  "rangement.aide": "Range tous les fichiers du dossier dans une arborescence Année/Mois (ex. 2026/06_Juin), d'après la date de prise de vue EXIF (ou la date de fichier, selon le réglage). Chaque déplacement est consigné : le dernier rangement peut être annulé.",
+  "rangement.lancer": "Ranger par date",
+  "rangement.annulerDernier": "Annuler le dernier rangement",
+  "rangement.enCours": "Rangement en cours…",
+  "rangement.annulation": "Annulation du rangement…",
+  "rangement.resultat": "{d} fichiers rangés · {i} déjà en place ou ignorés",
+  "rangement.annule": "{n} fichiers remis à leur emplacement d'origine.",
+  "confirm.rangement": "Ranger tous les fichiers en Année/Mois ?\nLes fichiers seront DÉPLACÉS dans le dossier ouvert. Un journal permet d'annuler le dernier rangement.",
+  "confirm.annulerRangement": "Remettre les fichiers du dernier rangement à leur emplacement d'origine ?",
+
+  "tri.favoriTitre": "Ajouter/retirer des favoris",
+  "reglages.favori": "Favori",
+  "reglages.parMois": "Regrouper par mois calendaire",
+  "reglages.parEvenement": "Regrouper par événement (séances espacées de plus de 6 h)",
+
+  "albums.aide": "Les favoris (marqués pendant le tri avec ★) et les albums sont des collections : les fichiers restent à leur place. « Exporter » copie l'album dans le dossier Albums/<nom>. Clique sur une vignette pour la sélectionner.",
+  "albums.favoris": "★ Favoris ({n})",
+  "albums.nomFavoris": "Favoris",
+  "albums.nouveau": "Nouvel album",
+  "albums.supprimer": "Supprimer l'album",
+  "albums.exporter": "Exporter en dossier",
+  "albums.ajouterA": "Ajouter à cet album",
+  "albums.retirer": "Retirer de la collection",
+  "albums.selection": "{n} sélectionné(s)",
+  "albums.nomNouveau": "Nom du nouvel album (thème, projet, personne…) :",
+  "albums.videFavoris": "Aucun favori — pendant le tri, appuie sur F ou clique sur ★ pour marquer une photo.",
+  "albums.videAlbum": "Album vide — sélectionne des photos dans les Favoris puis « Ajouter à cet album ».",
+  "albums.exportEnCours": "Copie des fichiers…",
+  "albums.exportes": "{n} fichiers copiés dans Albums/{a}.",
+  "confirm.supprimerAlbum": "Supprimer l'album « {a} » ? (les photos ne sont pas touchées)",
+  "confirm.exporterAlbum": "Copier les {n} fichiers de « {a} » dans le dossier Albums/{a} ?",
+
+  "chargement.annuler": "Annuler la tâche",
+  "confirm.annulerTache": "Annuler la tâche en cours ?\nSi tu la relances plus tard, elle devra recommencer de zéro.",
 };
 
 const EN: Dico = {
@@ -338,6 +377,45 @@ const EN: Dico = {
   "outils.aucun": "No duplicates found.",
   "outils.deplaces": "{n} files moved to the internal trash — recoverable until it is emptied.",
   "confirm.doublons": "Move {n} files ({t}) to Krino's trash?\nNothing is deleted until the trash is emptied.",
+
+  "outils.ongletDoublons": "Duplicates",
+  "outils.ongletRangement": "Organizing",
+  "outils.ongletAlbums": "Favorites & albums",
+
+  "rangement.aide": "Sorts every file of the folder into a Year/Month tree (e.g. 2026/06_Juin), based on the EXIF shooting date (or the file date, depending on the setting). Every move is journaled: the last run can be undone.",
+  "rangement.lancer": "Organize by date",
+  "rangement.annulerDernier": "Undo last organizing",
+  "rangement.enCours": "Organizing…",
+  "rangement.annulation": "Undoing the organizing…",
+  "rangement.resultat": "{d} files organized · {i} already in place or skipped",
+  "rangement.annule": "{n} files moved back to their original location.",
+  "confirm.rangement": "Organize all files into Year/Month?\nFiles will be MOVED inside the open folder. A journal allows undoing the last run.",
+  "confirm.annulerRangement": "Move the files of the last organizing run back to their original location?",
+
+  "tri.favoriTitre": "Add/remove from favorites",
+  "reglages.favori": "Favorite",
+  "reglages.parMois": "Group by calendar month",
+  "reglages.parEvenement": "Group by event (sessions more than 6 h apart)",
+
+  "albums.aide": "Favorites (marked during sorting with ★) and albums are collections: files stay where they are. “Export” copies the album into the Albums/<name> folder. Click a thumbnail to select it.",
+  "albums.favoris": "★ Favorites ({n})",
+  "albums.nomFavoris": "Favorites",
+  "albums.nouveau": "New album",
+  "albums.supprimer": "Delete album",
+  "albums.exporter": "Export as folder",
+  "albums.ajouterA": "Add to this album",
+  "albums.retirer": "Remove from collection",
+  "albums.selection": "{n} selected",
+  "albums.nomNouveau": "Name of the new album (theme, project, person…):",
+  "albums.videFavoris": "No favorites yet — while sorting, press F or click ★ to mark a photo.",
+  "albums.videAlbum": "Empty album — select photos in Favorites then “Add to this album”.",
+  "albums.exportEnCours": "Copying files…",
+  "albums.exportes": "{n} files copied to Albums/{a}.",
+  "confirm.supprimerAlbum": "Delete the album “{a}”? (photos are untouched)",
+  "confirm.exporterAlbum": "Copy the {n} files of “{a}” into the Albums/{a} folder?",
+
+  "chargement.annuler": "Cancel task",
+  "confirm.annulerTache": "Cancel the current task?\nIf you run it again later, it will have to start over from scratch.",
 };
 
 const DICOS: Record<Langue, Dico> = { fr: FR, en: EN };

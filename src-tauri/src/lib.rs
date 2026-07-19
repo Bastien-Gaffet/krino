@@ -252,6 +252,12 @@ async fn miniature(racine: String, rel: String, corbeille: bool) -> Result<Strin
     "_o2".hash(&mut hacheur);
     let dossier = racine_p.join(DOSSIER_ETAT).join("miniatures");
     let cible = dossier.join(format!("{:016x}.jpg", hacheur.finish()));
+    // Course bénigne assumée : si deux appels simultanés demandent la même
+    // miniature, tous deux voient `!exists()` et la génèrent. La clé de cache
+    // étant déterministe (rel + mtime + version), ils écrivent le même contenu
+    // au même endroit — le second écrase le premier à l'identique. Pas de verrou
+    // par clé : le coût d'un décodage WIC redondant occasionnel est négligeable
+    // devant la complexité d'un registre de verrous partagé.
     if !cible.exists() {
         fs::create_dir_all(&dossier).map_err(|e| e.to_string())?;
         wic::generer_miniature(&source.to_string_lossy(), &cible.to_string_lossy(), 320)

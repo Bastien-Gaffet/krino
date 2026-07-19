@@ -1573,7 +1573,9 @@ let galerieScroll = 0;
 /** Signature du contenu affiché : si inchangée, on réaffiche le DOM existant. */
 function signatureGalerie(): string {
   const filtre = ($("#filtre-galerie") as unknown as HTMLSelectElement).value;
-  return `${albumOuvert ?? ""}|${filtre}|${etat.regroupement}|${etat.source_date}|${medias.length}`;
+  // langue() en fait partie : les titres de section (nomMois) et les badges
+  // sont traduits, un changement de langue doit donc invalider le cache.
+  return `${albumOuvert ?? ""}|${filtre}|${etat.regroupement}|${etat.source_date}|${medias.length}|${langue()}`;
 }
 
 /** Force la reconstruction de la galerie au prochain affichage. */

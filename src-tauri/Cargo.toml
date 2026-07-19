@@ -26,7 +26,7 @@ tauri-plugin-dialog = "2.7.1"
 walkdir = "2.5.0"
 kamadak-exif = "0.6.1"
 base64 = "0.22.1"
-windows = { version = "0.62.2", features = ["Win32_Graphics_Imaging", "Win32_System_Com", "Win32_Foundation", "Win32_UI_Shell", "Win32_System_Com_StructuredStorage"] }
+windows = { version = "0.62.2", features = ["Win32_Graphics_Imaging", "Win32_System_Com", "Win32_Foundation", "Win32_UI_Shell", "Win32_System_Com_StructuredStorage", "Win32_System_Variant"] }
 filetime = "0.2.29"
 rayon = "1.12.0"
 tauri-plugin-updater = "2"

@@ -205,6 +205,9 @@ const FR: Dico = {
   "rangement.annulation": "Annulation du rangement…",
   "rangement.resultat": "{d} fichiers rangés · {i} déjà en place ou ignorés",
   "rangement.annule": "{n} fichiers remis à leur emplacement d'origine.",
+  "rangement.apercuTitre": "Arborescence qui sera créée",
+  "rangement.apercuTotal": "Total : {n} fichiers",
+  "rangement.apercuVide": "Aucun média à ranger.",
   "confirm.rangement": "Ranger tous les fichiers en Année/Mois ?\nLes fichiers seront DÉPLACÉS dans le dossier ouvert. Un journal permet d'annuler le dernier rangement.",
   "confirm.annulerRangement": "Remettre les fichiers du dernier rangement à leur emplacement d'origine ?",
 
@@ -436,6 +439,9 @@ const EN: Dico = {
   "rangement.annulation": "Undoing the organizing…",
   "rangement.resultat": "{d} files organized · {i} already in place or skipped",
   "rangement.annule": "{n} files moved back to their original location.",
+  "rangement.apercuTitre": "Folder tree that will be created",
+  "rangement.apercuTotal": "Total: {n} files",
+  "rangement.apercuVide": "No media to organize.",
   "confirm.rangement": "Organize all files into Year/Month?\nFiles will be MOVED inside the open folder. A journal allows undoing the last run.",
   "confirm.annulerRangement": "Move the files of the last organizing run back to their original location?",
 

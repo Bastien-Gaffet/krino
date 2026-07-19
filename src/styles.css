@@ -73,6 +73,7 @@ body { height: 100vh; overflow: hidden; user-select: none; color: var(--texte); 
   transition: border-color 0.15s, background-color 0.15s, transform 0.1s;
 }
 .btn:hover { border-color: var(--accent); }
+.btn-primaire:hover { filter: brightness(1.1); }
 .btn:active { transform: scale(0.97); }
 .btn-primaire { background-color: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
 .btn-danger { background-color: var(--rouge-sombre); border-color: var(--rouge-sombre); color: #fff; }
@@ -339,6 +340,28 @@ dialog h2 { margin-bottom: 0.6em; }
   display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap;
   padding: 0 1.2rem 0.6rem;
 }
+/* Survol des boutons de la vue Rangement : léger soulèvement cohérent avec
+   la transition globale de .btn. */
+.params-outils .btn:hover { transform: translateY(-1px); }
+
+/* Aperçu de l'arborescence AAAA/MM_Mois qui sera créée par le rangement. */
+.apercu-rangement {
+  margin: 0.4rem 1.2rem 1rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--bord);
+  border-radius: 8px;
+  background-color: var(--panneau);
+}
+.titre-apercu-rangement { margin: 0 0 0.6rem; font-size: 0.95rem; color: var(--sourd); }
+.arbre-rangement {
+  max-height: 45vh; overflow-y: auto;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.9rem; line-height: 1.5;
+}
+.arbre-annee { font-weight: 600; margin-top: 0.4rem; }
+.arbre-mois { padding-left: 1.6rem; color: var(--sourd); }
+.arbre-total { margin-top: 0.7rem; font-weight: 600; color: var(--accent); }
+.arbre-vide { color: var(--sourd); margin: 0; }
 .groupe-doublons {
   margin: 0 1.2rem 1.4rem;
   padding-bottom: 1rem;

@@ -65,6 +65,23 @@ fn chemin_corbeille(racine: &Path) -> PathBuf {
     racine.join(DOSSIER_ETAT).join(CORBEILLE)
 }
 
+/// Supprime, en remontant depuis les feuilles, les dossiers devenus vides sous
+/// `racine`. Ne touche jamais à la racine elle-même ni au dossier `.krino`
+/// (état/corbeille interne). `remove_dir` n'aboutit que si le dossier est vide.
+fn supprimer_dossiers_vides(racine: &Path) {
+    let dossier_etat = racine.join(DOSSIER_ETAT);
+    for e in WalkDir::new(racine)
+        .contents_first(true)
+        .into_iter()
+        .filter_entry(|e| e.path() != dossier_etat.as_path())
+        .filter_map(|e| e.ok())
+    {
+        if e.file_type().is_dir() && e.path() != racine {
+            let _ = fs::remove_dir(e.path()); // n'aboutit que si vide
+        }
+    }
+}
+
 /// Date de prise de vue EXIF (DateTimeOriginal, sinon DateTime), en ms epoch.
 fn date_exif(chemin: &Path) -> Option<i64> {
     let fichier = fs::File::open(chemin).ok()?;
@@ -276,6 +293,8 @@ fn valider_mois(racine: String, rels: Vec<String>) -> Result<u32, String> {
         fs::rename(&source, &dest).map_err(|e| format!("{rel} : {e}"))?;
         deplaces += 1;
     }
+    // Supprime les dossiers d'origine devenus vides (jamais la racine ni .krino)
+    supprimer_dossiers_vides(&racine);
     Ok(deplaces)
 }
 
@@ -730,16 +749,8 @@ async fn ranger_par_date(
             serde_json::to_string(&journal).map_err(|e| e.to_string())?,
         );
     }
-    // Supprime les dossiers devenus vides
-    for e in WalkDir::new(&racine_p)
-        .contents_first(true)
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
-        if e.file_type().is_dir() && e.path() != racine_p {
-            let _ = fs::remove_dir(e.path()); // n'aboutit que si vide
-        }
-    }
+    // Supprime les dossiers devenus vides (jamais la racine ni .krino)
+    supprimer_dossiers_vides(&racine_p);
     Ok((deplaces, ignores))
 }
 

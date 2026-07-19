@@ -230,6 +230,7 @@ function allerA(vue: string) {
   if (vue === "vue-mois") rendreMois();
   else if (vue === "vue-galerie") afficherGalerie();
   else if (vue === "vue-corbeille") void rendreCorbeille();
+  else if (vue === "vue-rangement") rendreApercuRangement();
 }
 
 function afficherGalerie() {
@@ -1081,6 +1082,58 @@ async function validerDoublons() {
 
 /* ═══ Organiser : rangement par date ═══ */
 
+// Noms de mois identiques au tableau MOIS_FR côté Rust (dossiers créés).
+const MOIS_FR = [
+  "01_Janvier", "02_Février", "03_Mars", "04_Avril", "05_Mai", "06_Juin",
+  "07_Juillet", "08_Août", "09_Septembre", "10_Octobre", "11_Novembre", "12_Décembre",
+];
+
+/** Affiche l'arborescence AAAA/MM_Mois qui sera créée, avec le nombre de
+ *  fichiers par dossier, calculée depuis `medias` (même logique que le Rust).
+ *  Se rafraîchit quand la source de date change. */
+function rendreApercuRangement() {
+  const conteneur = $("#apercu-rangement");
+  const arbre = $("#arbre-rangement");
+  arbre.innerHTML = "";
+  if (!medias.length) {
+    conteneur.hidden = false;
+    const p = document.createElement("p");
+    p.className = "arbre-vide";
+    p.textContent = t("rangement.apercuVide");
+    arbre.appendChild(p);
+    return;
+  }
+  conteneur.hidden = false;
+  // année -> (indice de mois 0-11 -> nombre de fichiers)
+  const parAnnee = new Map<number, Map<number, number>>();
+  for (const m of medias) {
+    const d = new Date(dateDe(m));
+    const an = d.getFullYear(), mois = d.getMonth();
+    let mm = parAnnee.get(an);
+    if (!mm) { mm = new Map(); parAnnee.set(an, mm); }
+    mm.set(mois, (mm.get(mois) ?? 0) + 1);
+  }
+  const annees = [...parAnnee.keys()].sort((a, b) => a - b);
+  for (const an of annees) {
+    const total = [...parAnnee.get(an)!.values()].reduce((s, n) => s + n, 0);
+    const ligneAn = document.createElement("div");
+    ligneAn.className = "arbre-annee";
+    ligneAn.textContent = `${an}/ (${total})`;
+    arbre.appendChild(ligneAn);
+    const mois = [...parAnnee.get(an)!.keys()].sort((a, b) => a - b);
+    for (const mi of mois) {
+      const ligneMois = document.createElement("div");
+      ligneMois.className = "arbre-mois";
+      ligneMois.textContent = `${MOIS_FR[mi]}/ (${parAnnee.get(an)!.get(mi)})`;
+      arbre.appendChild(ligneMois);
+    }
+  }
+  const totalGeneral = document.createElement("div");
+  totalGeneral.className = "arbre-total";
+  totalGeneral.textContent = t("rangement.apercuTotal", { n: medias.length });
+  arbre.appendChild(totalGeneral);
+}
+
 async function lancerRangement() {
   if (!(await confirmer(t("confirm.rangement"), { danger: true }))) return;
   montrerChargement(t("rangement.enCours"), "", true);
@@ -1676,6 +1729,7 @@ function installerModaleReglages() {
       construireEvenements();
       await sauver();
       rendreMois();
+      if (vueActive() === "vue-rangement") rendreApercuRangement();
     });
   }
   for (const radio of document.querySelectorAll<HTMLInputElement>("input[name=regroupement]")) {

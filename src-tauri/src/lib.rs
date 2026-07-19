@@ -65,6 +65,23 @@ fn chemin_corbeille(racine: &Path) -> PathBuf {
     racine.join(DOSSIER_ETAT).join(CORBEILLE)
 }
 
+/// Supprime, en remontant depuis les feuilles, les dossiers devenus vides sous
+/// `racine`. Ne touche jamais à la racine elle-même ni au dossier `.krino`
+/// (état/corbeille interne). `remove_dir` n'aboutit que si le dossier est vide.
+fn supprimer_dossiers_vides(racine: &Path) {
+    let dossier_etat = racine.join(DOSSIER_ETAT);
+    for e in WalkDir::new(racine)
+        .contents_first(true)
+        .into_iter()
+        .filter_entry(|e| e.path() != dossier_etat.as_path())
+        .filter_map(|e| e.ok())
+    {
+        if e.file_type().is_dir() && e.path() != racine {
+            let _ = fs::remove_dir(e.path()); // n'aboutit que si vide
+        }
+    }
+}
+
 /// Date de prise de vue EXIF (DateTimeOriginal, sinon DateTime), en ms epoch.
 fn date_exif(chemin: &Path) -> Option<i64> {
     let fichier = fs::File::open(chemin).ok()?;
@@ -276,6 +293,8 @@ fn valider_mois(racine: String, rels: Vec<String>) -> Result<u32, String> {
         fs::rename(&source, &dest).map_err(|e| format!("{rel} : {e}"))?;
         deplaces += 1;
     }
+    // Supprime les dossiers d'origine devenus vides (jamais la racine ni .krino)
+    supprimer_dossiers_vides(&racine);
     Ok(deplaces)
 }
 
@@ -337,6 +356,52 @@ fn restaurer_fichier(racine: String, rel: String) -> Result<(), String> {
     }
     fs::create_dir_all(dest.parent().unwrap()).map_err(|e| e.to_string())?;
     fs::rename(&source, &dest).map_err(|e| e.to_string())
+}
+
+/// Vérifie qu'un chemin relatif reste bien à l'intérieur de la corbeille
+/// (protège la suppression définitive contre toute échappée via `..`).
+fn chemin_dans_corbeille(corbeille: &Path, rel: &str) -> Result<PathBuf, String> {
+    let cible = corbeille.join(rel);
+    // On compare les parents canonisés : le fichier lui-même doit exister.
+    let base = corbeille.canonicalize().map_err(|e| e.to_string())?;
+    let cible_abs = cible.canonicalize().map_err(|e| e.to_string())?;
+    if !cible_abs.starts_with(&base) {
+        return Err("Chemin hors de la corbeille".into());
+    }
+    Ok(cible)
+}
+
+/// Restaure une liste de fichiers de la corbeille à leur emplacement d'origine.
+#[tauri::command]
+fn restaurer_fichiers(racine: String, rels: Vec<String>) -> Result<u32, String> {
+    let racine = PathBuf::from(&racine);
+    let corbeille = chemin_corbeille(&racine);
+    let mut restaures = 0u32;
+    for rel in &rels {
+        let source = chemin_dans_corbeille(&corbeille, rel)?;
+        let dest = racine.join(rel);
+        if dest.exists() {
+            continue;
+        }
+        fs::create_dir_all(dest.parent().unwrap()).map_err(|e| e.to_string())?;
+        fs::rename(&source, &dest).map_err(|e| e.to_string())?;
+        restaures += 1;
+    }
+    Ok(restaures)
+}
+
+/// Supprime définitivement une liste de fichiers, uniquement s'ils sont situés
+/// dans la corbeille interne (sécurité : aucun chemin hors corbeille accepté).
+#[tauri::command]
+fn supprimer_definitivement(racine: String, rels: Vec<String>) -> Result<u32, String> {
+    let corbeille = chemin_corbeille(Path::new(&racine));
+    let mut supprimes = 0u32;
+    for rel in &rels {
+        let cible = chemin_dans_corbeille(&corbeille, rel)?;
+        fs::remove_file(&cible).map_err(|e| e.to_string())?;
+        supprimes += 1;
+    }
+    Ok(supprimes)
 }
 
 /// Restaure tout le contenu de la corbeille à son emplacement d'origine.
@@ -730,16 +795,8 @@ async fn ranger_par_date(
             serde_json::to_string(&journal).map_err(|e| e.to_string())?,
         );
     }
-    // Supprime les dossiers devenus vides
-    for e in WalkDir::new(&racine_p)
-        .contents_first(true)
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
-        if e.file_type().is_dir() && e.path() != racine_p {
-            let _ = fs::remove_dir(e.path()); // n'aboutit que si vide
-        }
-    }
+    // Supprime les dossiers devenus vides (jamais la racine ni .krino)
+    supprimer_dossiers_vides(&racine_p);
     Ok((deplaces, ignores))
 }
 
@@ -946,6 +1003,8 @@ pub fn run() {
             valider_mois,
             lister_corbeille,
             restaurer_fichier,
+            restaurer_fichiers,
+            supprimer_definitivement,
             vider_corbeille,
             restaurer_corbeille,
             apercu_png,

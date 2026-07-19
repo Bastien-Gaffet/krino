@@ -2,6 +2,7 @@
   font-family: Inter, "Segoe UI", Avenir, Helvetica, Arial, sans-serif;
   font-size: 15px;
   --accent: #6c8cff;
+  --favori: #ff4d6d;
   --vert: #3ecf8e;
   --rouge: #ff5d5d;
   --rouge-sombre: #b03030;
@@ -57,6 +58,7 @@
 body { height: 100vh; overflow: hidden; user-select: none; color: var(--texte); background: var(--fond); }
 
 .vue { height: 100vh; display: flex; flex-direction: column; }
+#vue-doublons { position: relative; }
 [hidden] { display: none !important; }
 
 /* ── Boutons ── */
@@ -72,6 +74,7 @@ body { height: 100vh; overflow: hidden; user-select: none; color: var(--texte); 
   transition: border-color 0.15s, background-color 0.15s, transform 0.1s;
 }
 .btn:hover { border-color: var(--accent); }
+.btn-primaire:hover { filter: brightness(1.1); }
 .btn:active { transform: scale(0.97); }
 .btn-primaire { background-color: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
 .btn-danger { background-color: var(--rouge-sombre); border-color: var(--rouge-sombre); color: #fff; }
@@ -338,17 +341,53 @@ dialog h2 { margin-bottom: 0.6em; }
   display: flex; align-items: center; gap: 1.2rem; flex-wrap: wrap;
   padding: 0 1.2rem 0.6rem;
 }
+/* Survol des boutons de la vue Rangement : léger soulèvement cohérent avec
+   la transition globale de .btn. */
+.params-outils .btn:hover { transform: translateY(-1px); }
+
+/* Aperçu de l'arborescence AAAA/MM_Mois qui sera créée par le rangement. */
+.apercu-rangement {
+  margin: 0.4rem 1.2rem 1rem;
+  padding: 0.9rem 1.1rem;
+  border: 1px solid var(--bord);
+  border-radius: 8px;
+  background-color: var(--panneau);
+}
+.titre-apercu-rangement { margin: 0 0 0.6rem; font-size: 0.95rem; color: var(--sourd); }
+.arbre-rangement {
+  max-height: 45vh; overflow-y: auto;
+  font-family: ui-monospace, "Cascadia Code", Consolas, monospace;
+  font-size: 0.9rem; line-height: 1.5;
+}
+.arbre-annee { font-weight: 600; margin-top: 0.4rem; }
+.arbre-mois { padding-left: 1.6rem; color: var(--sourd); }
+.arbre-total { margin-top: 0.7rem; font-weight: 600; color: var(--accent); }
+.arbre-vide { color: var(--sourd); margin: 0; }
 .groupe-doublons {
   margin: 0 1.2rem 1.4rem;
   padding-bottom: 1rem;
   border-bottom: 1px solid var(--bord);
 }
 .groupe-doublons h3 { margin: 0.3rem 0 0.6rem; font-size: 0.95rem; color: var(--sourd); }
+/* La photo reste toujours pleinement visible (aucune opacité) : l'état se lit
+   à la bordure et à la pastille coche / croix. */
 .vignette.sel-garder { outline: 3px solid #4caf50; }
-.vignette.sel-jeter { outline: 3px solid #e6a23c; opacity: 0.7; }
-.vignette .marque-sel { left: 6px; right: auto; }
-.vignette.sel-garder .marque-sel { color: #4caf50; }
-.vignette.sel-jeter .marque-sel { color: #e6a23c; }
+.vignette.sel-jeter { outline: 3px solid #e5484d; }
+.vignette .marque-sel {
+  top: 6px; left: 6px; right: auto; bottom: auto;
+  width: 1.5em; height: 1.5em; padding: 0; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.9em; font-weight: 700; line-height: 1; color: #fff;
+}
+.vignette.sel-garder .marque-sel { background: #4caf50; }
+.vignette.sel-jeter .marque-sel { background: #e5484d; }
+
+/* Écran de vérification récapitulatif (avant envoi à la corbeille) */
+.verif-doublons {
+  position: absolute; inset: 0; z-index: 5;
+  background: var(--fond);
+  display: flex; flex-direction: column;
+}
 .legende-doublon {
   position: absolute; left: 0; right: 0; bottom: 0;
   padding: 3px 6px; font-size: 0.68rem; line-height: 1.25;
@@ -389,7 +428,18 @@ dialog h2 { margin-bottom: 0.6em; }
 .nav-item.discret { color: var(--sourd); font-size: .8rem; }
 .nav-titre { font-size: .7rem; text-transform: uppercase; letter-spacing: 1px;
   color: var(--sourd); padding: 10px 10px 2px; }
+.nav-titre-albums { margin-top: 6px; font-weight: 600; }
 .nav-album.drop-cible { outline: 2px dashed var(--accent); }
+/* Album : nom à gauche, compteur discret (plus petit, atténué) à droite */
+.nav-album { display: flex; align-items: baseline; gap: 8px; }
+.nav-album-nom { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-compteur { font-size: .72rem; opacity: .55; flex-shrink: 0; }
+.nav-item.actif .nav-compteur { opacity: .85; }
+.nav-plus { padding-top: 3px; padding-bottom: 3px; }
+/* « Nouvel album » : libellé à gauche, symbole + à droite */
+.nav-nouvel-album { display: flex; align-items: center; gap: 8px; }
+.nav-nouvel-album span:first-child { flex: 1; }
+.plus-nouvel-album { font-size: 1.1rem; line-height: 1; font-weight: 700; }
 body.plein-ecran .barre-laterale { display: none; }
 .fantome-drag { position: fixed; top: -100px; padding: 6px 12px; background: var(--accent);
   color: #fff; border-radius: 14px; font-size: .8rem; z-index: 70; }
@@ -398,18 +448,37 @@ body.plein-ecran .barre-laterale { display: none; }
 #sections-galerie .grille-vignettes {
   grid-template-columns: repeat(auto-fill, minmax(var(--taille-vignette, 150px), 1fr));
 }
-.vignette-galerie.selectionnee { outline: 3px solid var(--accent); }
+.vignette-galerie.selectionnee,
+.vignette-corbeille.selectionnee { outline: 3px solid var(--accent); }
+/* La corbeille est une grille type galerie : la zone défilable occupe l'espace
+   restant pour ancrer la barre de sélection en bas de la vue. */
+#defil-corbeille { position: relative; flex: 1; min-height: 0; }
 .badges-galerie { position: absolute; top: 4px; left: 6px; font-size: .68rem;
   color: #fff; text-shadow: 0 1px 3px #000; pointer-events: none; }
 .barre-selection { display: flex; gap: 10px; align-items: center; justify-content: center;
-  padding: 10px; border-top: 1px solid var(--bord); background: var(--panneau); flex-wrap: wrap; }
-#defil-galerie { position: relative; }
+  padding: 10px; border-top: 1px solid var(--bord); background: var(--panneau); flex-wrap: wrap;
+  flex-shrink: 0; }
+/* La zone défilable occupe tout l'espace restant : la barre de sélection reste
+   ancrée en bas de la vue même quand l'album contient peu de photos. */
+#defil-galerie { position: relative; flex: 1; min-height: 0; }
+
+/* ═══ Page d'accueil des albums ═══ */
+.carte-album h3 { text-transform: none; }
+.carte-album .compteur-album { color: var(--discret); font-size: 0.85em; }
+.carte-creer-album {
+  align-items: center; justify-content: center; text-align: center;
+  border-style: dashed; color: var(--sourd);
+}
+.carte-creer-album .signe-creer { font-size: 2.6em; font-weight: 300; line-height: 1; color: var(--accent); }
+.carte-mois.drop-cible { outline: 2px dashed var(--accent); outline-offset: 2px; }
 
 /* ═══ Visionneuse & rectangle ═══ */
 .visionneuse { position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.92);
   display: flex; align-items: center; justify-content: center; }
 .visionneuse[hidden] { display: none; }
 .visionneuse img, .visionneuse video { max-width: 92vw; max-height: 88vh; }
+.visionneuse img { touch-action: none; transition: transform .25s ease; cursor: grab; }
+.visionneuse img.vis-saisi { transition: none; cursor: grabbing; }
 .vis-fermer { position: absolute; top: 14px; right: 18px; }
 .vis-nav { position: absolute; top: 50%; transform: translateY(-50%); }
 .vis-prec { left: 14px; } .vis-suiv { right: 14px; }
@@ -417,3 +486,113 @@ body.plein-ecran .barre-laterale { display: none; }
   text-align: center; color: #ddd; font-size: .85rem; }
 .rectangle-selection { position: absolute; border: 1px solid var(--accent);
   background: color-mix(in srgb, var(--accent) 18%, transparent); z-index: 5; pointer-events: none; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   UI custom & détails visuels (Tâche 7)
+   Toutes les couleurs dérivent des variables de thème : le rendu s'adapte
+   automatiquement au clair comme au sombre (plus de barre blanche en sombre).
+   ═══════════════════════════════════════════════════════════════════════ */
+
+/* ── Scrollbars custom (fines et discrètes, partout) ── */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--bord) transparent;
+}
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--bord);
+  border-radius: 6px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--discret); background-clip: padding-box; }
+::-webkit-scrollbar-corner { background: transparent; }
+
+/* ── Menus déroulants (select) custom : flèche SVG en currentColor ── */
+select.btn {
+  appearance: none; -webkit-appearance: none; -moz-appearance: none;
+  padding-right: 2.2em;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239a9aa6' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.7em center;
+  background-size: 12px;
+}
+select.btn:hover { border-color: var(--accent); }
+select.btn option { background: var(--panneau); color: var(--texte); }
+
+/* ── Input range (taille des vignettes) custom ── */
+input[type="range"] {
+  appearance: none; -webkit-appearance: none;
+  height: 6px; border-radius: 3px; cursor: pointer;
+  background: var(--bord); outline: none;
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none; appearance: none;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--accent); border: 2px solid var(--panneau);
+  box-shadow: 0 1px 3px var(--ombre); cursor: pointer;
+}
+input[type="range"]::-moz-range-thumb {
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--accent); border: 2px solid var(--panneau); cursor: pointer;
+}
+input[type="range"]::-moz-range-track { height: 6px; border-radius: 3px; background: var(--bord); }
+
+/* ── Cases à cocher & boutons radio custom (puces plus soignées) ── */
+.ligne-radio input[type="checkbox"],
+.ligne-radio input[type="radio"],
+.filtre-faits input[type="checkbox"] {
+  appearance: none; -webkit-appearance: none;
+  width: 1.05em; height: 1.05em; flex-shrink: 0;
+  border: 2px solid var(--discret); background: var(--panneau);
+  cursor: pointer; position: relative; vertical-align: -0.18em;
+  margin-right: 0.15em; transition: border-color 0.15s, background 0.15s;
+}
+.ligne-radio input[type="radio"],
+.filtre-faits input[type="checkbox"] { border-radius: 50%; }
+.ligne-radio input[type="checkbox"] { border-radius: 5px; }
+.filtre-faits input[type="checkbox"] { border-radius: 5px; }
+.ligne-radio input:hover, .filtre-faits input:hover { border-color: var(--accent); }
+.ligne-radio input[type="checkbox"]:checked,
+.filtre-faits input[type="checkbox"]:checked {
+  background: var(--accent); border-color: var(--accent);
+}
+.ligne-radio input[type="checkbox"]:checked::after,
+.filtre-faits input[type="checkbox"]:checked::after {
+  content: ""; position: absolute; left: 4px; top: 1px;
+  width: 4px; height: 8px; border: solid #fff;
+  border-width: 0 2px 2px 0; transform: rotate(45deg);
+}
+.ligne-radio input[type="radio"]:checked { border-color: var(--accent); }
+.ligne-radio input[type="radio"]:checked::after {
+  content: ""; position: absolute; inset: 2px;
+  border-radius: 50%; background: var(--accent);
+}
+
+/* ── Favoris = cœur ── */
+.ico-coeur { width: 1.05em; height: 1.05em; vertical-align: -0.15em; }
+.btn-favori.actif { color: var(--favori); border-color: var(--favori); }
+.coeur-badge { color: var(--favori); }
+.coeur-nav svg { color: var(--favori); }
+
+/* ── Icônes de la barre latérale ── */
+.nav-item { display: flex; align-items: center; gap: 9px; }
+.ico-nav { width: 16px; height: 16px; flex-shrink: 0; }
+.ico-nav svg { width: 100%; height: 100%; display: block; }
+.nav-album { align-items: center; }
+.nav-nouvel-album span:first-child { flex: 1; }
+/* Bouton Ko-fi de la barre latérale : discret, aux couleurs du bouton Ko-fi. */
+.nav-kofi { color: #a866ff; font-size: .82rem; }
+.nav-kofi:hover { background: color-mix(in srgb, #8833ff 16%, transparent); }
+.nav-kofi .ico-nav { color: #a866ff; }
+
+/* ── Éventail : les vidéos s'affichent comme les images ── */
+.eventail video {
+  position: absolute; top: 8px; width: 52%; aspect-ratio: 3/2; object-fit: cover;
+  border-radius: 8px; border: 2px solid var(--carte-bord);
+  box-shadow: 0 3px 10px var(--ombre);
+}
+.eventail video:nth-child(1) { left: 2%; transform: rotate(-7deg); z-index: 1; }
+.eventail video:nth-child(2) { left: 24%; transform: rotate(0deg) translateY(-6px); z-index: 2; }
+.eventail video:nth-child(3) { left: 46%; transform: rotate(7deg); z-index: 3; }

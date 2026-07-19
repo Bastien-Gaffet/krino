@@ -219,6 +219,9 @@ function activerNav(vue: string) {
   for (const b of document.querySelectorAll<HTMLButtonElement>(".nav-item[data-vue]")) {
     b.classList.toggle("actif", b.dataset.vue === vue);
   }
+  for (const b of document.querySelectorAll<HTMLButtonElement>(".nav-album")) {
+    b.classList.remove("actif");
+  }
 }
 
 function allerA(vue: string) {
@@ -282,6 +285,7 @@ async function ouvrirDossier(chemin: string) {
   const nd = $("#nav-dossier");
   nd.textContent = chemin.split(/[\\/]/).pop() ?? chemin;
   nd.title = chemin;
+  rendreNavAlbums();
   allerA("vue-mois");
   rendreEtiquettesRaccourcis();
 }
@@ -575,6 +579,7 @@ async function basculerFavori() {
   }
   $("#btn-favori").classList.toggle("actif", etat.favoris.includes(m.rel));
   await sauver();
+  rendreNavAlbums();
 }
 
 async function decider(action: "garder" | "jeter", animer = true) {
@@ -1033,6 +1038,29 @@ function contenuAlbum(nom: string): string[] {
   return nom === ALBUM_FAVORIS ? etat.favoris : (etat.albums[nom] ?? []);
 }
 
+/** Alimente la barre latérale avec Favoris + les albums (avec compteurs). */
+function rendreNavAlbums() {
+  const conteneur = $("#nav-albums");
+  conteneur.innerHTML = "";
+  const entree = (nom: string, libelle: string) => {
+    const b = document.createElement("button");
+    b.className = "nav-item nav-album";
+    b.dataset.album = nom;
+    b.textContent = libelle;
+    b.title = libelle;
+    b.addEventListener("click", () => {
+      albumOuvert = nom;
+      allerA("vue-galerie");
+      b.classList.add("actif");
+    });
+    conteneur.appendChild(b);
+  };
+  entree(ALBUM_FAVORIS, t("albums.favoris", { n: etat.favoris.length }));
+  for (const nom of Object.keys(etat.albums).sort()) {
+    entree(nom, `${nom} (${etat.albums[nom].length})`);
+  }
+}
+
 /* ═══ Galerie ═══ */
 let albumOuvert: string | null = null; // null = galerie complète ; sinon nom d'album ou ALBUM_FAVORIS
 let selectionGalerie = new Set<string>();
@@ -1169,6 +1197,7 @@ async function actionSelection(action: "favori" | "ajouter" | "retirer" | "corbe
     construireEvenements();
   }
   await sauver();
+  rendreNavAlbums();
   rendreGalerie();
 }
 
@@ -1208,12 +1237,21 @@ function rendreGalerie() {
     ? (albumOuvert === ALBUM_FAVORIS ? t("albums.nomFavoris") : albumOuvert)
     : t("nav.galerie");
   $("#bilan-galerie").textContent = t("galerie.bilan", { n: liste.length });
+  ($("#btn-exporter-album2") as unknown as HTMLButtonElement).hidden = !albumOuvert;
+  ($("#btn-supprimer-album2") as unknown as HTMLButtonElement).hidden =
+    !albumOuvert || albumOuvert === ALBUM_FAVORIS;
   const conteneur = $("#sections-galerie");
   conteneur.innerHTML = "";
   conteneur.style.setProperty("--taille-vignette",
     `${($("#taille-galerie") as unknown as HTMLInputElement).value}px`);
   const saut = $("#saut-galerie") as unknown as HTMLSelectElement;
   saut.innerHTML = "";
+  if (!liste.length) {
+    conteneur.innerHTML = `<p class="aide-revue">${albumOuvert
+      ? (albumOuvert === ALBUM_FAVORIS ? t("albums.videFavoris") : t("albums.videAlbum"))
+      : t("galerie.vide")}</p>`;
+    return;
+  }
   let cleCourante = "";
   let grille: HTMLElement | null = null;
   for (const m of liste) {
@@ -1652,10 +1690,39 @@ window.addEventListener("DOMContentLoaded", () => {
   }
   $("#nav-reglages").addEventListener("click", ouvrirReglages);
   $("#nav-nouvel-album").addEventListener("click", async () => {
-    const nom = await demander(t("albums.nomNouveau"));
-    if (!nom) return;
-    etat.albums[nom] ??= [];
+    const nom = (await demander(t("albums.nomNouveau")))?.trim();
+    if (!nom || nom === ALBUM_FAVORIS || etat.albums[nom]) return;
+    etat.albums[nom] = [];
     await sauver();
+    rendreNavAlbums();
+    albumOuvert = nom;
+    allerA("vue-galerie");
+  });
+  $("#btn-exporter-album2").addEventListener("click", async () => {
+    const rels = contenuAlbum(albumOuvert!);
+    if (!rels.length) return;
+    const nom = albumOuvert === ALBUM_FAVORIS ? t("albums.nomFavoris") : albumOuvert!;
+    if (!(await confirmer(t("confirm.exporterAlbum", { n: rels.length, a: nom })))) return;
+    montrerChargement(t("albums.exportEnCours"));
+    let copies = 0;
+    try {
+      copies = await invoke<number>("exporter_album", { racine, nom, rels });
+    } catch (err) {
+      await informer(String(err));
+      return;
+    } finally {
+      cacherChargement();
+    }
+    await informer(t("albums.exportes", { n: copies, a: nom }));
+  });
+  $("#btn-supprimer-album2").addEventListener("click", async () => {
+    if (!albumOuvert || albumOuvert === ALBUM_FAVORIS) return;
+    if (!(await confirmer(t("confirm.supprimerAlbum", { a: albumOuvert }), { danger: true }))) return;
+    delete etat.albums[albumOuvert];
+    albumOuvert = null;
+    await sauver();
+    rendreNavAlbums();
+    rendreGalerie();
   });
 
   // Vue mois

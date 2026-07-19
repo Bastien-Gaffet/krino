@@ -25,6 +25,7 @@ const FR: Dico = {
   "galerie.badgeNonTriee": "à trier",
   "galerie.favori": "Favori",
   "galerie.annulerSel": "Annuler la sélection",
+  "galerie.vide": "Aucun fichier ne correspond au filtre.",
 
   "mois.dossier": "Dossier",
   "mois.inverser": "Inverser l'ordre",
@@ -247,6 +248,7 @@ const EN: Dico = {
   "galerie.badgeNonTriee": "to sort",
   "galerie.favori": "Favorite",
   "galerie.annulerSel": "Clear selection",
+  "galerie.vide": "No file matches the filter.",
 
   "mois.dossier": "Folder",
   "mois.inverser": "Reverse order",

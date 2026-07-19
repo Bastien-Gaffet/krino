@@ -303,7 +303,17 @@ async function ouvrirDossier(chemin: string) {
 async function purgerDisparus() {
   const presents = new Set(medias.map((m) => m.rel));
   const disparus = Object.keys(etat.decisions).filter((rel) => !presents.has(rel));
-  if (!disparus.length) return;
+  const favorisAvant = etat.favoris.length;
+  etat.favoris = etat.favoris.filter((rel) => presents.has(rel));
+  let albumsChanges = false;
+  for (const nom of Object.keys(etat.albums)) {
+    const filtre = etat.albums[nom].filter((rel) => presents.has(rel));
+    if (filtre.length !== etat.albums[nom].length) {
+      etat.albums[nom] = filtre;
+      albumsChanges = true;
+    }
+  }
+  if (!disparus.length && etat.favoris.length === favorisAvant && !albumsChanges) return;
   for (const rel of disparus) delete etat.decisions[rel];
   etat.ordre = etat.ordre.filter((rel) => presents.has(rel));
   await sauver();
@@ -1060,6 +1070,8 @@ function rendreNavAlbums() {
     b.addEventListener("click", () => {
       albumOuvert = nom;
       allerA("vue-galerie");
+      // L'album ouvert est la vraie section active, pas « Galerie »
+      document.querySelector(".nav-item[data-vue=vue-galerie]")?.classList.remove("actif");
       b.classList.add("actif");
     });
     installerDropAlbum(b, nom);

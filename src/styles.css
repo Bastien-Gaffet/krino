@@ -126,6 +126,8 @@ kbd {
   display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
   gap: 1em;
 }
+/* Espace entre la barre supérieure et les cartes sur la page des albums. */
+#grille-albums { padding-top: 1em; }
 .carte-mois {
   background: var(--panneau); border: 1px solid var(--bord); border-radius: 14px;
   padding: 1.1em; cursor: pointer; transition: border-color 0.15s, transform 0.1s;
@@ -579,9 +581,10 @@ input[type="range"]::-moz-range-track { height: 6px; border-radius: 3px; backgro
 }
 .ligne-radio input[type="checkbox"]:checked::after,
 .filtre-faits input[type="checkbox"]:checked::after {
-  content: ""; position: absolute; left: 4px; top: 1px;
+  content: ""; position: absolute; left: 50%; top: 45%;
   width: 4px; height: 8px; border: solid #fff;
-  border-width: 0 2px 2px 0; transform: rotate(45deg);
+  border-width: 0 2px 2px 0;
+  transform: translate(-50%, -50%) rotate(45deg);
 }
 .ligne-radio input[type="radio"]:checked { border-color: var(--accent); }
 .ligne-radio input[type="radio"]:checked::after {

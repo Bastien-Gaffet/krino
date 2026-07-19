@@ -1375,6 +1375,17 @@ function rendreNavAlbums() {
 let modeChoixAlbum = false;
 let choixAlbumRels: string[] = [];
 
+let albumsSignature = ""; // signature du DOM des cartes d'albums (cache anti-reconstruction)
+
+/** Signature du contenu affiché (noms + longueurs + aperçus) : si inchangée, on
+ *  garde le DOM de #grille-albums et on évite de recharger tous les aperçus. */
+function signatureAlbums(): string {
+  const clef = (rels: string[]) => `${rels.length}:${rels.slice(0, 3).join("~")}`;
+  const parts = [modeChoixAlbum ? "choix" : "vue", langue(), `m${medias.length}`, `f${clef(etat.favoris)}`];
+  for (const nom of albumsOrdonnes()) parts.push(`${nom}=${clef(etat.albums[nom] ?? [])}`);
+  return parts.join("|");
+}
+
 function rendrePageAlbums() {
   $("#titre-albums").textContent = modeChoixAlbum ? t("albums.choixTitre") : t("nav.albums");
   ($("#btn-retour-choix") as unknown as HTMLButtonElement).hidden = !modeChoixAlbum;
@@ -1383,6 +1394,11 @@ function rendrePageAlbums() {
     ? t("albums.selection", { n: choixAlbumRels.length })
     : t("albums.nbAlbums", { n: ordre.length });
   const grille = $("#grille-albums");
+  // Contenu identique à l'affichage précédent : on ne rebâtit pas le DOM (comme
+  // les cartes de mois), les aperçus déjà chargés restent en place.
+  const sig = signatureAlbums();
+  if (sig === albumsSignature && grille.childElementCount) return;
+  albumsSignature = sig;
   grille.innerHTML = "";
   grille.appendChild(carteAlbum(ALBUM_FAVORIS, t("albums.nomFavoris"), etat.favoris, false));
   for (const nom of ordre) {
@@ -1681,9 +1697,16 @@ async function montrerVis() {
     video.pause(); video.hidden = true; img.hidden = false;
     img.src = await urlAffichable(srcVis(m.rel), m.wic);
   }
-  $("#vis-legende").textContent =
-    `${m.rel.split("/").pop()} · ${tailleLisible(m.taille)} · ${dateLisible(m)}` +
-    (etat.favoris.includes(m.rel) ? " · ♥" : "");
+  const legende = $("#vis-legende");
+  legende.textContent =
+    `${m.rel.split("/").pop()} · ${tailleLisible(m.taille)} · ${dateLisible(m)}`;
+  if (etat.favoris.includes(m.rel)) {
+    legende.append(" · ");
+    const c = document.createElement("span");
+    c.className = "coeur-badge";
+    c.innerHTML = COEUR_SVG;
+    legende.append(c);
+  }
 }
 
 function fermerVisionneuse() {
@@ -1803,6 +1826,10 @@ async function actionSelection(action: "favori" | "retirer" | "corbeille") {
   else majBarreSelection();
 }
 
+/** Petit cœur SVG inline : le glyphe texte « ♥ » a une excroissance selon la
+ *  police, on affiche donc partout ce tracé (même facture que les icônes). */
+const COEUR_SVG = `<svg class="ico-coeur" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
+
 /** Met à jour le badge (★ / non triée) d'une vignette de la galerie sur place. */
 function majBadgeVignette(rel: string) {
   const v = document.querySelector<HTMLElement>(`.vignette-galerie[data-rel="${CSS.escape(rel)}"]`);
@@ -1812,7 +1839,7 @@ function majBadgeVignette(rel: string) {
   if (etat.favoris.includes(rel)) {
     const c = document.createElement("span");
     c.className = "coeur-badge";
-    c.textContent = "♥";
+    c.innerHTML = COEUR_SVG;
     badges.append(c);
   }
   if (!etat.decisions[rel]) badges.append(badges.textContent ? " · " : "", t("galerie.badgeNonTriee"));
@@ -1975,7 +2002,7 @@ function vignetteGalerie(m: Media): HTMLElement {
   if (etat.favoris.includes(m.rel)) {
     const c = document.createElement("span");
     c.className = "coeur-badge";
-    c.textContent = "♥";
+    c.innerHTML = COEUR_SVG;
     badges.append(c);
   }
   if (!etat.decisions[m.rel]) badges.append(badges.textContent ? " · " : "", t("galerie.badgeNonTriee"));

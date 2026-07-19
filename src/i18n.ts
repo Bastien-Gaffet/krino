@@ -151,7 +151,6 @@ const FR: Dico = {
   "kofi.texte": "Si tu apprécies ce que je fais, tu peux me soutenir — chaque petit geste compte énormément !",
   "kofi.bouton": "Me soutenir sur Ko-fi",
   "kofi.plusTard": "Plus tard",
-  "kofi.masquer": "Ne plus me le proposer",
 
   "mois.outils": "Outils",
   "outils.titre": "Outils — Doublons & similaires",
@@ -357,7 +356,6 @@ const EN: Dico = {
   "kofi.texte": "If you enjoy what I do, consider supporting me! Every little bit means the world!",
   "kofi.bouton": "Support me on Ko-fi",
   "kofi.plusTard": "Later",
-  "kofi.masquer": "Don't ask me again",
 
   "mois.outils": "Tools",
   "outils.titre": "Tools — Duplicates & similar",

@@ -57,11 +57,9 @@ interface Prefs {
   parAnnee: boolean;
   tutoVu: boolean;
   cguAcceptees: boolean;
-  kofiMasque: boolean;
 }
 const prefs: Prefs = {
   theme: "auto", langue: "auto", parAnnee: true, tutoVu: false, cguAcceptees: false,
-  kofiMasque: false,
   ...JSON.parse(localStorage.getItem("krino-prefs") ?? "{}"),
 };
 function sauverPrefs() {
@@ -730,7 +728,7 @@ async function rendreRevue() {
         v.className = "vignette";
         v.title = m.rel;
         if (m.video) {
-          v.innerHTML = `<video src="${convertFileSrc(src(m.rel))}" preload="metadata" muted></video><span class="marque">${t("vignette.video")}</span>`;
+          v.innerHTML = `<video src="${convertFileSrc(src(m.rel))}#t=0.1" preload="metadata" muted></video><span class="marque">${t("vignette.video")}</span>`;
         } else {
           const img = document.createElement("img");
           img.loading = "lazy";
@@ -818,7 +816,7 @@ async function rendreCorbeille() {
     v.className = "vignette";
     v.title = f.rel;
     if (f.video) {
-      v.innerHTML = `<video src="${convertFileSrc(srcCorbeille(f.rel))}" preload="metadata" muted></video><span class="marque">${t("vignette.video")}</span>`;
+      v.innerHTML = `<video src="${convertFileSrc(srcCorbeille(f.rel))}#t=0.1" preload="metadata" muted></video><span class="marque">${t("vignette.video")}</span>`;
     } else {
       const img = document.createElement("img");
       // Premier écran en priorité haute, le reste en chargement paresseux
@@ -1064,11 +1062,16 @@ function rendreAlbum() {
     const v = document.createElement("div");
     v.className = "vignette";
     v.title = rel;
-    const img = document.createElement("img");
-    img.loading = "lazy";
-    img.decoding = "async";
-    urlMiniature(m).then((u) => { img.src = u; });
-    v.appendChild(img);
+    if (m.video) {
+      // #t=0.1 force le rendu de la première image de la vidéo
+      v.innerHTML = `<video src="${convertFileSrc(src(rel))}#t=0.1" preload="metadata" muted></video><span class="marque">${t("vignette.video")}</span>`;
+    } else {
+      const img = document.createElement("img");
+      img.loading = "lazy";
+      img.decoding = "async";
+      urlMiniature(m).then((u) => { img.src = u; });
+      v.appendChild(img);
+    }
     v.addEventListener("click", () => {
       if (selectionAlbum.has(rel)) selectionAlbum.delete(rel);
       else selectionAlbum.add(rel);
@@ -1225,9 +1228,8 @@ async function installerMaj() {
   }
 }
 
-/** Fenêtre de soutien Ko-fi — aux grandes étapes, jamais si l'utilisateur l'a masquée. */
+/** Fenêtre de soutien Ko-fi — aux grandes étapes seulement. */
 function proposerSoutien() {
-  if (prefs.kofiMasque) return;
   ($("#modale-kofi") as unknown as HTMLDialogElement).showModal();
 }
 
@@ -1564,10 +1566,6 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#btn-kofi").addEventListener("click", () => {
     void openUrl(URL_KOFI);
     ($("#modale-kofi") as unknown as HTMLDialogElement).close();
-  });
-  $("#kofi-masquer").addEventListener("change", () => {
-    prefs.kofiMasque = ($("#kofi-masquer") as unknown as HTMLInputElement).checked;
-    sauverPrefs();
   });
   $("#btn-maj-telecharger").addEventListener("click", () => void installerMaj());
   $("#btn-verif-maj").addEventListener("click", () => verifierMaj(false));

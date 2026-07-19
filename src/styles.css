@@ -447,7 +447,11 @@ body.plein-ecran .barre-laterale { display: none; }
 #sections-galerie .grille-vignettes {
   grid-template-columns: repeat(auto-fill, minmax(var(--taille-vignette, 150px), 1fr));
 }
-.vignette-galerie.selectionnee { outline: 3px solid var(--accent); }
+.vignette-galerie.selectionnee,
+.vignette-corbeille.selectionnee { outline: 3px solid var(--accent); }
+/* La corbeille est une grille type galerie : la zone défilable occupe l'espace
+   restant pour ancrer la barre de sélection en bas de la vue. */
+#defil-corbeille { position: relative; flex: 1; min-height: 0; }
 .badges-galerie { position: absolute; top: 4px; left: 6px; font-size: .68rem;
   color: #fff; text-shadow: 0 1px 3px #000; pointer-events: none; }
 .barre-selection { display: flex; gap: 10px; align-items: center; justify-content: center;

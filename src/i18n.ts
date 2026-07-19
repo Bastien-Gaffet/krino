@@ -80,7 +80,9 @@ const FR: Dico = {
   "corbeille.bilan": "{n} fichiers · {t} récupérables",
   "corbeille.vide": "vide",
   "corbeille.restaurer": "Restaurer",
+  "corbeille.supprimerDef": "Supprimer définitivement",
   "corbeille.restaures": "{n} fichiers restaurés.",
+  "corbeille.videGrille": "La corbeille est vide.",
   "vignette.video": "vidéo",
 
   "chargement.analyse": "Analyse du dossier…",
@@ -130,6 +132,7 @@ const FR: Dico = {
   "confirm.garderReste": "Marquer les {n} fichiers restants comme gardés ?",
   "confirm.validerMois": "Valider {m} ?\n\n{n} fichiers ({t}) seront déplacés vers la corbeille de Krino.\nRien n'est supprimé tant que la corbeille n'est pas vidée.",
   "confirm.vider": "Vider la corbeille DÉFINITIVEMENT ? Cette action est irréversible.",
+  "confirm.supprimerDef": "Supprimer DÉFINITIVEMENT {n} fichiers ({t}) ? Cette action est irréversible.",
   "confirm.tuto": "Première utilisation : suivre le petit tutoriel (2 minutes, sur des images de démonstration) ?",
 
   "tuto.suivant": "Suivant",
@@ -322,7 +325,9 @@ const EN: Dico = {
   "corbeille.bilan": "{n} files · {t} recoverable",
   "corbeille.vide": "empty",
   "corbeille.restaurer": "Restore",
+  "corbeille.supprimerDef": "Delete permanently",
   "corbeille.restaures": "{n} files restored.",
+  "corbeille.videGrille": "The trash is empty.",
   "vignette.video": "video",
 
   "chargement.analyse": "Analyzing folder…",
@@ -372,6 +377,7 @@ const EN: Dico = {
   "confirm.garderReste": "Mark the {n} remaining files as kept?",
   "confirm.validerMois": "Confirm {m}?\n\n{n} files ({t}) will be moved to Krino's trash.\nNothing is deleted until the trash is emptied.",
   "confirm.vider": "Empty the trash PERMANENTLY? This cannot be undone.",
+  "confirm.supprimerDef": "Permanently delete {n} files ({t})? This cannot be undone.",
   "confirm.tuto": "First run: follow the short tutorial (2 minutes, on demo images)?",
 
   "tuto.suivant": "Next",

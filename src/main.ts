@@ -841,57 +841,129 @@ async function validerMois() {
   ($("#modale-valide") as unknown as HTMLDialogElement).showModal();
 }
 
-/* ═══ Vue corbeille ═══ */
+/* ═══ Vue corbeille — grille type galerie ═══
+   La corbeille est un album comme un autre, juste avec d'autres boutons :
+   mêmes vignettes lazy (chargement/déchargement hors écran) et même sélection
+   multiple (clic/Ctrl/Maj + rectangle + Ctrl+A) que la galerie, mais avec
+   Restaurer / Supprimer définitivement dans la barre de sélection. */
+interface FichierCorbeille { rel: string; taille: number; video: boolean; wic: boolean; }
+let corbeilleListe: FichierCorbeille[] = [];
+let selectionCorbeille = new Set<string>();
+let ancreCorbeille: string | null = null;
+
+/** Vue Media des fichiers de la corbeille (pour la visionneuse). */
+function mediasCorbeille(): Media[] {
+  return corbeilleListe.map((f) => ({ ...f, mtime_ms: 0, exif_ms: null }));
+}
 
 async function rendreCorbeille() {
   afficherVue("vue-corbeille");
   montrerChargement(t("chargement.corbeille"));
-  let liste: { rel: string; taille: number; video: boolean; wic: boolean }[] = [];
   try {
-    liste = await invoke<typeof liste>("lister_corbeille", { racine });
+    corbeilleListe = await invoke<FichierCorbeille[]>("lister_corbeille", { racine });
   } finally {
     cacherChargement();
   }
-  const octets = liste.reduce((s, f) => s + f.taille, 0);
-  $("#bilan-corbeille").textContent = liste.length
-    ? t("corbeille.bilan", { n: liste.length, t: tailleLisible(octets) })
+  selectionCorbeille = new Set();
+  ancreCorbeille = null;
+  const octets = corbeilleListe.reduce((s, f) => s + f.taille, 0);
+  $("#bilan-corbeille").textContent = corbeilleListe.length
+    ? t("corbeille.bilan", { n: corbeilleListe.length, t: tailleLisible(octets) })
     : t("corbeille.vide");
+  ($("#btn-restaurer") as unknown as HTMLButtonElement).hidden = !corbeilleListe.length;
+  ($("#btn-vider") as unknown as HTMLButtonElement).hidden = !corbeilleListe.length;
   const grille = $("#grille-corbeille");
   grille.innerHTML = "";
-  for (const f of liste) {
-    const v = document.createElement("div");
-    v.className = "vignette";
-    v.title = f.rel;
-    if (f.video) {
-      // Chargement paresseux comme la galerie (métadonnées à l'apparition)
-      v.innerHTML = `<video preload="none" muted></video><span class="marque">${t("vignette.video")}</span>`;
-      const vid = v.querySelector("video")!;
-      vid.dataset.src = `${convertFileSrc(srcCorbeille(f.rel))}#t=0.1`;
-      observateurVignettes.observe(vid);
-    } else {
-      // Vignettes chargées/déchargées à l'écran : premiers aperçus instantanés,
-      // mémoire maîtrisée même sur une grosse corbeille.
-      const img = document.createElement("img");
-      img.decoding = "async";
-      observerVignette(img, () => urlMiniature(f, true));
-      v.appendChild(img);
-    }
-    const btn = document.createElement("button");
-    btn.className = "btn-restaurer-un";
-    btn.textContent = t("corbeille.restaurer");
-    btn.addEventListener("click", async (e) => {
-      e.stopPropagation();
-      try {
-        await invoke("restaurer_fichier", { racine, rel: f.rel });
-        await ouvrirDossier(racine);
-        rendreCorbeille();
-      } catch (err) {
-        await informer(String(err));
-      }
-    });
-    v.appendChild(btn);
-    grille.appendChild(v);
+  if (!corbeilleListe.length) {
+    grille.innerHTML = `<p class="aide-revue">${t("corbeille.videGrille")}</p>`;
+    majBarreSelectionCorbeille();
+    return;
   }
+  for (const f of corbeilleListe) grille.appendChild(vignetteCorbeille(f));
+  ($("#defil-corbeille") as unknown as HTMLElement).scrollTop = 0;
+  majBarreSelectionCorbeille();
+}
+
+function vignetteCorbeille(f: FichierCorbeille): HTMLElement {
+  const v = document.createElement("div");
+  v.className = "vignette vignette-corbeille";
+  v.dataset.rel = f.rel;
+  v.title = f.rel;
+  if (f.video) {
+    // preload=none : première image chargée à l'apparition (déchargée en sortie)
+    v.innerHTML = `<video preload="none" muted></video><span class="marque">${t("vignette.video")}</span>`;
+    const vid = v.querySelector("video")!;
+    vid.dataset.src = `${convertFileSrc(srcCorbeille(f.rel))}#t=0.1`;
+    observateurVignettes.observe(vid);
+  } else {
+    const img = document.createElement("img");
+    img.decoding = "async";
+    observerVignette(img, () => urlMiniature(f, true));
+    v.appendChild(img);
+  }
+  v.addEventListener("click", (e) => clicVignetteCorbeille(f.rel, e));
+  v.addEventListener("dblclick", () => void ouvrirVisionneuse(f.rel, mediasCorbeille(), true));
+  return v;
+}
+
+/** Sélection à la souris : clic simple, Ctrl (bascule), Maj (plage). */
+function clicVignetteCorbeille(rel: string, e: MouseEvent) {
+  const visibles = corbeilleListe.map((f) => f.rel);
+  if (e.shiftKey && ancreCorbeille) {
+    const a = visibles.indexOf(ancreCorbeille), b = visibles.indexOf(rel);
+    if (a >= 0 && b >= 0) {
+      for (const r of visibles.slice(Math.min(a, b), Math.max(a, b) + 1)) selectionCorbeille.add(r);
+    }
+  } else if (e.ctrlKey || e.metaKey) {
+    if (selectionCorbeille.has(rel)) selectionCorbeille.delete(rel);
+    else selectionCorbeille.add(rel);
+    ancreCorbeille = rel;
+  } else {
+    selectionCorbeille = new Set([rel]);
+    ancreCorbeille = rel;
+  }
+  majSelectionVisuelleCorbeille();
+}
+
+function majSelectionVisuelleCorbeille() {
+  for (const v of document.querySelectorAll<HTMLElement>(".vignette-corbeille")) {
+    v.classList.toggle("selectionnee", selectionCorbeille.has(v.dataset.rel!));
+  }
+  majBarreSelectionCorbeille();
+}
+
+function majBarreSelectionCorbeille() {
+  $("#barre-selection-corbeille").hidden = selectionCorbeille.size === 0;
+  $("#bilan-selection-corbeille").textContent = t("albums.selection", { n: selectionCorbeille.size });
+}
+
+/** Restaure les fichiers sélectionnés hors de la corbeille, vers leur origine. */
+async function restaurerSelectionCorbeille() {
+  const rels = [...selectionCorbeille];
+  if (!rels.length) return;
+  try {
+    await invoke("restaurer_fichiers", { racine, rels });
+    await ouvrirDossier(racine);
+  } catch (err) {
+    await informer(String(err));
+  }
+  await rendreCorbeille();
+}
+
+/** Supprime définitivement les fichiers sélectionnés (confirmation danger). */
+async function supprimerSelectionCorbeille() {
+  const rels = [...selectionCorbeille];
+  if (!rels.length) return;
+  const octets = corbeilleListe.filter((f) => selectionCorbeille.has(f.rel))
+    .reduce((s, f) => s + f.taille, 0);
+  if (!(await confirmer(t("confirm.supprimerDef", { n: rels.length, t: tailleLisible(octets) }),
+                        { danger: true }))) return;
+  try {
+    await invoke("supprimer_definitivement", { racine, rels });
+  } catch (err) {
+    await informer(String(err));
+  }
+  await rendreCorbeille();
 }
 
 /* ═══ Outils : doublons & similaires ═══ */
@@ -1493,15 +1565,21 @@ function installerDropAlbum(b: HTMLButtonElement, nom: string) {
   });
 }
 
-function installerRectangleSelection() {
-  const zone = $("#defil-galerie");
+/** Rectangle de sélection générique (galerie et corbeille partagent la logique).
+ *  `classe` = classe des vignettes ; `lire`/`ecrire` accèdent à la sélection ;
+ *  `maj` rafraîchit l'affichage. */
+function installerRectangle(
+  zoneId: string, classe: string,
+  lire: () => Set<string>, ecrire: (s: Set<string>) => void, maj: () => void,
+) {
+  const zone = $(zoneId);
   let x0 = 0, y0 = 0, rect: HTMLElement | null = null, additive = false;
   let base = new Set<string>();
   zone.addEventListener("pointerdown", (e) => {
     if (e.button !== 0) return;
-    if ((e.target as HTMLElement).closest(".vignette-galerie")) return; // clic sur vignette = sélection normale
+    if ((e.target as HTMLElement).closest("." + classe)) return; // clic sur vignette = sélection normale
     additive = e.ctrlKey || e.metaKey;
-    base = new Set(selectionGalerie);
+    base = new Set(lire());
     const cadre = zone.getBoundingClientRect();
     x0 = e.clientX - cadre.left; y0 = e.clientY - cadre.top + zone.scrollTop;
     rect = document.createElement("div");
@@ -1516,18 +1594,26 @@ function installerRectangleSelection() {
     const [gx, gy] = [Math.min(x0, x1), Math.min(y0, y1)];
     const [lx, ly] = [Math.abs(x1 - x0), Math.abs(y1 - y0)];
     Object.assign(rect.style, { left: `${gx}px`, top: `${gy}px`, width: `${lx}px`, height: `${ly}px` });
-    selectionGalerie = additive ? new Set(base) : new Set();
+    const sel = additive ? new Set(base) : new Set<string>();
     const zr = rect.getBoundingClientRect();
-    for (const v of document.querySelectorAll<HTMLElement>(".vignette-galerie")) {
+    for (const v of document.querySelectorAll<HTMLElement>("." + classe)) {
       const vr = v.getBoundingClientRect();
       const chevauche = !(vr.right < zr.left || vr.left > zr.right || vr.bottom < zr.top || vr.top > zr.bottom);
-      if (chevauche) selectionGalerie.add(v.dataset.rel!);
+      if (chevauche) sel.add(v.dataset.rel!);
     }
-    majSelectionVisuelle();
+    ecrire(sel);
+    maj();
   });
   const fin = () => { rect?.remove(); rect = null; };
   zone.addEventListener("pointerup", fin);
   zone.addEventListener("pointercancel", fin);
+}
+
+function installerRectangleSelection() {
+  installerRectangle("#defil-galerie", "vignette-galerie",
+    () => selectionGalerie, (s) => { selectionGalerie = s; }, majSelectionVisuelle);
+  installerRectangle("#defil-corbeille", "vignette-corbeille",
+    () => selectionCorbeille, (s) => { selectionCorbeille = s; }, majSelectionVisuelleCorbeille);
 }
 
 /* ═══ Visionneuse ═══ */
@@ -1535,13 +1621,21 @@ let visIndex = -1;
 // Liste parcourue par la visionneuse. `null` = galerie courante ; sinon une
 // liste explicite (ex. les fichiers d'un groupe de doublons).
 let visListe: Media[] | null = null;
+// Les médias visionnés sont-ils dans la corbeille ? (résolution de chemin distincte)
+let visCorbeille = false;
 
 function mediasVis(): Media[] {
   return visListe ?? mediasGalerie();
 }
 
-async function ouvrirVisionneuse(rel: string, liste?: Media[]) {
+/** Chemin absolu source d'un média visionné (galerie ou corbeille). */
+function srcVis(rel: string): string {
+  return visCorbeille ? srcCorbeille(rel) : src(rel);
+}
+
+async function ouvrirVisionneuse(rel: string, liste?: Media[], corbeille = false) {
   visListe = liste ?? null;
+  visCorbeille = corbeille;
   const l = mediasVis();
   visIndex = l.findIndex((m) => m.rel === rel);
   if (visIndex < 0) return;
@@ -1562,10 +1656,10 @@ async function montrerVis() {
   ($("#vis-suiv") as HTMLElement).hidden = visIndex >= n - 1;
   if (m.video) {
     img.hidden = true; video.hidden = false;
-    video.src = convertFileSrc(src(m.rel));
+    video.src = convertFileSrc(srcVis(m.rel));
   } else {
     video.pause(); video.hidden = true; img.hidden = false;
-    img.src = await urlAffichable(src(m.rel), m.wic);
+    img.src = await urlAffichable(srcVis(m.rel), m.wic);
   }
   $("#vis-legende").textContent =
     `${m.rel.split("/").pop()} · ${tailleLisible(m.taille)} · ${dateLisible(m)}` +
@@ -1576,6 +1670,7 @@ function fermerVisionneuse() {
   ($("#vis-video") as unknown as HTMLVideoElement).pause();
   $("#visionneuse").hidden = true;
   visListe = null;
+  visCorbeille = false;
 }
 
 function visNaviguer(delta: number) {
@@ -2163,10 +2258,19 @@ function installerClavier() {
       } else {
         allerA("vue-mois");
       }
+    } else if (vue === "vue-corbeille") {
+      if (e.ctrlKey && k.toLowerCase() === "a") {
+        e.preventDefault();
+        selectionCorbeille = new Set(corbeilleListe.map((f) => f.rel));
+        majSelectionVisuelleCorbeille();
+      } else if (k === "Escape") {
+        if (selectionCorbeille.size > 0) { selectionCorbeille = new Set(); majSelectionVisuelleCorbeille(); }
+        else allerA("vue-mois");
+      }
     } else if (vue === "vue-doublons" && !$("#verif-doublons").hidden && k === "Escape") {
       fermerVerifDoublons();
     } else if (
-      (vue === "vue-doublons" || vue === "vue-rangement" || vue === "vue-corbeille") &&
+      (vue === "vue-doublons" || vue === "vue-rangement") &&
       k === "Escape"
     ) {
       allerA("vue-mois");
@@ -2401,6 +2505,13 @@ window.addEventListener("DOMContentLoaded", () => {
     const n = await invoke<number>("restaurer_corbeille", { racine });
     await informer(t("corbeille.restaures", { n }));
     await ouvrirDossier(racine);
+    await rendreCorbeille();
+  });
+  $("#sel-restaurer-corbeille").addEventListener("click", () => void restaurerSelectionCorbeille());
+  $("#sel-supprimer-corbeille").addEventListener("click", () => void supprimerSelectionCorbeille());
+  $("#sel-annuler-corbeille").addEventListener("click", () => {
+    selectionCorbeille = new Set();
+    majSelectionVisuelleCorbeille();
   });
 
   for (const btn of document.querySelectorAll<HTMLButtonElement>("dialog .fermer")) {

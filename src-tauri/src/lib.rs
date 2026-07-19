@@ -358,6 +358,52 @@ fn restaurer_fichier(racine: String, rel: String) -> Result<(), String> {
     fs::rename(&source, &dest).map_err(|e| e.to_string())
 }
 
+/// Vérifie qu'un chemin relatif reste bien à l'intérieur de la corbeille
+/// (protège la suppression définitive contre toute échappée via `..`).
+fn chemin_dans_corbeille(corbeille: &Path, rel: &str) -> Result<PathBuf, String> {
+    let cible = corbeille.join(rel);
+    // On compare les parents canonisés : le fichier lui-même doit exister.
+    let base = corbeille.canonicalize().map_err(|e| e.to_string())?;
+    let cible_abs = cible.canonicalize().map_err(|e| e.to_string())?;
+    if !cible_abs.starts_with(&base) {
+        return Err("Chemin hors de la corbeille".into());
+    }
+    Ok(cible)
+}
+
+/// Restaure une liste de fichiers de la corbeille à leur emplacement d'origine.
+#[tauri::command]
+fn restaurer_fichiers(racine: String, rels: Vec<String>) -> Result<u32, String> {
+    let racine = PathBuf::from(&racine);
+    let corbeille = chemin_corbeille(&racine);
+    let mut restaures = 0u32;
+    for rel in &rels {
+        let source = chemin_dans_corbeille(&corbeille, rel)?;
+        let dest = racine.join(rel);
+        if dest.exists() {
+            continue;
+        }
+        fs::create_dir_all(dest.parent().unwrap()).map_err(|e| e.to_string())?;
+        fs::rename(&source, &dest).map_err(|e| e.to_string())?;
+        restaures += 1;
+    }
+    Ok(restaures)
+}
+
+/// Supprime définitivement une liste de fichiers, uniquement s'ils sont situés
+/// dans la corbeille interne (sécurité : aucun chemin hors corbeille accepté).
+#[tauri::command]
+fn supprimer_definitivement(racine: String, rels: Vec<String>) -> Result<u32, String> {
+    let corbeille = chemin_corbeille(Path::new(&racine));
+    let mut supprimes = 0u32;
+    for rel in &rels {
+        let cible = chemin_dans_corbeille(&corbeille, rel)?;
+        fs::remove_file(&cible).map_err(|e| e.to_string())?;
+        supprimes += 1;
+    }
+    Ok(supprimes)
+}
+
 /// Restaure tout le contenu de la corbeille à son emplacement d'origine.
 #[tauri::command]
 fn restaurer_corbeille(racine: String) -> Result<u32, String> {
@@ -957,6 +1003,8 @@ pub fn run() {
             valider_mois,
             lister_corbeille,
             restaurer_fichier,
+            restaurer_fichiers,
+            supprimer_definitivement,
             vider_corbeille,
             restaurer_corbeille,
             apercu_png,

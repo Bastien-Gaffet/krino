@@ -180,9 +180,14 @@
         <button id="btn-restaurer" class="btn" data-i18n="corbeille.restaurerTout"></button>
         <button id="btn-vider" class="btn btn-danger" data-i18n="corbeille.vider"></button>
       </header>
-      <div class="defilable">
-        <p class="aide-revue" data-i18n="corbeille.aide"></p>
+      <div id="defil-corbeille" class="defilable">
         <div id="grille-corbeille" class="grille-vignettes"></div>
+      </div>
+      <div id="barre-selection-corbeille" class="barre-selection" hidden>
+        <span id="bilan-selection-corbeille"></span>
+        <button id="sel-restaurer-corbeille" class="btn btn-primaire" data-i18n="corbeille.restaurer"></button>
+        <button id="sel-supprimer-corbeille" class="btn btn-danger" data-i18n="corbeille.supprimerDef"></button>
+        <button id="sel-annuler-corbeille" class="btn" data-i18n="galerie.annulerSel"></button>
       </div>
     </section>
 

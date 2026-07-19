@@ -73,8 +73,8 @@ posée au moment où vous quittez, sans interrompre votre tri) ou **plus tard**.
   `<dossier>/.krino/etat.json` — le dossier trié est autonome, l'état voyage avec lui.
 - Formats reconnus : jpg, jpeg, png, gif, webp, bmp, tiff, avif / mp4, mov,
   m4v, webm, mkv, avi, 3gp.
-- Limitation actuelle : le regroupement utilise la **date de modification** des
-  fichiers (pas l'EXIF), et le format HEIC n'est pas affiché par la WebView.
+- Le regroupement utilise la **date EXIF** (ou la date de fichier, au choix dans
+  les Réglages) ; HEIC/TIFF sont décodés côté Rust via Windows Imaging Component.
 
 ## 🛡️ Sécurité des données
 

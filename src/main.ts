@@ -1133,15 +1133,20 @@ function rendreVerifDoublons() {
       `${f.rel.split("/").pop()} · ${tailleLisible(f.taille)} · ` +
       new Date(f.mtime_ms).toLocaleDateString(localeDate());
     v.append(img, marque, legende);
-    // Un clic retire le fichier de la liste (il sera conservé).
+    // Un clic retire le fichier de la liste (il sera conservé), mais on
+    // attend un court délai : un double-clic annule le retrait et agrandit.
+    let retraitPrevu = 0;
     v.addEventListener("click", () => {
-      selectionDoublons.set(f.rel, "garder");
-      majBilanDoublons();
-      rendreGroupesDoublons();
-      rendreVerifDoublons();
+      window.clearTimeout(retraitPrevu);
+      retraitPrevu = window.setTimeout(() => {
+        selectionDoublons.set(f.rel, "garder");
+        majBilanDoublons();
+        rendreGroupesDoublons();
+        rendreVerifDoublons();
+      }, 250);
     });
-    // Double-clic : agrandir pour comparer sans quitter la vérification.
     v.addEventListener("dblclick", (e) => {
+      window.clearTimeout(retraitPrevu);
       e.stopPropagation();
       void ouvrirVisionneuse(f.rel, listeVis);
     });
@@ -1680,7 +1685,7 @@ async function montrerVis() {
   }
   $("#vis-legende").textContent =
     `${m.rel.split("/").pop()} · ${tailleLisible(m.taille)} · ${dateLisible(m)}` +
-    (etat.favoris.includes(m.rel) ? " · ★" : "");
+    (etat.favoris.includes(m.rel) ? " · ♥" : "");
 }
 
 function fermerVisionneuse() {
@@ -2273,7 +2278,8 @@ function installerClavier() {
       else if (e.key === "ArrowRight") { e.preventDefault(); visNaviguer(1); }
       else if (e.key === "Escape") fermerVisionneuse();
       else if (e.key === raccourci("favori")) {
-        const m = mediasVis()[visIndex];
+        // Les chemins de la corbeille ne correspondent à aucun média réel.
+        const m = visCorbeille ? undefined : mediasVis()[visIndex];
         if (m) {
           if (etat.favoris.includes(m.rel)) etat.favoris = etat.favoris.filter((r) => r !== m.rel);
           else etat.favoris.push(m.rel);
@@ -2423,6 +2429,7 @@ window.addEventListener("DOMContentLoaded", () => {
     if (!(await confirmer(t("confirm.supprimerAlbum", { a: albumOuvert }), { danger: true }))) return;
     delete etat.albums[albumOuvert];
     albumOuvert = null;
+    albumsOrdonnes(); // purge le nom supprimé de etat.ordre_albums avant la sauvegarde
     await sauver();
     rendreNavAlbums();
     rendreGalerie();

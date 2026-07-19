@@ -8,6 +8,7 @@ import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 import kofiBanniere from "./assets/kofi.jpg";
 import { t, appliquerTraductions, definirLangue, resoudreLangue, langue } from "./i18n";
+import { confirmer, demander, informer } from "./dialogues";
 
 /* ═══ Types ═══ */
 
@@ -244,10 +245,10 @@ async function ouvrirDossier(chemin: string) {
     cacherChargement();
     if (String(err).includes("Annulé")) {
       afficherVue("vue-accueil");
-    } else if (ressembleBlocageWindows(err) && confirm(t("bloquee.detecte"))) {
+    } else if (ressembleBlocageWindows(err) && await confirmer(t("bloquee.detecte"))) {
       void openUrl(URL_AIDE_BLOCAGE);
     } else {
-      alert(String(err));
+      await informer(String(err));
     }
     return;
   } finally {
@@ -370,7 +371,7 @@ function carteDeMois(s: StatsMois): HTMLElement {
     btn.textContent = t("mois.refaire");
     btn.addEventListener("click", async (e) => {
       e.stopPropagation();
-      if (!confirm(t("confirm.refaireMois", { m: nomCle(s.cle) }))) return;
+      if (!(await confirmer(t("confirm.refaireMois", { m: nomCle(s.cle) }), { danger: true }))) return;
       etat.mois_valides = etat.mois_valides.filter((m) => m !== s.cle);
       for (const f of s.fichiers) delete etat.decisions[f.rel];
       etat.ordre = etat.ordre.filter((rel) => etat.decisions[rel]);
@@ -582,7 +583,7 @@ async function annuler() {
 
 async function garderLeReste() {
   if (!file.length) return;
-  if (!confirm(t("confirm.garderReste", { n: file.length }))) return;
+  if (!(await confirmer(t("confirm.garderReste", { n: file.length })))) return;
   for (const m of file) noterDecision(m.rel, "garder");
   file = [];
   rendreCarte();
@@ -754,14 +755,14 @@ async function validerMois() {
   const fichiers = medias.filter((m) => cleDe(m) === moisCourant);
   const nonDecides = fichiers.filter((m) => !etat.decisions[m.rel]);
   if (nonDecides.length) {
-    alert(t("revue.nonDecides", { n: nonDecides.length }));
+    await informer(t("revue.nonDecides", { n: nonDecides.length }));
     return;
   }
   const jetees = fichiers.filter((m) => etat.decisions[m.rel] === "jeter");
   const octets = jetees.reduce((s, f) => s + f.taille, 0);
-  if (!confirm(t("confirm.validerMois", {
+  if (!(await confirmer(t("confirm.validerMois", {
     m: nomCle(moisCourant), n: jetees.length, t: tailleLisible(octets),
-  }))) return;
+  })))) return;
 
   montrerChargement(t("chargement.validation"));
   try {
@@ -840,7 +841,7 @@ async function rendreCorbeille() {
         await ouvrirDossier(racine);
         rendreCorbeille();
       } catch (err) {
-        alert(String(err));
+        await informer(String(err));
       }
     });
     v.appendChild(btn);
@@ -880,7 +881,7 @@ async function analyserDoublons() {
       racine, mode, seuil,
     });
   } catch (err) {
-    if (!String(err).includes("Annulé")) alert(String(err));
+    if (!String(err).includes("Annulé")) await informer(String(err));
     return;
   } finally {
     cacherChargement();
@@ -953,14 +954,14 @@ async function appliquerDoublons() {
   const octets = groupesDoublons.flat()
     .filter((f) => selectionDoublons.get(f.rel) === "jeter")
     .reduce((s, f) => s + f.taille, 0);
-  if (!confirm(t("confirm.doublons", { n: rels.length, t: tailleLisible(octets) }))) return;
+  if (!(await confirmer(t("confirm.doublons", { n: rels.length, t: tailleLisible(octets) }), { danger: true }))) return;
   montrerChargement(t("chargement.validation"));
   try {
     await invoke("valider_mois", { racine, rels });
   } finally {
     cacherChargement();
   }
-  alert(t("outils.deplaces", { n: rels.length }));
+  await informer(t("outils.deplaces", { n: rels.length }));
   groupesDoublons = [];
   selectionDoublons = new Map();
   rendreGroupesDoublons();
@@ -971,7 +972,7 @@ async function appliquerDoublons() {
 /* ═══ Organiser : rangement par date ═══ */
 
 async function lancerRangement() {
-  if (!confirm(t("confirm.rangement"))) return;
+  if (!(await confirmer(t("confirm.rangement"), { danger: true }))) return;
   montrerChargement(t("rangement.enCours"), "", true);
   let deplaces = 0, ignores = 0;
   try {
@@ -979,7 +980,7 @@ async function lancerRangement() {
       racine, sourceDate: etat.source_date || "exif",
     });
   } catch (err) {
-    alert(String(err));
+    await informer(String(err));
     return;
   } finally {
     cacherChargement();
@@ -990,13 +991,13 @@ async function lancerRangement() {
 }
 
 async function annulerDernierRangement() {
-  if (!confirm(t("confirm.annulerRangement"))) return;
+  if (!(await confirmer(t("confirm.annulerRangement"), { danger: true }))) return;
   montrerChargement(t("rangement.annulation"));
   let n = 0;
   try {
     n = await invoke<number>("annuler_rangement", { racine });
   } catch (err) {
-    alert(String(err));
+    await informer(String(err));
     return;
   } finally {
     cacherChargement();
@@ -1093,7 +1094,7 @@ function installerAlbums() {
     rendreAlbum();
   });
   $("#btn-nouvel-album").addEventListener("click", async () => {
-    const nom = prompt(t("albums.nomNouveau"))?.trim();
+    const nom = await demander(t("albums.nomNouveau"));
     if (!nom || nom === ALBUM_FAVORIS) return;
     etat.albums[nom] ??= [];
     albumCourant = nom;
@@ -1102,7 +1103,7 @@ function installerAlbums() {
   });
   $("#btn-supprimer-album").addEventListener("click", async () => {
     if (albumCourant === ALBUM_FAVORIS) return;
-    if (!confirm(t("confirm.supprimerAlbum", { a: albumCourant }))) return;
+    if (!(await confirmer(t("confirm.supprimerAlbum", { a: albumCourant }), { danger: true }))) return;
     delete etat.albums[albumCourant];
     albumCourant = ALBUM_FAVORIS;
     await sauver();
@@ -1133,18 +1134,18 @@ function installerAlbums() {
     const rels = contenuAlbum(albumCourant);
     if (!rels.length) return;
     const nom = albumCourant === ALBUM_FAVORIS ? t("albums.nomFavoris") : albumCourant;
-    if (!confirm(t("confirm.exporterAlbum", { n: rels.length, a: nom }))) return;
+    if (!(await confirmer(t("confirm.exporterAlbum", { n: rels.length, a: nom })))) return;
     montrerChargement(t("albums.exportEnCours"));
     let copies = 0;
     try {
       copies = await invoke<number>("exporter_album", { racine, nom, rels });
     } catch (err) {
-      alert(String(err));
+      await informer(String(err));
       return;
     } finally {
       cacherChargement();
     }
-    alert(t("albums.exportes", { n: copies, a: nom }));
+    await informer(t("albums.exportes", { n: copies, a: nom }));
   });
 }
 
@@ -1176,7 +1177,7 @@ async function verifierMaj(silencieux: boolean) {
       $("#btn-maj-telecharger").textContent = t("maj.installer");
       ($("#modale-maj") as unknown as HTMLDialogElement).showModal();
     } else if (!silencieux) {
-      alert(t("maj.aJour", { l: locale }));
+      await informer(t("maj.aJour", { l: locale }));
     }
     return;
   } catch {
@@ -1193,10 +1194,10 @@ async function verifierMaj(silencieux: boolean) {
       $("#btn-maj-telecharger").textContent = t("maj.telecharger");
       ($("#modale-maj") as unknown as HTMLDialogElement).showModal();
     } else if (!silencieux) {
-      alert(t("maj.aJour", { l: locale }));
+      await informer(t("maj.aJour", { l: locale }));
     }
   } catch {
-    if (!silencieux) alert(t("maj.erreur"));
+    if (!silencieux) await informer(t("maj.erreur"));
   }
 }
 
@@ -1223,7 +1224,7 @@ async function installerMaj() {
     });
     await relaunch();
   } catch (err) {
-    alert(t("maj.erreurInstall", { e: String(err) }));
+    await informer(t("maj.erreurInstall", { e: String(err) }));
     btn.disabled = false;
   }
 }
@@ -1454,11 +1455,11 @@ window.addEventListener("DOMContentLoaded", () => {
 
   // Conditions d'utilisation : acceptation obligatoire au premier lancement
   const cgu = $("#modale-cgu") as unknown as HTMLDialogElement;
-  $("#btn-accepter-cgu").addEventListener("click", () => {
+  $("#btn-accepter-cgu").addEventListener("click", async () => {
     prefs.cguAcceptees = true;
     sauverPrefs();
     cgu.close();
-    if (!prefs.tutoVu && confirm(t("confirm.tuto"))) tutoAller(0);
+    if (!prefs.tutoVu && (await confirmer(t("confirm.tuto")))) tutoAller(0);
   });
   if (!prefs.cguAcceptees) {
     cgu.addEventListener("cancel", (e) => {
@@ -1517,8 +1518,8 @@ window.addEventListener("DOMContentLoaded", () => {
   $("#btn-favori").addEventListener("click", () => void basculerFavori());
 
   // Annulation des tâches longues (le programme repartira de zéro)
-  $("#btn-annuler-tache").addEventListener("click", () => {
-    if (confirm(t("confirm.annulerTache"))) void invoke("annuler_tache");
+  $("#btn-annuler-tache").addEventListener("click", async () => {
+    if (await confirmer(t("confirm.annulerTache"))) void invoke("annuler_tache");
   });
   $("#btn-analyser-doublons").addEventListener("click", () => void analyserDoublons());
   $("#btn-appliquer-doublons").addEventListener("click", () => void appliquerDoublons());
@@ -1534,7 +1535,7 @@ window.addEventListener("DOMContentLoaded", () => {
   });
   $("#btn-reglages").addEventListener("click", ouvrirReglages);
   $("#btn-reset-tout").addEventListener("click", async () => {
-    if (!confirm(t("confirm.reset"))) return;
+    if (!(await confirmer(t("confirm.reset"), { danger: true }))) return;
     etat.decisions = {};
     etat.mois_valides = [];
     etat.ordre = [];
@@ -1589,14 +1590,14 @@ window.addEventListener("DOMContentLoaded", () => {
   // Corbeille
   $("#btn-retour-corbeille").addEventListener("click", () => { afficherVue("vue-mois"); rendreMois(); });
   $("#btn-vider").addEventListener("click", async () => {
-    if (!confirm(t("confirm.vider"))) return;
+    if (!(await confirmer(t("confirm.vider"), { danger: true }))) return;
     await invoke("vider_corbeille", { racine });
     await rendreCorbeille();
     proposerSoutien();
   });
   $("#btn-restaurer").addEventListener("click", async () => {
     const n = await invoke<number>("restaurer_corbeille", { racine });
-    alert(t("corbeille.restaures", { n }));
+    await informer(t("corbeille.restaures", { n }));
     await ouvrirDossier(racine);
   });
 

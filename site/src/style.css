@@ -129,6 +129,11 @@ a { color: inherit; }
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
   padding: 0.4em;
 }
+/* Un style d'auteur passe toujours devant le style par défaut du navigateur
+   pour [hidden], quelle que soit la spécificité : sans cette règle,
+   `display: flex` ci-dessus rendait l'attribut hidden inopérant et le menu
+   restait visible en permanence, cachant le contenu en dessous. */
+.partage-menu[hidden] { display: none; }
 .partage-lien {
   display: block;
   width: 100%;

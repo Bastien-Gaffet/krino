@@ -1,0 +1,139 @@
+name: Android
+
+# Compile l'application mobile en APK signé (voir docs/MOBILE.md).
+#
+# Le job `windows` n'est PAS décoratif : `release.yml` ne se déclenche que sur un
+# tag, donc rien ne vérifiait le build desktop sur un push. Comme le portage
+# Android modifie du code Rust partagé (module `wic`, dépendance `windows`), la
+# moindre régression ne se serait vue qu'au moment de publier une release.
+# Les deux cibles sont donc vérifiées ensemble, et l'APK n'est produit que si le
+# desktop compile toujours.
+
+on:
+  push:
+    branches: [mobile-pre-tri]
+    paths-ignore:
+      - "site/**"
+      - "docs/**"
+      - "**/*.md"
+  workflow_dispatch:
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── Garde-fou : le desktop Windows doit toujours compiler ──
+  windows:
+    name: Vérifier que le desktop compile encore
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      # tauri-build intègre le frontend à la compilation : dist/ doit exister.
+      - run: npm run build
+
+      - name: cargo check (cible Windows)
+        run: cargo check --manifest-path src-tauri/Cargo.toml --locked
+
+  # ── Build Android ──
+  android:
+    name: APK signé
+    needs: windows
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Installer le NDK
+        run: sdkmanager --install "ndk;27.2.12479018" "platforms;android-35" "build-tools;35.0.0"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,i686-linux-android,x86_64-linux-android
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      - name: Construire le frontend mobile
+        # L'application Android doit ouvrir le pré-tri, pas l'interface PC :
+        # mobile.html devient le point d'entrée du bundle embarqué.
+        run: |
+          npm run build
+          cp dist/mobile.html dist/index.html
+
+      - name: Initialiser le projet Android
+        env:
+          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.2.12479018
+        run: npx tauri android init --ci
+
+      - name: Compiler l'APK
+        env:
+          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.2.12479018
+        run: npx tauri android build --apk --target aarch64
+
+      - name: Signer l'APK
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 absent."
+            exit 1
+          fi
+
+          # La clé n'existe que le temps du job, hors de l'arborescence du dépôt.
+          cle="$RUNNER_TEMP/upload.jks"
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$cle"
+
+          brut="$(find src-tauri/gen/android -name '*-unsigned.apk' -o -name '*.apk' | grep -v signed | head -1)"
+          echo "APK trouvé : $brut"
+
+          outils="$ANDROID_HOME/build-tools/35.0.0"
+          "$outils/zipalign" -p -f 4 "$brut" aligne.apk
+          "$outils/apksigner" sign \
+            --ks "$cle" \
+            --ks-pass "pass:$KEYSTORE_PASSWORD" \
+            --ks-key-alias "$KEY_ALIAS" \
+            --key-pass "pass:$KEYSTORE_PASSWORD" \
+            --out krino.apk aligne.apk
+
+          # Une signature non vérifiée ne vaut rien : on le prouve.
+          "$outils/apksigner" verify --print-certs krino.apk
+          rm -f "$cle" aligne.apk
+
+      - name: Publier l'APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: krino-apk
+          path: krino.apk
+          if-no-files-found: error

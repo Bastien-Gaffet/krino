@@ -873,6 +873,39 @@ async fn exporter_album(racine: String, nom: String, rels: Vec<String>) -> Resul
     Ok(copies)
 }
 
+/// Repli hors Windows (Android). Le décodage WIC est une API Windows ; sur
+/// mobile le pré-tri passe par MediaStore et n'appelle jamais ces commandes.
+/// Ce module existe uniquement pour que le crate compile pour Android — la
+/// version Windows ci-dessous est strictement inchangée.
+#[cfg(not(windows))]
+mod wic {
+    use std::fmt;
+
+    #[derive(Debug)]
+    pub struct Indisponible;
+
+    impl fmt::Display for Indisponible {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            write!(f, "décodage WIC indisponible sur cette plateforme")
+        }
+    }
+
+    pub type Result<T> = std::result::Result<T, Indisponible>;
+
+    pub fn generer_miniature(_source: &str, _cible: &str, _largeur_max: u32) -> Result<()> {
+        Err(Indisponible)
+    }
+
+    pub fn decoder_en_png(_chemin: &str, _largeur_max: u32) -> Result<Vec<u8>> {
+        Err(Indisponible)
+    }
+
+    pub fn dhash(_chemin: &str) -> Option<u64> {
+        None
+    }
+}
+
+#[cfg(windows)]
 mod wic {
     use windows::core::{Interface, HSTRING};
     use windows::Win32::Foundation::{GENERIC_READ, GENERIC_WRITE};

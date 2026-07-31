@@ -13,6 +13,14 @@ dist-ssr
 *.local
 .env
 
+# Clés de signature — ne doivent JAMAIS entrer dans le dépôt.
+# La clé d'envoi Android vit uniquement dans les secrets GitHub Actions.
+*.jks
+*.keystore
+*.p12
+*.pepk
+key.properties
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

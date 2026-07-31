@@ -4,11 +4,10 @@
 
 > Du grec κρίνω — *juger, trier, décider*.
 
+[![Site](https://img.shields.io/badge/Site-krino.netlify.app-6c8cff)](https://krino.netlify.app)
 [![Soutenir sur Ko-fi](https://img.shields.io/badge/Ko--fi-Soutenir%20le%20projet-8833ff?logo=ko-fi&logoColor=white)](https://ko-fi.com/G2G71YFHWX)
 
-Site vitrine : [`site/`](site/) (Vite + TS statique, hébergé sur Netlify via
-[`.github/workflows/site.yml`](.github/workflows/site.yml) — voir
-[`site/README.md`](site/README.md) pour la mise en place).
+**[krino.netlify.app](https://krino.netlify.app)** — présentation, capture d'écran, téléchargement et statistiques d'usage de la communauté.
 
 Application de bureau pour **épurer sa photothèque** : on parcourt ses photos et
 vidéos mois par mois, et pour chacune on décide — **garder** ou **jeter** — au
@@ -73,6 +72,12 @@ npm run tauri dev     # lancement en mode développement
 npm run tauri build   # exécutable + installeur dans src-tauri/target/release
 .\publier.ps1         # build signé + release GitHub avec manifeste de mise à jour
 ```
+
+### Site vitrine
+
+Le site ([`site/`](site/), Vite + TS statique) est hébergé sur Netlify et
+déployé automatiquement par [`.github/workflows/site.yml`](.github/workflows/site.yml)
+à chaque push touchant `site/`. Mise en place détaillée : [`site/README.md`](site/README.md).
 
 ### Mises à jour automatiques
 

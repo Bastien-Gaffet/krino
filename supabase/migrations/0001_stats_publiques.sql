@@ -11,21 +11,24 @@
 -- des fonctions SECURITY DEFINER, ce qui empêche un client de lire ou de
 -- modifier les données d'une autre installation.
 
-create table public.krino_installations (
+-- `if not exists` : rend la migration rejouable sans erreur si les tables ont
+-- déjà été créées manuellement (ex. via l'éditeur SQL du dashboard avant que
+-- le pipeline de déploiement automatique n'existe).
+create table if not exists public.krino_installations (
   anon_id uuid primary key,
   first_seen date not null default current_date,
   last_seen date not null default current_date
 );
 
-create table public.krino_totaux (
+create table if not exists public.krino_totaux (
   id boolean primary key default true check (id),
   photos_revues bigint not null default 0,
   photos_supprimees bigint not null default 0
 );
 insert into public.krino_totaux (id) values (true) on conflict do nothing;
 
-create table public.krino_totaux_quotidiens (
-  jour date primary key,
+create table if not exists public.krino_totaux_quotidiens (
+  jour date not null primary key,
   photos_revues bigint not null default 0,
   photos_supprimees bigint not null default 0,
   nouvelles_installations integer not null default 0

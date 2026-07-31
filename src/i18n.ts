@@ -293,6 +293,11 @@ const FR: Dico = {
   "mobile.corbeilleSysteme": "Les photos jetées sont dans la corbeille de ton téléphone. Elles y restent 30 jours, puis sont supprimées automatiquement.",
   "mobile.demo": "Démo — photos fictives, rien n'est supprimé",
   "mobile.reinitDemo": "Réinitialiser la démo",
+  "mobile.themeAuto": "Automatique (suit le mode du téléphone)",
+  "mobile.soutien": "Soutenir Krino",
+  "mobile.soutienAide": "Krino est gratuit et sans compte. Si l'application t'a fait gagner du temps, tu peux offrir un café à son auteur.",
+  "mobile.kofi": "Offrir un café",
+  "mobile.moisVide": "Aucune photo à trier dans ce mois.",
 };
 
 const EN: Dico = {
@@ -582,6 +587,11 @@ const EN: Dico = {
   "mobile.corbeilleSysteme": "Binned photos are in your phone's trash. They stay there for 30 days, then are deleted automatically.",
   "mobile.demo": "Demo — fake photos, nothing is deleted",
   "mobile.reinitDemo": "Reset demo",
+  "mobile.themeAuto": "Automatic (follows the phone's mode)",
+  "mobile.soutien": "Support Krino",
+  "mobile.soutienAide": "Krino is free and account-free. If the app saved you time, you can buy its author a coffee.",
+  "mobile.kofi": "Buy a coffee",
+  "mobile.moisVide": "No photos left to sort in this month.",
 };
 
 const DICOS: Record<Langue, Dico> = { fr: FR, en: EN };

@@ -31,8 +31,11 @@
       <header class="barre barre-mobile">
         <span class="titre-dossier" data-i18n="mobile.titre"></span>
         <span class="espace"></span>
-        <button id="btn-corbeille" class="btn btn-ico" aria-label="Corbeille">
+        <button id="btn-corbeille" class="btn btn-ico" data-i18n-title="corbeille.titre" aria-label="Corbeille">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6"/></svg>
+        </button>
+        <button id="btn-reglages" class="btn btn-ico" data-i18n-title="mois.reglages" aria-label="Réglages">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
       </header>
       <div id="conteneur-mois" class="conteneur-mois"></div>
@@ -42,29 +45,34 @@
       </footer>
     </section>
 
-    <!-- ═══ Tri (swipe) ═══ -->
+    <!-- ═══ Tri (swipe) ═══
+         Les deux cartes ont EXACTEMENT la même structure : sans ça, la photo
+         change de taille et de position au moment où la carte de fond devient
+         la carte active. -->
     <section id="vue-tri" class="vue" hidden>
       <header class="barre barre-mobile">
-        <button id="btn-retour-mois" class="btn btn-ico" aria-label="Retour">&larr;</button>
+        <button id="btn-retour-mois" class="btn btn-ico" data-i18n-title="tri.retour" aria-label="Retour">&larr;</button>
         <span id="titre-tri" class="titre-dossier"></span>
         <span class="espace"></span>
         <span id="progression-tri" class="progression"></span>
       </header>
       <div id="scene" class="scene">
         <div id="carte-fond" class="carte carte-fond" hidden>
-          <div class="carte-visuel"></div>
+          <div class="carte-visuel">
+            <img class="apercu-fond" alt="" aria-hidden="true" />
+            <img class="apercu-photo" alt="" />
+          </div>
+          <div class="carte-infos"><span></span><span></span></div>
         </div>
         <div id="carte" class="carte" hidden>
           <div class="carte-visuel">
-            <!-- La photo est affichée entière (`contain`) ; ce fond flouté remplit
-                 les bandes latérales plutôt que de laisser du noir mort. -->
             <img id="apercu-fond" class="apercu-fond" alt="" aria-hidden="true" />
-            <img id="apercu-img" alt="" draggable="false" hidden />
-            <video id="apercu-video" playsinline muted loop hidden></video>
+            <img id="apercu-img" class="apercu-photo" alt="" draggable="false" hidden />
+            <video id="apercu-video" class="apercu-photo" playsinline muted loop hidden></video>
             <div id="badge-garder" class="badge badge-garder" data-i18n="rafale.garder"></div>
             <div id="badge-jeter" class="badge badge-jeter" data-i18n="rafale.jeter"></div>
           </div>
-          <div id="carte-infos" class="carte-infos"></div>
+          <div id="carte-infos" class="carte-infos"><span></span><span></span></div>
         </div>
         <div id="fin-mois" class="fin-mois" hidden>
           <h2 data-i18n="finMois.titre"></h2>
@@ -79,9 +87,6 @@
         <button id="btn-annuler" class="btn-rond btn-rond-petit" data-i18n-title="tri.annulerTitre" aria-label="Annuler">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10h11a5 5 0 0 1 0 10h-3M3 10l5-5M3 10l5 5"/></svg>
         </button>
-        <button id="btn-favori" class="btn-rond btn-rond-petit" data-i18n-title="tri.favoriTitre" aria-label="Favori">
-          <svg class="ico-coeur" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-        </button>
         <button id="btn-garder" class="btn-rond btn-rond-garder" data-i18n-title="tri.garder" aria-label="Garder">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>
         </button>
@@ -94,8 +99,6 @@
         <button id="btn-retour-tri" class="btn btn-ico" aria-label="Retour">&larr;</button>
         <span id="titre-revue" class="titre-dossier"></span>
       </header>
-      <!-- Le bilan a sa propre ligne : inséré dans la barre, il la faisait passer
-           sur deux lignes et tronquait le titre du mois. -->
       <p id="bilan-revue" class="sous-barre"></p>
       <div class="defilable">
         <p class="aide-revue" data-i18n="revue.aide"></p>
@@ -125,10 +128,71 @@
       </footer>
     </section>
 
-    <!-- ═══ Chargement ═══ -->
-    <div id="voile-chargement" class="voile-chargement" hidden>
-      <div class="rond-chargement"></div>
-      <span id="texte-chargement"></span>
+    <!-- ═══ Réglages ═══ -->
+    <section id="vue-reglages" class="vue" hidden>
+      <header class="barre barre-mobile">
+        <button id="btn-retour-mois-3" class="btn btn-ico" aria-label="Retour">&larr;</button>
+        <span class="titre-dossier" data-i18n="mois.reglages"></span>
+      </header>
+      <div class="defilable reglages">
+        <h3 class="titre-groupe" data-i18n="reglages.apparence"></h3>
+        <div class="groupe-choix" id="choix-theme">
+          <label><input type="radio" name="theme" value="auto" /><span data-i18n="mobile.themeAuto"></span></label>
+          <label><input type="radio" name="theme" value="clair" /><span data-i18n="reglages.themeClair"></span></label>
+          <label><input type="radio" name="theme" value="sombre" /><span data-i18n="reglages.themeSombre"></span></label>
+        </div>
+
+        <h3 class="titre-groupe" data-i18n="reglages.langue"></h3>
+        <div class="groupe-choix" id="choix-langue">
+          <label><input type="radio" name="langue" value="auto" /><span data-i18n="reglages.langueAuto"></span></label>
+          <label><input type="radio" name="langue" value="fr" />Français</label>
+          <label><input type="radio" name="langue" value="en" />English</label>
+        </div>
+
+        <h3 class="titre-groupe" data-i18n="confidentialite.titre"></h3>
+        <label class="ligne-reglage">
+          <input type="checkbox" id="opt-telemetrie" />
+          <span data-i18n="reglages.statsActivees"></span>
+        </label>
+        <p class="aide-revue" data-i18n="reglages.statsAide"></p>
+        <p class="aide-revue anon-id">
+          <span data-i18n="reglages.statsId"></span>
+          <code id="anon-id"></code>
+        </p>
+
+        <h3 class="titre-groupe" data-i18n="mobile.soutien"></h3>
+        <p class="aide-revue" data-i18n="mobile.soutienAide"></p>
+        <a
+          id="lien-kofi"
+          class="btn btn-kofi"
+          href="https://ko-fi.com/G2G71YFHWX"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h13v5a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5z"/><path d="M17 9h1.5a2.5 2.5 0 0 1 0 5H17"/><path d="M8.5 3c-.5.7-.5 1.3 0 2M12 3c-.5.7-.5 1.3 0 2"/></svg>
+          <span data-i18n="mobile.kofi"></span>
+        </a>
+      </div>
+    </section>
+
+    <!-- Dialogue maison, repris du desktop (src/dialogues.ts) : pas de popup
+         natif du navigateur, thème et traductions respectés. -->
+    <dialog id="dialogue-krino" class="dialogue-krino">
+      <p class="dialogue-texte"></p>
+      <input class="dialogue-champ" type="text" hidden />
+      <div class="rangee-boutons">
+        <button class="btn dialogue-annuler" data-i18n="dialogue.annuler"></button>
+        <button class="btn btn-primaire dialogue-ok" data-i18n="dialogue.ok"></button>
+      </div>
+    </dialog>
+
+    <!-- Superposition de chargement : le loader du desktop, repris tel quel
+         (classes .chargement / .chargement-boite / .loader de styles.css). -->
+    <div id="chargement" class="chargement" hidden>
+      <div class="chargement-boite">
+        <div class="loader"></div>
+        <h2 id="chargement-titre"></h2>
+      </div>
     </div>
 
     <script type="module" src="/src/mobile/main.ts"></script>

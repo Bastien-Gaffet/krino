@@ -2,8 +2,8 @@
  * Krino mobile — contrôleur du pré-tri.
  *
  * Périmètre volontairement réduit au mode « Trier » du desktop : liste des mois,
- * swipe, revue de fin de mois, corbeille. Tout le mode « Organiser » (galerie,
- * albums, rangement, doublons) reste sur PC — voir `docs/MOBILE.md`.
+ * swipe, revue de fin de mois, corbeille, réglages. Tout le mode « Organiser »
+ * (galerie, albums, rangement) reste sur PC — voir `docs/MOBILE.md`.
  *
  * Ce fichier ne connaît que l'interface `Backend` : il ne sait pas s'il tourne
  * au-dessus de MediaStore ou du backend de démonstration.
@@ -12,6 +12,14 @@
 import "../styles.css";
 import "./mobile.css";
 import { appliquerTraductions, definirLangue, langue, resoudreLangue, t } from "../i18n";
+import { confirmer, informer } from "../dialogues";
+import {
+  anonId,
+  definirTelemetrieActivee,
+  enregistrerRevue,
+  enregistrerSuppression,
+  envoyerTelemetrie,
+} from "../telemetrie";
 import {
   type Backend,
   type Decision,
@@ -31,6 +39,33 @@ const SOUS_TAURI = "__TAURI_INTERNALS__" in window;
 const backend: Backend = new BackendDemo();
 const estDemo = !SOUS_TAURI;
 
+/* ══ Préférences ══ */
+type Prefs = {
+  theme: "auto" | "clair" | "sombre";
+  langue: "auto" | "fr" | "en";
+  telemetrieActivee: boolean;
+};
+
+const CLE_PREFS = "krino-mobile-prefs";
+
+const prefs: Prefs = {
+  theme: "auto",
+  langue: "auto",
+  telemetrieActivee: true,
+  ...JSON.parse(localStorage.getItem(CLE_PREFS) ?? "{}"),
+};
+
+function sauverPrefs() {
+  localStorage.setItem(CLE_PREFS, JSON.stringify(prefs));
+}
+
+function appliquerTheme() {
+  document.documentElement.dataset.theme = prefs.theme;
+  // La couleur de la barre système Android suit le thème.
+  const meta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+  if (meta) meta.content = prefs.theme === "clair" ? "#f4f4f7" : "#141418";
+}
+
 /* ══ État global ══ */
 let medias: Media[] = [];
 let etat: Etat = { ...ETAT_VIDE };
@@ -45,19 +80,26 @@ let historique: string[] = [];
 const $ = <T extends HTMLElement = HTMLElement>(sel: string) =>
   document.querySelector<T>(sel)!;
 
-const VUES = ["vue-onboard", "vue-mois", "vue-tri", "vue-revue", "vue-corbeille"];
+const VUES = [
+  "vue-onboard",
+  "vue-mois",
+  "vue-tri",
+  "vue-revue",
+  "vue-corbeille",
+  "vue-reglages",
+];
 
 function montrer(id: string) {
   for (const v of VUES) $(`#${v}`).hidden = v !== id;
 }
 
 function chargement(texte: string | null) {
-  const voile = $("#voile-chargement");
+  const voile = $("#chargement");
   if (texte === null) {
     voile.hidden = true;
     return;
   }
-  $("#texte-chargement").textContent = texte;
+  $("#chargement-titre").textContent = texte;
   voile.hidden = false;
 }
 
@@ -65,24 +107,51 @@ function locale() {
   return langue() === "fr" ? "fr-FR" : "en-US";
 }
 
+/**
+ * Charge une image en tolérant un échec réseau.
+ *
+ * Les vignettes de démo viennent d'un service externe qui limite le débit :
+ * sans nouvel essai, une partie de la grille restait vide. Le backend Android
+ * n'aura pas ce problème (URIs locales), mais la robustesse reste utile.
+ */
+function chargerImage(img: HTMLImageElement, url: string) {
+  let essais = 0;
+  img.classList.remove("image-absente");
+  img.onerror = () => {
+    essais++;
+    if (essais <= 2) {
+      // Le paramètre force le navigateur à refaire la requête plutôt que de
+      // resservir l'échec depuis son cache.
+      window.setTimeout(() => (img.src = `${url}${url.includes("?") ? "&" : "?"}r=${essais}`), 400 * essais);
+    } else {
+      img.removeAttribute("src");
+      img.classList.add("image-absente");
+    }
+  };
+  img.src = url;
+}
+
 /* ══ Démarrage ══ */
 
 async function demarrer() {
-  definirLangue(resoudreLangue("auto"));
+  definirLangue(resoudreLangue(prefs.langue));
   document.documentElement.lang = langue();
+  appliquerTheme();
+  definirTelemetrieActivee(prefs.telemetrieActivee);
   appliquerTraductions();
 
   $("#btn-autoriser").addEventListener("click", () => void autoriser());
   $("#btn-corbeille").addEventListener("click", () => void ouvrirCorbeille());
+  $("#btn-reglages").addEventListener("click", () => ouvrirReglages());
   $("#btn-retour-mois").addEventListener("click", () => void retourMois());
   $("#btn-retour-mois-2").addEventListener("click", () => void retourMois());
+  $("#btn-retour-mois-3").addEventListener("click", () => void retourMois());
   $("#btn-retour-tri").addEventListener("click", () => ouvrirTri(moisCourant));
   $("#btn-fin-revue").addEventListener("click", () => ouvrirRevue());
   $("#btn-valider-mois").addEventListener("click", () => void validerMois());
   $("#btn-jeter").addEventListener("click", () => decider("jeter"));
   $("#btn-garder").addEventListener("click", () => decider("garder"));
   $("#btn-annuler").addEventListener("click", () => annuler());
-  $("#btn-favori").addEventListener("click", () => basculerFavori());
   $("#btn-restaurer-tout").addEventListener("click", () => void restaurerTout());
   $("#btn-vider").addEventListener("click", () => void viderCorbeille());
   $("#btn-reinit-demo").addEventListener("click", () => {
@@ -90,10 +159,10 @@ async function demarrer() {
     location.reload();
   });
 
+  installerReglages();
   installerSwipe();
 
   $("#bandeau-demo").textContent = estDemo ? t("mobile.demo") : "";
-  $("#btn-reinit-demo").hidden = !estDemo;
   $(".pied-demo").hidden = !estDemo;
 
   if ((await backend.permission()) === "accordee") await chargerPhototheque();
@@ -124,6 +193,54 @@ async function chargerPhototheque() {
   [medias, etat] = await Promise.all([backend.scanner(), backend.lireEtat()]);
   chargement(null);
   afficherMois();
+}
+
+/* ══ Réglages ══ */
+
+function installerReglages() {
+  for (const radio of document.querySelectorAll<HTMLInputElement>("input[name=theme]")) {
+    radio.checked = radio.value === prefs.theme;
+    radio.addEventListener("change", () => {
+      if (!radio.checked) return;
+      prefs.theme = radio.value as Prefs["theme"];
+      appliquerTheme();
+      sauverPrefs();
+    });
+  }
+
+  for (const radio of document.querySelectorAll<HTMLInputElement>("input[name=langue]")) {
+    radio.checked = radio.value === prefs.langue;
+    radio.addEventListener("change", () => {
+      if (!radio.checked) return;
+      prefs.langue = radio.value as Prefs["langue"];
+      definirLangue(resoudreLangue(prefs.langue));
+      document.documentElement.lang = langue();
+      sauverPrefs();
+      appliquerTraductions();
+      // Les écrans déjà rendus contiennent des textes construits en JS.
+      rafraichirTextes();
+    });
+  }
+
+  const opt = $<HTMLInputElement>("#opt-telemetrie");
+  opt.checked = prefs.telemetrieActivee;
+  opt.addEventListener("change", () => {
+    prefs.telemetrieActivee = opt.checked;
+    definirTelemetrieActivee(opt.checked);
+    sauverPrefs();
+  });
+
+  $("#anon-id").textContent = anonId();
+}
+
+function ouvrirReglages() {
+  montrer("vue-reglages");
+}
+
+/** Re-rend les écrans dont le texte est construit en JS, après changement de langue. */
+function rafraichirTextes() {
+  $("#bandeau-demo").textContent = estDemo ? t("mobile.demo") : "";
+  if (!$("#vue-mois").hidden) afficherMois();
 }
 
 /* ══ Liste des mois ══ */
@@ -177,11 +294,23 @@ function afficherMois() {
     const titre = document.createElement("h3");
     titre.textContent = libelleMois(g.cle, locale());
 
+    // Aperçu en éventail, repris du desktop : on reconnaît le mois d'un coup
+    // d'œil au lieu de lire une date.
+    const eventail = document.createElement("div");
+    eventail.className = "eventail";
+    for (const m of g.medias.slice(0, 3)) {
+      const vignette = document.createElement("img");
+      vignette.alt = "";
+      void backend.vignette(m, 300).then((url) => chargerImage(vignette, url));
+      eventail.append(vignette);
+    }
+
     const stats = document.createElement("div");
     stats.className = "stats";
-    stats.textContent = fait
-      ? t("mois.fait")
-      : t("mois.fichiers", { n: g.medias.length, t: formaterTaille(g.taille) });
+    stats.textContent = t("mois.fichiers", {
+      n: g.medias.length,
+      t: formaterTaille(g.taille),
+    });
 
     const jauge = document.createElement("div");
     jauge.className = "jauge";
@@ -191,9 +320,16 @@ function afficherMois() {
 
     const avancement = document.createElement("div");
     avancement.className = "stats";
-    avancement.textContent = t("mois.decides", { a: g.decides, b: g.medias.length });
+    if (fait) {
+      const etiquette = document.createElement("span");
+      etiquette.className = "etiquette-fait";
+      etiquette.textContent = t("mois.fait");
+      avancement.append(etiquette);
+    } else {
+      avancement.textContent = t("mois.decides", { a: g.decides, b: g.medias.length });
+    }
 
-    carte.append(titre, stats, jauge, avancement);
+    carte.append(titre, eventail, stats, jauge, avancement);
     carte.addEventListener("click", () => ouvrirTri(g.cle));
     grille.append(carte);
   }
@@ -225,6 +361,39 @@ function ouvrirTri(cle: string) {
 
 const courant = (): Media | undefined => file[idx];
 
+/** Remplit une carte (active ou de fond) avec un média. Structure identique. */
+function peupler(carte: HTMLElement, m: Media, avecInfos: boolean) {
+  const flou = carte.querySelector<HTMLImageElement>(".apercu-fond")!;
+  const photo = carte.querySelector<HTMLImageElement>("img.apercu-photo")!;
+  const video = carte.querySelector<HTMLVideoElement>("video.apercu-photo");
+
+  if (m.video && video) {
+    photo.hidden = true;
+    video.hidden = false;
+    video.src = m.uri;
+    flou.hidden = true;
+  } else {
+    if (video) {
+      video.hidden = true;
+      video.removeAttribute("src");
+    }
+    photo.hidden = false;
+    chargerImage(photo, m.uri);
+    flou.hidden = false;
+    chargerImage(flou, m.uri);
+  }
+
+  const infos = carte.querySelector(".carte-infos");
+  if (infos && avecInfos) {
+    const [gauche, droite] = infos.querySelectorAll("span");
+    gauche.textContent = new Date(m.dateMs).toLocaleDateString(locale(), {
+      day: "numeric",
+      month: "short",
+    });
+    droite.textContent = formaterTaille(m.taille);
+  }
+}
+
 function rendreCarte() {
   const carte = $("#carte");
   const fond = $("#carte-fond");
@@ -251,51 +420,12 @@ function rendreCarte() {
   carte.style.transform = "";
   carte.style.transition = "";
 
-  const img = $<HTMLImageElement>("#apercu-img");
-  const video = $<HTMLVideoElement>("#apercu-video");
-  const flou = $<HTMLImageElement>("#apercu-fond");
-
-  if (m.video) {
-    img.hidden = true;
-    video.hidden = false;
-    video.src = m.uri;
-    flou.hidden = true;
-  } else {
-    video.hidden = true;
-    video.removeAttribute("src");
-    img.hidden = false;
-    img.src = m.uri;
-    flou.hidden = false;
-    flou.src = m.uri;
-  }
-
-  const date = new Date(m.dateMs).toLocaleDateString(locale(), {
-    day: "numeric",
-    month: "short",
-  });
-  const infos = $("#carte-infos");
-  infos.textContent = "";
-  const gauche = document.createElement("span");
-  gauche.textContent = date;
-  const droite = document.createElement("span");
-  droite.textContent = formaterTaille(m.taille);
-  infos.append(gauche, droite);
-
-  $("#btn-favori").classList.toggle("actif", etat.favoris.includes(m.id));
+  peupler(carte, m, true);
 
   // Carte suivante en arrière-plan, pour donner la sensation de pile.
   const suivant = file[idx + 1];
   fond.hidden = !suivant;
-  if (suivant) {
-    const visuel = fond.querySelector(".carte-visuel")!;
-    visuel.textContent = "";
-    if (!suivant.video) {
-      const apercu = document.createElement("img");
-      apercu.src = suivant.uri;
-      apercu.alt = "";
-      visuel.append(apercu);
-    }
-  }
+  if (suivant) peupler(fond, suivant, true);
 }
 
 function decider(choix: Decision) {
@@ -304,6 +434,7 @@ function decider(choix: Decision) {
 
   etat.decisions[m.id] = choix;
   historique.push(m.id);
+  enregistrerRevue(1);
 
   // La carte part dans la direction du choix avant de laisser place à la suivante.
   const carte = $("#carte");
@@ -327,16 +458,6 @@ function annuler() {
   delete etat.decisions[id];
   idx = Math.max(0, idx - 1);
   rendreCarte();
-  void backend.ecrireEtat(etat);
-}
-
-function basculerFavori() {
-  const m = courant();
-  if (!m) return;
-  const i = etat.favoris.indexOf(m.id);
-  if (i >= 0) etat.favoris.splice(i, 1);
-  else etat.favoris.push(m.id);
-  $("#btn-favori").classList.toggle("actif", i < 0);
   void backend.ecrireEtat(etat);
 }
 
@@ -441,7 +562,7 @@ function creerVignette(m: Media, classe: string, auClic?: () => void): HTMLEleme
   const img = document.createElement("img");
   img.alt = "";
   img.loading = "lazy";
-  void backend.vignette(m, 200).then((url) => (img.src = url));
+  void backend.vignette(m, 200).then((url) => chargerImage(img, url));
   el.append(img);
 
   if (m.video) {
@@ -458,7 +579,7 @@ async function validerMois() {
   const liste = mediasDuMois();
   const nonDecides = liste.filter((m) => !etat.decisions[m.id]).length;
   if (nonDecides > 0) {
-    alert(t("revue.nonDecides", { n: nonDecides }));
+    await informer(t("revue.nonDecides", { n: nonDecides }));
     return;
   }
 
@@ -479,7 +600,10 @@ async function validerMois() {
   medias = medias.filter((m) => !partis.has(m.id));
   await backend.ecrireEtat(etat);
 
-  alert(t("valide.texte", { n: misCorbeille, t: formaterTaille(octets) }));
+  enregistrerSuppression(misCorbeille);
+  void envoyerTelemetrie();
+
+  await informer(t("valide.texte", { n: misCorbeille, t: formaterTaille(octets) }));
   afficherMois();
 }
 
@@ -527,14 +651,14 @@ async function restaurerTout() {
   );
   await backend.ecrireEtat(etat);
 
-  alert(t("corbeille.restaures", { n }));
+  await informer(t("corbeille.restaures", { n }));
   await chargerPhototheque();
 }
 
 async function viderCorbeille() {
   const liste = await backend.listerCorbeille();
   if (liste.length === 0) return;
-  if (!confirm(t("corbeille.vider") + " ?")) return;
+  if (!(await confirmer(t("corbeille.vider") + " ?", { danger: true }))) return;
   await backend.supprimerDefinitivement(liste.map((m) => m.id));
   await rendreCorbeille();
 }

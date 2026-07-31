@@ -143,6 +143,14 @@ body.mobile .carte-mois h3 {
 body.mobile .carte-mois:hover {
   transform: none;
 }
+/* Éventail d'aperçus : un peu plus haut que sur desktop, la carte occupant
+   toute la largeur de l'écran. */
+body.mobile .eventail {
+  height: 132px;
+}
+body.mobile .eventail img {
+  width: 48%;
+}
 
 .pied-demo {
   display: flex;
@@ -159,17 +167,24 @@ body.mobile .carte-mois:hover {
 }
 
 /* ── Carte de tri ──
-   Plein cadre : sur téléphone la photo doit occuper tout l'espace disponible. */
+   La carte respire : coller aux bords de l'écran donnait une impression
+   d'étouffement et empêchait de voir qu'il s'agit d'une pile de cartes. */
 body.mobile .scene {
-  padding: 0.6em;
+  padding: 1.1em 1.2em;
 }
 body.mobile .carte {
   width: 100%;
   height: 100%;
-  border-radius: 18px;
+  border-radius: 20px;
 }
-body.mobile .carte-visuel img {
+body.mobile .carte-visuel img.apercu-photo,
+body.mobile .carte-visuel video.apercu-photo {
   object-fit: contain;
+}
+/* Image indisponible après plusieurs essais : un aplat discret vaut mieux
+   qu'une icône de vignette cassée. */
+.image-absente {
+  background: var(--visuel);
 }
 /* Une photo paysage dans une carte portrait laisse d'énormes bandes noires.
    On remplit le cadre avec la même image, floutée et assombrie, et la photo
@@ -184,10 +199,15 @@ body.mobile .carte-visuel .apercu-fond {
   transform: scale(1.35);
   z-index: 0;
 }
-body.mobile .carte-visuel #apercu-img,
-body.mobile .carte-visuel #apercu-video {
+body.mobile .carte-visuel .apercu-photo {
   position: relative;
   z-index: 1;
+}
+/* La carte de fond a la même structure que la carte active — sinon la photo
+   changeait de taille au moment de passer au premier plan. Elle n'affiche
+   simplement pas de texte. */
+body.mobile .carte-fond .carte-infos {
+  visibility: hidden;
 }
 body.mobile .carte-infos {
   font-size: 0.82em;
@@ -305,6 +325,54 @@ body.mobile .aide-revue {
   flex: 1;
 }
 
+/* ── Réglages ── */
+.reglages {
+  padding-bottom: calc(1.5em + env(safe-area-inset-bottom));
+}
+.groupe-choix {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2em;
+}
+.groupe-choix label,
+.ligne-reglage {
+  display: flex;
+  align-items: center;
+  gap: 0.7em;
+  min-height: 46px;
+  padding: 0.2em 0.1em;
+  cursor: pointer;
+}
+.groupe-choix input,
+.ligne-reglage input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+  flex: none;
+}
+.anon-id code {
+  background: var(--voile);
+  border: 1px solid var(--bord);
+  border-radius: 5px;
+  padding: 0.1em 0.4em;
+  font-size: 0.92em;
+  user-select: text;
+  word-break: break-all;
+}
+.btn-kofi {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.6em;
+  text-decoration: none;
+  margin-top: 0.4em;
+}
+.btn-kofi svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
 /* ── Vignettes ── */
 .vignette {
   position: relative;
@@ -345,38 +413,16 @@ body.mobile .aide-revue {
   outline-offset: -3px;
 }
 
-/* ── Voile de chargement ── */
-.voile-chargement {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1em;
-  background: var(--fond);
-  color: var(--sourd);
-}
-.rond-chargement {
-  width: 38px;
-  height: 38px;
-  border-radius: 50%;
-  border: 3px solid var(--bord);
-  border-top-color: var(--accent);
-  animation: tourne 0.8s linear infinite;
-}
-@keyframes tourne {
-  to {
-    transform: rotate(360deg);
-  }
+/* ── Chargement ──
+   La boîte du desktop impose 320px de large : trop pour les petits écrans. */
+body.mobile .chargement-boite {
+  min-width: 0;
+  width: min(320px, calc(100vw - 3em));
+  padding: 1.4em 1.6em;
 }
 
 /* Respecte le réglage système de réduction des animations. */
 @media (prefers-reduced-motion: reduce) {
-  .rond-chargement {
-    animation-duration: 2.4s;
-  }
   .btn-rond:active {
     transform: none;
   }

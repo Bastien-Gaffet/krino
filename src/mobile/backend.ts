@@ -38,7 +38,6 @@ export type Decision = "garder" | "jeter";
  */
 export type Etat = {
   decisions: Record<string, Decision>;
-  favoris: string[];
   /** Clés de mois (`AAAA-MM`) déjà validés. */
   moisFaits: string[];
 };
@@ -96,7 +95,11 @@ export interface Backend {
   ecrireEtat(etat: Etat): Promise<void>;
 }
 
-export const ETAT_VIDE: Etat = { decisions: {}, favoris: [], moisFaits: [] };
+/* Pas de favoris : le but du pré-tri mobile est d'éliminer les photos ratées,
+   pas de constituer une collection. Si le besoin revient, passer par
+   `MediaStore.createFavoriteRequest` — le favori serait alors celui du système,
+   partagé avec Google Photos, et non un marquage interne à l'application. */
+export const ETAT_VIDE: Etat = { decisions: {}, moisFaits: [] };
 
 /** Clé de mois `AAAA-MM`, utilisée pour regrouper et pour `Etat.moisFaits`. */
 export function cleMois(dateMs: number): string {

@@ -115,8 +115,17 @@ jobs:
           cle="$RUNNER_TEMP/upload.jks"
           printf '%s' "$KEYSTORE_B64" | base64 -d > "$cle"
 
-          brut="$(find src-tauri/gen/android -name '*-unsigned.apk' -o -name '*.apk' | grep -v signed | head -1)"
-          echo "APK trouvé : $brut"
+          echo "APK produits par le build :"
+          find src-tauri/gen/android -type f -name '*.apk' -print
+
+          # Ne PAS filtrer sur « signed » : le fichier s'appelle
+          # « ...-release-unsigned.apk », qui contient cette sous-chaîne.
+          brut="$(find src-tauri/gen/android -type f -name '*.apk' | head -1)"
+          if [ -z "$brut" ]; then
+            echo "::error::Aucun APK produit par le build."
+            exit 1
+          fi
+          echo "APK à signer : $brut"
 
           outils="$ANDROID_HOME/build-tools/35.0.0"
           "$outils/zipalign" -p -f 4 "$brut" aligne.apk

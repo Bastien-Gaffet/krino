@@ -31,8 +31,11 @@ const PLUGIN_ANDROID: &str = "app.krino.media";
 pub struct KrinoMedia<R: Runtime> {
     #[cfg(mobile)]
     handle: PluginHandle<R>,
+    // Sur desktop on conserve l'AppHandle plutôt qu'un PhantomData<R> : l'état
+    // géré par Tauri doit être Send + Sync, or PhantomData<R> ferait hériter
+    // la structure des traits de R, qui ne les garantit pas.
     #[cfg(not(mobile))]
-    _marker: std::marker::PhantomData<R>,
+    _app: tauri::AppHandle<R>,
 }
 
 #[cfg(mobile)]
@@ -136,9 +139,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             app.manage(KrinoMedia { handle });
 
             #[cfg(not(mobile))]
-            app.manage(KrinoMedia::<R> {
-                _marker: std::marker::PhantomData,
-            });
+            app.manage(KrinoMedia::<R> { _app: app.clone() });
 
             Ok(())
         })

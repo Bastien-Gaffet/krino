@@ -1476,11 +1476,15 @@ function rendrePageAlbums() {
 function carteAlbum(nom: string, libelle: string, rels: string[], reordonnable: boolean): HTMLElement {
   const carte = document.createElement("div");
   carte.className = "carte-mois carte-album";
+  // libelle est un nom d'album saisi par l'utilisateur (et potentiellement
+  // partagé via etat.json) : jamais interpolé dans innerHTML, pour éviter
+  // toute injection HTML/script via un nom d'album malveillant.
   carte.innerHTML = `
-    <h3>${libelle}</h3>
+    <h3></h3>
     <div class="eventail"></div>
     <div class="stats"><span class="compteur-album">${t("albums.nbPhotos", { n: rels.length })}</span></div>
   `;
+  carte.querySelector("h3")!.textContent = libelle;
   const eventail = carte.querySelector(".eventail") as HTMLElement;
   const apercus = rels
     .map((r) => medias.find((m) => m.rel === r))

@@ -21,7 +21,7 @@ Les deux seuls échanges réseau de Krino sont :
 ## Responsable du traitement
 
 Bastien Gaffet, auteur et éditeur de Krino.
-Contact : bastien.gaffet2007@gmail.com
+Contact : krino.app@gmail.com
 
 ## Données collectées
 

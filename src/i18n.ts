@@ -133,7 +133,7 @@ const FR: Dico = {
 
   "confidentialite.titre": "Confidentialité",
   "confidentialite.html":
-    "<p><strong>Responsable du traitement :</strong> Bastien Gaffet, auteur de Krino (contact : bastien.gaffet2007@gmail.com).</p>" +
+    "<p><strong>Responsable du traitement :</strong> Bastien Gaffet, auteur de Krino (contact : krino.app@gmail.com).</p>" +
     "<p><strong>Ce que Krino ne fait jamais :</strong> lire ou transmettre vos photos, vidéos, noms de fichiers ou chemins de dossiers. Le tri de vos fichiers reste 100% local sur votre ordinateur.</p>" +
     "<p><strong>Ce qui est collecté (si les statistiques anonymes sont activées, ce qui est le cas par défaut) :</strong> un identifiant aléatoire généré sur votre appareil (non relié à votre identité), le nombre de photos passées en revue, le nombre de photos supprimées, et la date de ces actions. Le seul autre échange réseau de Krino est la vérification de mise à jour auprès de GitHub au démarrage.</p>" +
     "<p><strong>Finalité et base légale :</strong> ces compteurs, agrégés à l'ensemble des utilisateurs, alimentent un graphique public sur le site de Krino et aident à comprendre l'usage de l'application. Base légale : intérêt légitime (RGPD art. 6.1.f), compte tenu du caractère anonyme et minimal des données.</p>" +
@@ -409,7 +409,7 @@ const EN: Dico = {
 
   "confidentialite.titre": "Privacy",
   "confidentialite.html":
-    "<p><strong>Data controller:</strong> Bastien Gaffet, Krino's author (contact: bastien.gaffet2007@gmail.com).</p>" +
+    "<p><strong>Data controller:</strong> Bastien Gaffet, Krino's author (contact: krino.app@gmail.com).</p>" +
     "<p><strong>What Krino never does:</strong> read or transmit your photos, videos, file names, or folder paths. Sorting your files stays 100% local on your computer.</p>" +
     "<p><strong>What is collected (if anonymous statistics are enabled, which is the default):</strong> a random identifier generated on your device (not linked to your identity), the number of photos reviewed, the number of photos deleted, and the date of these actions. Krino's only other network exchange is the update check with GitHub on startup.</p>" +
     "<p><strong>Purpose and legal basis:</strong> these counters, aggregated across all users, feed a public graph on the Krino website and help understand how the app is used. Legal basis: legitimate interest (GDPR art. 6.1.f), given the anonymous and minimal nature of the data.</p>" +

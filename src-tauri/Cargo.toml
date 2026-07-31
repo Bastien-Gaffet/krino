@@ -35,7 +35,14 @@ tauri-plugin-krino-media = { path = "plugins/krino-media" }
 
 # L'updater maison ne sert que sur le bureau : le Play Store gère les mises à
 # jour Android, et ce plugin ne cible pas mobile.
-[target.'cfg(desktop)'.dependencies]
+#
+# ATTENTION : ne PAS écrire `cfg(desktop)` ici. `desktop` est une convention
+# Tauri, émise par tauri-build pendant la compilation ; Cargo résout les
+# dépendances bien avant et ne connaît que les cfg réels. Avec `cfg(desktop)`
+# la condition n'est jamais vraie et la dépendance disparaît de TOUTES les
+# cibles, y compris Windows. Dans le code Rust, en revanche, `#[cfg(desktop)]`
+# est valide, puisqu'il est évalué après tauri-build.
+[target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-updater = "2"
 
 # Windows Imaging Component : décodage HEIC/TIFF, miniatures, orientation EXIF.

@@ -138,6 +138,69 @@ async function chargerStats() {
   renderChart($("#chart-root"), serie);
 }
 
+/** Bouton « Partager » : feuille de partage native si disponible (mobile),
+ *  sinon menu déroulant avec les principaux réseaux + copie du lien. */
+function initialiserPartage() {
+  const bouton = $<HTMLButtonElement>("#btn-partager");
+  const url = window.location.href;
+  const titre = document.title;
+  const texte = "Krino — trie tes photos, une décision à la fois. Gratuit et open source.";
+
+  if (navigator.share) {
+    bouton.addEventListener("click", () => {
+      navigator.share({ title: titre, text: texte, url }).catch(() => {});
+    });
+    return;
+  }
+
+  const menu = $("#partage-menu");
+  const liens: Record<string, string> = {
+    "partage-x": `https://twitter.com/intent/tweet?text=${encodeURIComponent(texte)}&url=${encodeURIComponent(url)}`,
+    "partage-facebook": `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(url)}`,
+    "partage-linkedin": `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
+    "partage-reddit": `https://www.reddit.com/submit?url=${encodeURIComponent(url)}&title=${encodeURIComponent(titre)}`,
+    "partage-whatsapp": `https://api.whatsapp.com/send?text=${encodeURIComponent(`${texte} ${url}`)}`,
+  };
+  for (const [id, href] of Object.entries(liens)) {
+    const a = document.getElementById(id);
+    if (a) a.setAttribute("href", href);
+  }
+
+  const fermerMenu = () => {
+    menu.hidden = true;
+    bouton.setAttribute("aria-expanded", "false");
+  };
+
+  bouton.addEventListener("click", () => {
+    const etaitOuvert = !menu.hidden;
+    menu.hidden = etaitOuvert;
+    bouton.setAttribute("aria-expanded", String(!etaitOuvert));
+  });
+  document.addEventListener("click", (e) => {
+    const cible = e.target as Node;
+    if (!menu.hidden && !menu.contains(cible) && !bouton.contains(cible)) fermerMenu();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !menu.hidden) {
+      fermerMenu();
+      bouton.focus();
+    }
+  });
+
+  const btnCopier = $<HTMLButtonElement>("#partage-copier");
+  const libelleInitial = btnCopier.textContent;
+  btnCopier.addEventListener("click", async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      btnCopier.textContent = "Lien copié !";
+      setTimeout(() => { btnCopier.textContent = libelleInitial; }, 1500);
+    } catch {
+      // Presse-papiers indisponible : le lien reste copiable manuellement depuis la barre d'adresse.
+    }
+  });
+}
+
 initialiserRevelations();
+initialiserPartage();
 void chargerEtoilesGitHub();
 void chargerStats();

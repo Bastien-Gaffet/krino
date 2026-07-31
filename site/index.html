@@ -8,10 +8,41 @@
       name="description"
       content="Krino épure ta photothèque en quelques clics : garde ou jette, au clavier, à la souris ou d'un swipe. Gratuit, open source, 100% privé."
     />
+    <!-- TODO domaine final : krino.netlify.app est un nom provisoire (nom réel
+         choisi lors de la création du site Netlify). Si un domaine personnalisé
+         est branché ensuite, remplacer cette URL partout ci-dessous + dans
+         sitemap.xml et robots.txt. -->
+    <link rel="canonical" href="https://krino.netlify.app/" />
     <link rel="icon" href="/logo.png" />
+    <meta name="theme-color" content="#6c8cff" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://krino.netlify.app/" />
     <meta property="og:title" content="Krino — Trie tes photos, une décision à la fois" />
     <meta property="og:description" content="Application de bureau gratuite et open source pour épurer sa photothèque." />
-    <meta property="og:image" content="/apercu.png" />
+    <meta property="og:image" content="https://krino.netlify.app/apercu.png" />
+    <meta property="og:locale" content="fr_FR" />
+
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Krino — Trie tes photos, une décision à la fois" />
+    <meta name="twitter:description" content="Application de bureau gratuite et open source pour épurer sa photothèque." />
+    <meta name="twitter:image" content="https://krino.netlify.app/apercu.png" />
+
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "SoftwareApplication",
+        "name": "Krino",
+        "operatingSystem": "Windows",
+        "applicationCategory": "MultimediaApplication",
+        "description": "Application de bureau gratuite et open source pour épurer sa photothèque : trie tes photos mois par mois, garde ou jette au clavier, à la souris ou d'un swipe.",
+        "url": "https://krino.netlify.app/",
+        "image": "https://krino.netlify.app/apercu.png",
+        "author": { "@type": "Person", "name": "Bastien Gaffet", "url": "https://bastiengaffet.fr" },
+        "offers": { "@type": "Offer", "price": "0", "priceCurrency": "EUR" }
+      }
+    </script>
+
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
@@ -28,9 +59,7 @@
         </nav>
         <div class="entete-actions">
           <a class="btn btn-kofi" href="https://ko-fi.com/G2G71YFHWX">
-            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-              <path fill="currentColor" d="M2 4a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v1h1.5A2.5 2.5 0 0 1 22 7.5v3A4.5 4.5 0 0 1 17.5 15H17a7 7 0 0 1-6.16 6.94A7 7 0 0 1 4 15V4Zm2 1v10a5 5 0 0 0 10 0V5H4Zm14 2v5a2.5 2.5 0 0 0 0-5Z"/>
-            </svg>
+            <img src="/kofi-logomark.png" alt="" width="20" height="16" />
             Ko-fi
           </a>
           <a class="btn btn-primaire" href="https://github.com/Bastien-Gaffet/krino/releases/latest">
@@ -61,6 +90,26 @@
               <a class="btn btn-primaire btn-grand" href="https://github.com/Bastien-Gaffet/krino/releases/latest">
                 Télécharger pour Windows
               </a>
+              <div class="partage">
+                <button type="button" class="btn" id="btn-partager" aria-haspopup="true" aria-expanded="false">
+                  <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+                    <circle cx="18" cy="5" r="3" fill="none" stroke="currentColor" stroke-width="2"/>
+                    <circle cx="6" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="2"/>
+                    <circle cx="18" cy="19" r="3" fill="none" stroke="currentColor" stroke-width="2"/>
+                    <line x1="8.6" y1="10.6" x2="15.4" y2="6.4" stroke="currentColor" stroke-width="2"/>
+                    <line x1="8.6" y1="13.4" x2="15.4" y2="17.6" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                  Partager
+                </button>
+                <div class="partage-menu" id="partage-menu" hidden>
+                  <a class="partage-lien" id="partage-x" href="#" target="_blank" rel="noopener">X (Twitter)</a>
+                  <a class="partage-lien" id="partage-facebook" href="#" target="_blank" rel="noopener">Facebook</a>
+                  <a class="partage-lien" id="partage-linkedin" href="#" target="_blank" rel="noopener">LinkedIn</a>
+                  <a class="partage-lien" id="partage-reddit" href="#" target="_blank" rel="noopener">Reddit</a>
+                  <a class="partage-lien" id="partage-whatsapp" href="#" target="_blank" rel="noopener">WhatsApp</a>
+                  <button type="button" class="partage-lien" id="partage-copier">Copier le lien</button>
+                </div>
+              </div>
             </div>
           </div>
           <img class="hero-apercu" src="/apercu.png" alt="Aperçu de l'interface de Krino" width="1280" height="640" data-reveal />

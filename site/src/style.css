@@ -63,6 +63,8 @@ a { color: inherit; }
 .btn-primaire { background-color: var(--accent); border-color: var(--accent); color: #fff; }
 .btn-primaire:hover { transform: translateY(-1px); filter: brightness(1.08); }
 .btn-grand { padding: 0.85em 1.5em; font-size: 1.05em; }
+.btn-kofi { background: #8833ff; border-color: #8833ff; color: #fff; }
+.btn-kofi:hover { border-color: #a866ff; background: #9944ff; transform: translateY(-1px); }
 
 /* En-tête */
 .entete { position: sticky; top: 0; background: var(--fond); border-bottom: 1px solid var(--bordure); z-index: 10; }
@@ -191,17 +193,12 @@ a { color: inherit; }
 .chart-tooltip .tooltip-valeur { color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; margin-left: auto; padding-left: 0.8em; }
 
 /* Pied */
-/* padding-bottom généreux : le widget flottant Ko-fi (position fixed, bas
-   gauche, injecté par storage.ko-fi.com/cdn/widget/Widget_2.js) reste ancré
-   au viewport quel que soit le scroll — sans cette marge, il chevauche le
-   pied de page une fois arrivé tout en bas de la page. */
-.pied { border-top: 1px solid var(--bordure); padding: 2em 0 6em; margin-top: 2em; }
-@media (min-width: 640px) {
-  .pied { padding-bottom: 2em; }
-  .pied-interieur { padding-right: 11em; }
-}
+.pied { border-top: 1px solid var(--bordure); padding: 2em 0; margin-top: 2em; }
 .pied-interieur { display: flex; flex-wrap: wrap; gap: 1em; justify-content: space-between; align-items: center; color: var(--sourd); font-size: 0.9em; }
-.nav-pied { display: flex; gap: 1.2em; }
+.pied-credit p { margin: 0.2em 0; }
+.pied-credit a { color: var(--accent); text-decoration: none; }
+.pied-credit a:hover { text-decoration: underline; }
+.nav-pied { display: flex; gap: 1.2em; flex-wrap: wrap; }
 .nav-pied a { text-decoration: none; color: var(--sourd); }
 .nav-pied a:hover { color: var(--texte); }
 

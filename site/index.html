@@ -6,7 +6,7 @@
     <title>Krino — Trie tes photos, une décision à la fois</title>
     <meta
       name="description"
-      content="Krino épure ta photothèque : parcours tes photos et vidéos mois par mois, garde ou jette au clavier, à la souris ou d'un swipe. Rien n'est supprimé sans revue explicite."
+      content="Krino épure ta photothèque en quelques clics : garde ou jette, au clavier, à la souris ou d'un swipe. Gratuit, open source, 100% privé."
     />
     <link rel="icon" href="/logo.png" />
     <meta property="og:title" content="Krino — Trie tes photos, une décision à la fois" />
@@ -27,12 +27,6 @@
           <a href="https://github.com/Bastien-Gaffet/krino" id="lien-github">GitHub</a>
         </nav>
         <div class="entete-actions">
-          <a class="btn btn-kofi" href="https://ko-fi.com/G2G71YFHWX">
-            <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
-              <path fill="currentColor" d="M2 4a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v1h1.5A2.5 2.5 0 0 1 22 7.5v3A4.5 4.5 0 0 1 17.5 15H17a7 7 0 0 1-6.16 6.94A7 7 0 0 1 4 15V4Zm2 1v10a5 5 0 0 0 10 0V5H4Zm14 2v5a2.5 2.5 0 0 0 0-5Z"/>
-            </svg>
-            Ko-fi
-          </a>
           <a class="btn btn-primaire" href="https://github.com/Bastien-Gaffet/krino/releases/latest">
             Télécharger
           </a>
@@ -43,66 +37,57 @@
     <main>
       <section id="accueil" class="hero">
         <div class="conteneur hero-interieur">
-          <div class="hero-texte">
-            <p class="eyebrow">Gratuit · Open source · 100% local</p>
+          <div class="hero-texte" data-reveal>
+            <a class="badge-etoiles" href="https://github.com/Bastien-Gaffet/krino" id="lien-etoiles">
+              <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true">
+                <path fill="currentColor" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+              </svg>
+              <strong id="nb-etoiles">0</strong> sur GitHub
+            </a>
+            <p class="eyebrow">Gratuit · Open source · 100% privé</p>
             <h1>Trie tes photos, une décision à la fois.</h1>
             <p class="hero-sous-titre">
-              Krino parcourt ta photothèque mois par mois. Pour chaque photo : garder ou
-              jeter — au clavier, à la souris, ou d'un swipe façon Tinder. Rien n'est
-              supprimé sans une revue et une validation explicites : tout passe d'abord
-              par une corbeille interne.
+              Des milliers de photos en vrac ? Krino te les fait passer en revue mois
+              par mois : garde ou jette, au clavier, à la souris, ou d'un swipe façon
+              Tinder. Simple, rapide, et tes photos ne quittent jamais ton ordinateur.
             </p>
             <div class="hero-actions">
               <a class="btn btn-primaire btn-grand" href="https://github.com/Bastien-Gaffet/krino/releases/latest">
                 Télécharger pour Windows
               </a>
-              <a class="lien-etoiles" href="https://github.com/Bastien-Gaffet/krino" id="lien-etoiles">
-                <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
-                  <path fill="currentColor" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
-                </svg>
-                <span id="nb-etoiles">—</span> sur GitHub
-              </a>
             </div>
           </div>
-          <img class="hero-apercu" src="/apercu.png" alt="Aperçu de l'interface de Krino" width="1280" height="640" />
+          <img class="hero-apercu" src="/apercu.png" alt="Aperçu de l'interface de Krino" width="1280" height="640" data-reveal />
         </div>
       </section>
 
       <section id="fonctionnalites" class="section">
         <div class="conteneur">
-          <h2>Ce que fait Krino</h2>
+          <h2 data-reveal>Ce que fait Krino</h2>
           <div class="grille-fonctionnalites">
-            <article class="carte">
-              <h3>Tri par mois</h3>
-              <p>Les fichiers sont regroupés par mois, présentés chronologiquement, avec une progression claire.</p>
+            <article class="carte" data-reveal>
+              <h3>Tri éclair, façon jeu</h3>
+              <p>Swipe façon Tinder, clavier ou souris : trie des milliers de photos en quelques minutes, sans effort.</p>
             </article>
-            <article class="carte">
-              <h3>Trois façons de décider</h3>
-              <p>Boutons, raccourcis clavier configurables, ou swipe gauche/droite façon Tinder avec animation.</p>
+            <article class="carte" data-reveal>
+              <h3>Doublons repérés pour toi</h3>
+              <p>Photos en rafale ou quasi identiques : Krino les regroupe et te laisse choisir en un coup d'œil.</p>
             </article>
-            <article class="carte">
-              <h3>Corbeille interne</h3>
-              <p>Aucune suppression directe : les fichiers jetés passent d'abord par une corbeille restaurable.</p>
+            <article class="carte" data-reveal>
+              <h3>Galerie &amp; albums soignés</h3>
+              <p>Favoris, albums réordonnables, sélection multiple, visionneuse intégrée — une vraie photothèque.</p>
             </article>
-            <article class="carte">
-              <h3>Doublons intelligents</h3>
-              <p>Détection des doublons exacts ou semblables (empreinte perceptuelle), avec écran de vérification.</p>
-            </article>
-            <article class="carte">
-              <h3>Galerie &amp; albums</h3>
-              <p>Galerie optimisée, favoris, albums réordonnables, sélection multiple, visionneuse intégrée.</p>
-            </article>
-            <article class="carte">
+            <article class="carte" data-reveal>
               <h3>Rangement automatique</h3>
-              <p>Aperçu de l'arborescence Année/Mois avant confirmation, avec annulation en un clic.</p>
+              <p>Un dossier Année/Mois généré tout seul, avec aperçu avant validation et annulation en un clic.</p>
             </article>
-            <article class="carte">
-              <h3>100% local</h3>
-              <p>Aucun compte, aucun serveur : tes photos ne quittent jamais ton ordinateur.</p>
+            <article class="carte" data-reveal>
+              <h3>100% privé</h3>
+              <p>Aucun compte, aucun cloud : tes photos restent sur ton ordinateur, un point c'est tout.</p>
             </article>
-            <article class="carte">
-              <h3>Mises à jour automatiques</h3>
-              <p>Paquets signés, installation depuis l'application, à la fermeture ou plus tard.</p>
+            <article class="carte" data-reveal>
+              <h3>Gratuit &amp; open source</h3>
+              <p>Aucune limite, aucune publicité. Le code est ouvert, tu peux le vérifier toi-même.</p>
             </article>
           </div>
         </div>
@@ -110,40 +95,35 @@
 
       <section id="stats" class="section section-sourde">
         <div class="conteneur">
-          <h2>Utilisé par la communauté</h2>
-          <p class="section-intro">
+          <h2 data-reveal>Utilisé par la communauté</h2>
+          <p class="section-intro" data-reveal>
             Statistiques anonymes et agrégées, envoyées uniquement par les
-            utilisateurs qui le souhaitent (réglage activable/désactivable dans
-            l'application). Aucune photo, aucun nom de fichier n'est jamais
-            transmis — voir la
+            utilisateurs qui le souhaitent. Aucune photo, aucun nom de fichier
+            n'est jamais transmis — voir la
             <a href="https://github.com/Bastien-Gaffet/krino/blob/main/docs/CONFIDENTIALITE.md">notice de confidentialité</a>.
           </p>
 
           <div id="stats-contenu">
             <div class="ligne-kpi" id="ligne-kpi">
-              <div class="kpi">
-                <span class="kpi-valeur" id="kpi-installations">—</span>
+              <div class="kpi" data-reveal>
+                <span class="kpi-valeur" id="kpi-installations" data-compte="0">0</span>
                 <span class="kpi-label">Installations</span>
               </div>
-              <div class="kpi">
-                <span class="kpi-valeur" id="kpi-revues">—</span>
+              <div class="kpi" data-reveal>
+                <span class="kpi-valeur" id="kpi-revues" data-compte="0">0</span>
                 <span class="kpi-label">Photos passées en revue</span>
               </div>
-              <div class="kpi">
-                <span class="kpi-valeur" id="kpi-supprimees">—</span>
+              <div class="kpi" data-reveal>
+                <span class="kpi-valeur" id="kpi-supprimees" data-compte="0">0</span>
                 <span class="kpi-label">Photos supprimées</span>
               </div>
             </div>
 
-            <div class="viz-root" id="viz-root" data-palette="#2a78d6,#1baf7a">
+            <div class="viz-root" id="viz-root" data-palette="#2a78d6,#1baf7a" data-reveal>
               <div class="graphe-entete">
                 <h3>Activité des 90 derniers jours</h3>
-                <button type="button" class="lien-tableau" id="btn-table-toggle" aria-expanded="false">
-                  Voir les données en tableau
-                </button>
               </div>
               <div id="chart-root" class="chart-root" role="img" aria-label="Graphe des photos passées en revue et supprimées sur les 90 derniers jours"></div>
-              <div id="table-stats" class="table-stats" hidden></div>
             </div>
           </div>
 
@@ -160,11 +140,15 @@
         <nav class="nav-pied">
           <a href="https://github.com/Bastien-Gaffet/krino">Dépôt GitHub</a>
           <a href="https://github.com/Bastien-Gaffet/krino/blob/main/docs/CONFIDENTIALITE.md">Confidentialité</a>
-          <a href="https://ko-fi.com/G2G71YFHWX">Soutenir sur Ko-fi</a>
         </nav>
       </div>
     </footer>
 
     <script type="module" src="/src/main.ts"></script>
+    <script type="text/javascript" src="https://storage.ko-fi.com/cdn/widget/Widget_2.js"></script>
+    <script type="text/javascript">
+      kofiwidget2.init('Soutenir Krino', '#8833ff', 'G2G71YFHWX');
+      kofiwidget2.draw();
+    </script>
   </body>
 </html>

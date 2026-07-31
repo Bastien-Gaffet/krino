@@ -204,33 +204,3 @@ export function renderChart(racine: HTMLElement, serie: JourStats[]): void {
   }
   racine.appendChild(legende);
 }
-
-/** Table de repli accessible : mêmes données que le graphe, sans interaction requise. */
-export function renderTable(racine: HTMLElement, serie: JourStats[]): void {
-  racine.textContent = "";
-  const table = document.createElement("table");
-  const thead = document.createElement("thead");
-  const trEntete = document.createElement("tr");
-  for (const titre of ["Date", "Photos passées en revue", "Photos supprimées"]) {
-    const th = document.createElement("th");
-    th.textContent = titre;
-    trEntete.appendChild(th);
-  }
-  thead.appendChild(trEntete);
-  table.appendChild(thead);
-
-  const tbody = document.createElement("tbody");
-  for (const j of serie) {
-    const tr = document.createElement("tr");
-    const tdDate = document.createElement("td");
-    tdDate.textContent = formaterDate(j.jour);
-    const tdRevues = document.createElement("td");
-    tdRevues.textContent = String(j.photos_revues);
-    const tdSupprimees = document.createElement("td");
-    tdSupprimees.textContent = String(j.photos_supprimees);
-    tr.append(tdDate, tdRevues, tdSupprimees);
-    tbody.appendChild(tr);
-  }
-  table.appendChild(tbody);
-  racine.appendChild(table);
-}

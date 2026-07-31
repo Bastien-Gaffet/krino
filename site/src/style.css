@@ -23,6 +23,9 @@
 
 *, *::before, *::after { box-sizing: border-box; }
 html { overflow-x: hidden; }
+@media (prefers-reduced-motion: no-preference) {
+  html { scroll-behavior: smooth; }
+}
 body {
   margin: 0;
   overflow-x: hidden;
@@ -55,11 +58,11 @@ a { color: inherit; }
   text-decoration: none;
   font-weight: 600;
   cursor: pointer;
+  transition: transform 0.15s ease, filter 0.15s ease, border-color 0.15s ease;
 }
 .btn-primaire { background-color: var(--accent); border-color: var(--accent); color: #fff; }
+.btn-primaire:hover { transform: translateY(-1px); filter: brightness(1.08); }
 .btn-grand { padding: 0.85em 1.5em; font-size: 1.05em; }
-.btn-kofi { background: #8833ff; border-color: #8833ff; color: #fff; }
-.btn-kofi:hover { border-color: #a866ff; background: #9944ff; }
 
 /* En-tête */
 .entete { position: sticky; top: 0; background: var(--fond); border-bottom: 1px solid var(--bordure); z-index: 10; }
@@ -81,6 +84,24 @@ a { color: inherit; }
   .hero { padding: 4em 0 3em; }
   .hero-interieur { grid-template-columns: 1fr 1fr; gap: 2.5em; }
 }
+/* Badge étoiles : premier élément du hero, doit attirer l'œil avant le texte. */
+.badge-etoiles {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5em;
+  padding: 0.5em 1.1em;
+  border-radius: 999px;
+  background: rgba(108, 140, 255, 0.14);
+  border: 1px solid rgba(108, 140, 255, 0.4);
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 700;
+  font-size: 0.95em;
+  margin-bottom: 1.3em;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.badge-etoiles:hover { background: rgba(108, 140, 255, 0.22); transform: translateY(-1px); }
+.badge-etoiles strong { font-variant-numeric: tabular-nums; font-size: 1.1em; }
 .eyebrow { color: var(--accent); font-weight: 700; text-transform: uppercase; font-size: 0.8em; letter-spacing: 0.05em; margin: 0 0 0.5em; }
 .hero h1 { font-size: 1.8em; line-height: 1.2; margin: 0 0 0.5em; }
 @media (min-width: 640px) {
@@ -88,8 +109,6 @@ a { color: inherit; }
 }
 .hero-sous-titre { color: var(--sourd); font-size: 1.02em; }
 .hero-actions { display: flex; align-items: center; gap: 1.2em; flex-wrap: wrap; margin-top: 1.5em; }
-.lien-etoiles { display: inline-flex; align-items: center; gap: 0.4em; text-decoration: none; color: var(--sourd); font-weight: 600; }
-.lien-etoiles:hover { color: var(--texte); }
 .hero-apercu { width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--bordure); }
 
 /* Sections */
@@ -148,7 +167,6 @@ a { color: inherit; }
 }
 .graphe-entete { display: flex; align-items: baseline; justify-content: space-between; gap: 1em; flex-wrap: wrap; color: var(--text-primary); }
 .graphe-entete h3 { margin: 0; font-size: 1.05em; }
-.lien-tableau { background: none; border: none; color: var(--text-secondary); text-decoration: underline; cursor: pointer; font-size: 0.85em; padding: 0; }
 .chart-root { margin-top: 1em; }
 .chart-root svg { width: 100%; height: auto; overflow: visible; }
 .chart-legende { display: flex; gap: 1.2em; margin-top: 0.8em; font-size: 0.85em; color: var(--text-secondary); }
@@ -172,15 +190,28 @@ a { color: inherit; }
 .chart-tooltip .tooltip-ligne { display: flex; align-items: center; gap: 0.4em; }
 .chart-tooltip .tooltip-valeur { color: var(--text-primary); font-weight: 600; font-variant-numeric: tabular-nums; margin-left: auto; padding-left: 0.8em; }
 
-.table-stats { margin-top: 1em; overflow-x: auto; }
-.table-stats table { width: 100%; border-collapse: collapse; font-size: 0.85em; color: var(--text-secondary); }
-.table-stats th, .table-stats td { text-align: right; padding: 0.4em 0.6em; border-bottom: 1px solid var(--gridline); font-variant-numeric: tabular-nums; }
-.table-stats th:first-child, .table-stats td:first-child { text-align: left; font-variant-numeric: normal; }
-.table-stats th { color: var(--text-muted); font-weight: 600; }
-
 /* Pied */
-.pied { border-top: 1px solid var(--bordure); padding: 2em 0; margin-top: 2em; }
+/* padding-bottom généreux : le widget flottant Ko-fi (position fixed, bas
+   gauche, injecté par storage.ko-fi.com/cdn/widget/Widget_2.js) reste ancré
+   au viewport quel que soit le scroll — sans cette marge, il chevauche le
+   pied de page une fois arrivé tout en bas de la page. */
+.pied { border-top: 1px solid var(--bordure); padding: 2em 0 6em; margin-top: 2em; }
+@media (min-width: 640px) {
+  .pied { padding-bottom: 2em; }
+  .pied-interieur { padding-right: 11em; }
+}
 .pied-interieur { display: flex; flex-wrap: wrap; gap: 1em; justify-content: space-between; align-items: center; color: var(--sourd); font-size: 0.9em; }
 .nav-pied { display: flex; gap: 1.2em; }
 .nav-pied a { text-decoration: none; color: var(--sourd); }
 .nav-pied a:hover { color: var(--texte); }
+
+/* Animations d'apparition au scroll (voir src/main.ts, IntersectionObserver). */
+[data-reveal] {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+}
+[data-reveal].visible { opacity: 1; transform: none; }
+@media (prefers-reduced-motion: reduce) {
+  [data-reveal] { opacity: 1; transform: none; transition: none; }
+}

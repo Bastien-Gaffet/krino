@@ -1,0 +1,22 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "build": {
+    "beforeBuildCommand": "npm run build:mobile"
+  },
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "url": "index.html",
+        "title": "Krino"
+      }
+    ]
+  },
+  "bundle": {
+    "targets": ["aab", "apk"],
+    "createUpdaterArtifacts": false,
+    "android": {
+      "minSdkVersion": 30
+    }
+  }
+}

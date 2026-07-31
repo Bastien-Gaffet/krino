@@ -82,13 +82,6 @@ jobs:
 
       - run: npm ci
 
-      - name: Construire le frontend mobile
-        # L'application Android doit ouvrir le pré-tri, pas l'interface PC :
-        # mobile.html devient le point d'entrée du bundle embarqué.
-        run: |
-          npm run build
-          cp dist/mobile.html dist/index.html
-
       - name: Initialiser le projet Android
         env:
           NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.2.12479018
@@ -98,6 +91,19 @@ jobs:
         env:
           NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.2.12479018
         run: npx tauri android build --apk --target aarch64
+
+      - name: Vérifier que la page embarquée est bien celle du mobile
+        # Garde-fou contre une régression déjà survenue : `beforeBuildCommand`
+        # est relancé par `tauri android build` et régénérait dist/index.html
+        # à partir de la page desktop, écrasant la page mobile. L'APK était
+        # alors parfaitement signé — et parfaitement inutilisable au doigt.
+        run: |
+          set -euo pipefail
+          if ! grep -q "vue-onboard" dist/index.html; then
+            echo "::error::dist/index.html n'est PAS la page mobile — l'APK embarquerait l'interface PC."
+            exit 1
+          fi
+          echo "OK : la page embarquée est bien le pré-tri mobile."
 
       - name: Signer l'APK
         env:

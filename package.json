@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
+    "build:mobile": "npm run build && node -e \"require('node:fs').copyFileSync('dist/mobile.html','dist/index.html')\"",
     "preview": "vite preview",
     "tauri": "tauri"
   },

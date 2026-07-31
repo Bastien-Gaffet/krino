@@ -285,6 +285,14 @@
       <div class="ligne-raccourci"><span data-i18n="reglages.annuler"></span><button class="btn touche" data-action="annuler"></button></div>
       <div class="ligne-raccourci"><span data-i18n="reglages.valider"></span><button class="btn touche" data-action="valider"></button></div>
       <div class="ligne-raccourci"><span data-i18n="reglages.favori"></span><button class="btn touche" data-action="favori"></button></div>
+      <h3 class="titre-reglage" data-i18n="reglages.statistiques"></h3>
+      <label class="ligne-radio"><input type="checkbox" id="opt-telemetrie" /> <span data-i18n="reglages.statsActivees"></span></label>
+      <p class="aide" data-i18n="reglages.statsAide"></p>
+      <p class="aide"><span data-i18n="reglages.statsId"></span> <code id="stats-anon-id"></code> <button id="btn-copier-anon-id" class="btn btn-ico" data-i18n-title="reglages.copier">⧉</button></p>
+      <div class="rangee-boutons gauche">
+        <button id="btn-voir-confidentialite" class="btn" data-i18n="reglages.confidentialite"></button>
+        <button id="btn-reinitialiser-stats" class="btn btn-danger-leger" data-i18n="reglages.reinitialiserStats"></button>
+      </div>
       <h3 class="titre-reglage" data-i18n="reglages.aide"></h3>
       <div class="rangee-boutons gauche">
         <button id="btn-revoir-tuto" class="btn" data-i18n="reglages.tuto"></button>
@@ -326,6 +334,15 @@
       <div class="texte-cgu" data-i18n-html="cgu.html"></div>
       <div class="rangee-boutons">
         <button id="btn-accepter-cgu" class="btn btn-primaire" data-i18n="cgu.accepter"></button>
+      </div>
+    </dialog>
+
+    <!-- ═══ Confidentialité (RGPD) ═══ -->
+    <dialog id="modale-confidentialite">
+      <h2 data-i18n="confidentialite.titre"></h2>
+      <div class="texte-cgu" data-i18n-html="confidentialite.html"></div>
+      <div class="rangee-boutons">
+        <button class="btn fermer" data-i18n="reglages.fermer"></button>
       </div>
     </dialog>
 

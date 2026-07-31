@@ -6,6 +6,10 @@
 
 [![Soutenir sur Ko-fi](https://img.shields.io/badge/Ko--fi-Soutenir%20le%20projet-8833ff?logo=ko-fi&logoColor=white)](https://ko-fi.com/G2G71YFHWX)
 
+Site vitrine : [`site/`](site/) (Vite + TS statique, hébergé sur Netlify via
+[`.github/workflows/site.yml`](.github/workflows/site.yml) — voir
+[`site/README.md`](site/README.md) pour la mise en place).
+
 Application de bureau pour **épurer sa photothèque** : on parcourt ses photos et
 vidéos mois par mois, et pour chacune on décide — **garder** ou **jeter** — au
 clavier, à la souris ou d'un **swipe**. Rien n'est supprimé sans une revue et
@@ -99,6 +103,19 @@ Krino ne supprime **jamais** un fichier directement :
 
 Les conditions d'utilisation (avec décharge de responsabilité) sont affichées et
 doivent être acceptées au premier lancement. **Faites une sauvegarde avant tout tri.**
+
+## 🔒 Vie privée & désinstallation
+
+Krino peut envoyer des **statistiques d'usage anonymes** (activées par défaut,
+désactivables dans Réglages) : nombre de photos passées en revue, nombre de
+photos supprimées, et date de ces actions — jamais vos fichiers, noms ou
+dossiers. Elles alimentent un graphique public sur le site de Krino. Détails
+complets : [`docs/CONFIDENTIALITE.md`](docs/CONFIDENTIALITE.md) (config
+serveur : [`supabase/README.md`](supabase/README.md)).
+
+À la désinstallation (Windows), un choix est proposé : conserver vos réglages
+(thème, langue, dossiers récents, identifiant anonyme) pour les retrouver en
+cas de réinstallation, ou tout supprimer proprement.
 
 ## L'application est bloquée par Windows ?
 

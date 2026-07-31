@@ -121,7 +121,25 @@ const FR: Dico = {
   "reglages.cgu": "Conditions d'utilisation",
   "reglages.fermer": "Fermer",
 
-  "cgu.titre": "Conditions d'utilisation",
+  "reglages.statistiques": "Statistiques anonymes",
+  "reglages.statsActivees": "Envoyer des statistiques d'usage anonymes",
+  "reglages.statsAide": "Seuls des compteurs (nombre de photos passées en revue, nombre de photos supprimées, date) sont envoyés, jamais vos fichiers, noms ou dossiers. Ces statistiques, agrégées avec celles de tous les utilisateurs, alimentent un graphique public sur le site de Krino.",
+  "reglages.statsId": "Identifiant anonyme :",
+  "reglages.copier": "Copier",
+  "reglages.confidentialite": "Confidentialité",
+  "reglages.reinitialiserStats": "Réinitialiser mes statistiques",
+
+  "confirm.reinitialiserStats": "Réinitialiser l'identifiant anonyme et les statistiques locales en attente d'envoi ?",
+
+  "confidentialite.titre": "Confidentialité",
+  "confidentialite.html":
+    "<p><strong>Responsable du traitement :</strong> Bastien Gaffet, auteur de Krino (contact : bastien.gaffet2007@gmail.com).</p>" +
+    "<p><strong>Ce que Krino ne fait jamais :</strong> lire ou transmettre vos photos, vidéos, noms de fichiers ou chemins de dossiers. Le tri de vos fichiers reste 100% local sur votre ordinateur.</p>" +
+    "<p><strong>Ce qui est collecté (si les statistiques anonymes sont activées, ce qui est le cas par défaut) :</strong> un identifiant aléatoire généré sur votre appareil (non relié à votre identité), le nombre de photos passées en revue, le nombre de photos supprimées, et la date de ces actions. Le seul autre échange réseau de Krino est la vérification de mise à jour auprès de GitHub au démarrage.</p>" +
+    "<p><strong>Finalité et base légale :</strong> ces compteurs, agrégés à l'ensemble des utilisateurs, alimentent un graphique public sur le site de Krino et aident à comprendre l'usage de l'application. Base légale : intérêt légitime (RGPD art. 6.1.f), compte tenu du caractère anonyme et minimal des données.</p>" +
+    "<p><strong>Conservation :</strong> le serveur ne conserve aucun historique quotidien lié à votre identifiant précis — seuls des totaux globaux, communs à tous les utilisateurs, sont incrémentés. Votre identifiant n'est associé qu'à deux dates (première et dernière utilisation), pour compter les installations sans doublon.</p>" +
+    "<p><strong>Destinataires :</strong> personne d'autre que l'auteur de Krino. Hébergement chez Supabase (Union européenne). Aucune vente, aucun partage publicitaire.</p>" +
+    "<p><strong>Vos droits :</strong> désactivez l'envoi à tout moment dans Réglages ; le bouton « Réinitialiser mes statistiques » efface votre identifiant local. Pour toute question ou demande d'effacement côté serveur, contactez l'adresse ci-dessus en indiquant votre identifiant anonyme (visible dans Réglages).</p>",
   "cgu.accepter": "J'accepte",
   "cgu.html":
     "<p><strong>Krino déplace et supprime des fichiers.</strong> Son rôle est précisément de vous aider à effacer des photos et vidéos.</p>" +
@@ -379,7 +397,25 @@ const EN: Dico = {
   "reglages.cgu": "Terms of use",
   "reglages.fermer": "Close",
 
-  "cgu.titre": "Terms of use",
+  "reglages.statistiques": "Anonymous statistics",
+  "reglages.statsActivees": "Send anonymous usage statistics",
+  "reglages.statsAide": "Only counters (number of photos reviewed, number of photos deleted, date) are sent, never your files, names, or folders. These statistics, aggregated with those of all users, feed a public graph on the Krino website.",
+  "reglages.statsId": "Anonymous ID:",
+  "reglages.copier": "Copy",
+  "reglages.confidentialite": "Privacy",
+  "reglages.reinitialiserStats": "Reset my statistics",
+
+  "confirm.reinitialiserStats": "Reset the anonymous ID and the local statistics pending upload?",
+
+  "confidentialite.titre": "Privacy",
+  "confidentialite.html":
+    "<p><strong>Data controller:</strong> Bastien Gaffet, Krino's author (contact: bastien.gaffet2007@gmail.com).</p>" +
+    "<p><strong>What Krino never does:</strong> read or transmit your photos, videos, file names, or folder paths. Sorting your files stays 100% local on your computer.</p>" +
+    "<p><strong>What is collected (if anonymous statistics are enabled, which is the default):</strong> a random identifier generated on your device (not linked to your identity), the number of photos reviewed, the number of photos deleted, and the date of these actions. Krino's only other network exchange is the update check with GitHub on startup.</p>" +
+    "<p><strong>Purpose and legal basis:</strong> these counters, aggregated across all users, feed a public graph on the Krino website and help understand how the app is used. Legal basis: legitimate interest (GDPR art. 6.1.f), given the anonymous and minimal nature of the data.</p>" +
+    "<p><strong>Retention:</strong> the server keeps no daily history tied to your specific identifier — only global totals, shared across all users, are incremented. Your identifier is only associated with two dates (first and last use), to count installations without duplicates.</p>" +
+    "<p><strong>Recipients:</strong> no one other than Krino's author. Hosted with Supabase (European Union). No selling, no advertising sharing.</p>" +
+    "<p><strong>Your rights:</strong> disable sending at any time in Settings; the “Reset my statistics” button clears your local identifier. For any question or server-side deletion request, contact the address above with your anonymous ID (visible in Settings).</p>",
   "cgu.accepter": "I accept",
   "cgu.html":
     "<p><strong>Krino moves and deletes files.</strong> Its very purpose is to help you erase photos and videos.</p>" +

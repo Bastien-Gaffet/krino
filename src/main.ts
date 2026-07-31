@@ -9,6 +9,10 @@ import { relaunch, exit } from "@tauri-apps/plugin-process";
 import kofiBanniere from "./assets/kofi.jpg";
 import { t, appliquerTraductions, definirLangue, resoudreLangue, langue } from "./i18n";
 import { confirmer, demander, informer } from "./dialogues";
+import {
+  anonId, definirTelemetrieActivee, enregistrerRevue, enregistrerSuppression,
+  envoyerTelemetrie, reinitialiserTelemetrie,
+} from "./telemetrie";
 
 /* ═══ Types ═══ */
 
@@ -60,11 +64,14 @@ interface Prefs {
   tutoVu: boolean;
   cguAcceptees: boolean;
   kofiApresMaj: boolean; // proposer Ko-fi au prochain démarrage (après une installation de maj)
+  telemetrieActivee: boolean; // statistiques d'usage anonymes (voir docs/CONFIDENTIALITE.md)
 }
 const prefs: Prefs = {
   theme: "auto", langue: "auto", parAnnee: true, tutoVu: false, cguAcceptees: false, kofiApresMaj: false,
+  telemetrieActivee: true,
   ...JSON.parse(localStorage.getItem("krino-prefs") ?? "{}"),
 };
+definirTelemetrieActivee(prefs.telemetrieActivee);
 function sauverPrefs() {
   localStorage.setItem("krino-prefs", JSON.stringify(prefs));
 }
@@ -666,6 +673,7 @@ function noterDecision(rel: string, action: "garder" | "jeter") {
   etat.ordre = etat.ordre.filter((r) => r !== rel);
   etat.ordre.push(rel);
   historique.push(rel);
+  enregistrerRevue(1);
 }
 
 async function basculerFavori() {
@@ -889,6 +897,7 @@ async function validerMois() {
   montrerChargement(t("chargement.validation"));
   try {
     await invoke("valider_mois", { racine, rels: jetees.map((m) => m.rel) });
+    enregistrerSuppression(jetees.length);
     if (!etat.mois_valides.includes(moisCourant)) etat.mois_valides.push(moisCourant);
     await sauver();
   } finally {
@@ -1217,6 +1226,7 @@ async function validerDoublons() {
   montrerChargement(t("chargement.validation"));
   try {
     await invoke("valider_mois", { racine, rels });
+    enregistrerSuppression(rels.length);
   } finally {
     cacherChargement();
   }
@@ -1872,8 +1882,10 @@ async function actionSelection(action: "favori" | "retirer" | "corbeille") {
     if (!(await confirmer(t("confirm.doublons", { n: rels.length, t: tailleLisible(octets) }),
                           { danger: true }))) return;
     montrerChargement(t("chargement.validation"));
-    try { await invoke("valider_mois", { racine, rels }); }
-    finally { cacherChargement(); }
+    try {
+      await invoke("valider_mois", { racine, rels });
+      enregistrerSuppression(rels.length);
+    } finally { cacherChargement(); }
     medias = medias.filter((m) => !selectionGalerie.has(m.rel));
     construireEvenements();
     reconstruire = true;
@@ -2330,6 +2342,23 @@ function installerModaleReglages() {
     ($("#modale-reglages") as unknown as HTMLDialogElement).close();
     ($("#modale-cgu") as unknown as HTMLDialogElement).showModal();
   });
+  $("#btn-voir-confidentialite").addEventListener("click", () => {
+    ($("#modale-reglages") as unknown as HTMLDialogElement).close();
+    ($("#modale-confidentialite") as unknown as HTMLDialogElement).showModal();
+  });
+  $("#opt-telemetrie").addEventListener("change", () => {
+    prefs.telemetrieActivee = ($("#opt-telemetrie") as unknown as HTMLInputElement).checked;
+    sauverPrefs();
+    definirTelemetrieActivee(prefs.telemetrieActivee);
+  });
+  $("#btn-reinitialiser-stats").addEventListener("click", async () => {
+    if (!(await confirmer(t("confirm.reinitialiserStats")))) return;
+    reinitialiserTelemetrie();
+    $("#stats-anon-id").textContent = anonId();
+  });
+  $("#btn-copier-anon-id").addEventListener("click", () => {
+    void navigator.clipboard.writeText(anonId());
+  });
 }
 
 function ouvrirReglages() {
@@ -2346,6 +2375,8 @@ function ouvrirReglages() {
     radio.checked = radio.value === prefs.langue;
   }
   ($("#opt-annees") as unknown as HTMLInputElement).checked = prefs.parAnnee;
+  ($("#opt-telemetrie") as unknown as HTMLInputElement).checked = prefs.telemetrieActivee;
+  $("#stats-anon-id").textContent = anonId();
   rendreEtiquettesRaccourcis();
   ($("#modale-reglages") as unknown as HTMLDialogElement).showModal();
 }
@@ -2561,6 +2592,12 @@ window.addEventListener("DOMContentLoaded", () => {
     });
     cgu.showModal();
   }
+
+  // Statistiques anonymes : on tente d'envoyer ce qui est en attente au
+  // démarrage, puis périodiquement (les compteurs sont aussi envoyés après
+  // chaque validation de mois). Rien n'est envoyé si désactivé en Réglages.
+  void envoyerTelemetrie();
+  setInterval(() => void envoyerTelemetrie(), 15 * 60 * 1000);
 
   // Accueil
   $("#btn-choisir").addEventListener("click", choisirDossier);

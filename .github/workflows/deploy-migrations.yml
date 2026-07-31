@@ -1,0 +1,93 @@
+name: Deploy Supabase migrations
+
+# Deploiement automatique des migrations vers le projet Supabase de
+# production. Se declenche quand des migrations arrivent sur la branche par
+# defaut (main), ou manuellement (Actions > Run workflow). Plus aucune
+# application manuelle a chaque nouvelle migration.
+#
+# Prerequis (a configurer UNE fois, voir supabase/README.md) :
+#   Settings > Secrets and variables > Actions, onglet *Secrets* :
+#     - SUPABASE_ACCESS_TOKEN  : jeton perso (Account > Access Tokens)
+#     - SUPABASE_DB_PASSWORD   : mot de passe de la base du projet
+#   Meme page, onglet *Variables* (valeur publique, pas un secret) :
+#     - SUPABASE_PROJECT_ID    : ref du projet (Project Settings > General)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "supabase/migrations/**"
+      - "supabase/tests/**"
+      - ".github/workflows/deploy-migrations.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: supabase-migrations
+  cancel-in-progress: false
+
+jobs:
+  # Garde-fou : une migration part en production des qu elle arrive sur main.
+  # On la rejoue d abord, avec toutes les precedentes et dans l ordre, sur une
+  # base vierge. Une migration qui ne tient pas depuis zero ou un droit trop
+  # large arretent le deploiement au lieu d atterrir en production.
+  verifier:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Rejouer les migrations sur une base vierge
+        env:
+          KRINO_TEST_PSQL_URL: postgres://postgres:postgres@localhost:5432
+          PGPASSWORD: postgres
+        run: ./supabase/tests/run-local.sh
+
+  deploy:
+    needs: verifier
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_PROJECT_ID: ${{ vars.SUPABASE_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verifier que les reglages sont bien la
+        run: |
+          manquants=""
+          for nom in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD; do
+            if [ -z "${!nom}" ]; then manquants="$manquants $nom (Secret)"; fi
+          done
+          if [ -z "$SUPABASE_PROJECT_ID" ]; then
+            manquants="$manquants SUPABASE_PROJECT_ID (Variable)"
+          fi
+          if [ -n "$manquants" ]; then
+            echo "::error::Reglages absents ou vides :$manquants"
+            echo "Settings > Secrets and variables > Actions."
+            echo "Attention aux deux onglets : le jeton et le mot de passe vont dans"
+            echo "*Secrets* (masques dans les logs), la reference de projet peut rester"
+            echo "dans *Variables* (elle est publique)."
+            exit 1
+          fi
+          echo "Jeton et mot de passe presents (Secrets), projet $SUPABASE_PROJECT_ID (Variable)."
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link au projet
+        run: supabase link --project-ref "$SUPABASE_PROJECT_ID"
+
+      - name: Appliquer les migrations en attente
+        run: supabase db push

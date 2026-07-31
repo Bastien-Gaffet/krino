@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Krino — Trie tes photos, une décision à la fois</title>
+    <meta
+      name="description"
+      content="Krino épure ta photothèque : parcours tes photos et vidéos mois par mois, garde ou jette au clavier, à la souris ou d'un swipe. Rien n'est supprimé sans revue explicite."
+    />
+    <link rel="icon" href="/logo.png" />
+    <meta property="og:title" content="Krino — Trie tes photos, une décision à la fois" />
+    <meta property="og:description" content="Application de bureau gratuite et open source pour épurer sa photothèque." />
+    <meta property="og:image" content="/apercu.png" />
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header class="entete">
+      <div class="conteneur entete-interieur">
+        <a class="marque" href="#accueil">
+          <img src="/logo.png" alt="" width="32" height="32" />
+          <span>Krino</span>
+        </a>
+        <nav class="nav-entete">
+          <a href="#fonctionnalites">Fonctionnalités</a>
+          <a href="#stats">Statistiques</a>
+          <a href="https://github.com/Bastien-Gaffet/krino" id="lien-github">GitHub</a>
+        </nav>
+        <a class="btn btn-primaire" href="https://github.com/Bastien-Gaffet/krino/releases/latest">
+          Télécharger
+        </a>
+      </div>
+    </header>
+
+    <main>
+      <section id="accueil" class="hero">
+        <div class="conteneur hero-interieur">
+          <div class="hero-texte">
+            <p class="eyebrow">Gratuit · Open source · 100% local</p>
+            <h1>Trie tes photos, une décision à la fois.</h1>
+            <p class="hero-sous-titre">
+              Krino parcourt ta photothèque mois par mois. Pour chaque photo : garder ou
+              jeter — au clavier, à la souris, ou d'un swipe façon Tinder. Rien n'est
+              supprimé sans une revue et une validation explicites : tout passe d'abord
+              par une corbeille interne.
+            </p>
+            <div class="hero-actions">
+              <a class="btn btn-primaire btn-grand" href="https://github.com/Bastien-Gaffet/krino/releases/latest">
+                Télécharger pour Windows
+              </a>
+              <a class="lien-etoiles" href="https://github.com/Bastien-Gaffet/krino" id="lien-etoiles">
+                <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+                  <path fill="currentColor" d="M8 .25a.75.75 0 0 1 .673.418l1.882 3.815 4.21.612a.75.75 0 0 1 .416 1.279l-3.046 2.97.719 4.192a.75.75 0 0 1-1.088.791L8 12.347l-3.766 1.98a.75.75 0 0 1-1.088-.79l.72-4.194L.818 6.374a.75.75 0 0 1 .416-1.28l4.21-.611L7.327.668A.75.75 0 0 1 8 .25Z"/>
+                </svg>
+                <span id="nb-etoiles">—</span> sur GitHub
+              </a>
+            </div>
+          </div>
+          <img class="hero-apercu" src="/apercu.png" alt="Aperçu de l'interface de Krino" width="960" height="600" />
+        </div>
+      </section>
+
+      <section id="fonctionnalites" class="section">
+        <div class="conteneur">
+          <h2>Ce que fait Krino</h2>
+          <div class="grille-fonctionnalites">
+            <article class="carte">
+              <h3>Tri par mois</h3>
+              <p>Les fichiers sont regroupés par mois, présentés chronologiquement, avec une progression claire.</p>
+            </article>
+            <article class="carte">
+              <h3>Trois façons de décider</h3>
+              <p>Boutons, raccourcis clavier configurables, ou swipe gauche/droite façon Tinder avec animation.</p>
+            </article>
+            <article class="carte">
+              <h3>Corbeille interne</h3>
+              <p>Aucune suppression directe : les fichiers jetés passent d'abord par une corbeille restaurable.</p>
+            </article>
+            <article class="carte">
+              <h3>Doublons intelligents</h3>
+              <p>Détection des doublons exacts ou semblables (empreinte perceptuelle), avec écran de vérification.</p>
+            </article>
+            <article class="carte">
+              <h3>Galerie &amp; albums</h3>
+              <p>Galerie optimisée, favoris, albums réordonnables, sélection multiple, visionneuse intégrée.</p>
+            </article>
+            <article class="carte">
+              <h3>Rangement automatique</h3>
+              <p>Aperçu de l'arborescence Année/Mois avant confirmation, avec annulation en un clic.</p>
+            </article>
+            <article class="carte">
+              <h3>100% local</h3>
+              <p>Aucun compte, aucun serveur : tes photos ne quittent jamais ton ordinateur.</p>
+            </article>
+            <article class="carte">
+              <h3>Mises à jour automatiques</h3>
+              <p>Paquets signés, installation depuis l'application, à la fermeture ou plus tard.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <section id="stats" class="section section-sourde">
+        <div class="conteneur">
+          <h2>Utilisé par la communauté</h2>
+          <p class="section-intro">
+            Statistiques anonymes et agrégées, envoyées uniquement par les
+            utilisateurs qui le souhaitent (réglage activable/désactivable dans
+            l'application). Aucune photo, aucun nom de fichier n'est jamais
+            transmis — voir la
+            <a href="https://github.com/Bastien-Gaffet/krino/blob/main/docs/CONFIDENTIALITE.md">notice de confidentialité</a>.
+          </p>
+
+          <div id="stats-contenu">
+            <div class="ligne-kpi" id="ligne-kpi">
+              <div class="kpi">
+                <span class="kpi-valeur" id="kpi-installations">—</span>
+                <span class="kpi-label">Installations</span>
+              </div>
+              <div class="kpi">
+                <span class="kpi-valeur" id="kpi-revues">—</span>
+                <span class="kpi-label">Photos passées en revue</span>
+              </div>
+              <div class="kpi">
+                <span class="kpi-valeur" id="kpi-supprimees">—</span>
+                <span class="kpi-label">Photos supprimées</span>
+              </div>
+            </div>
+
+            <div class="viz-root" id="viz-root" data-palette="#2a78d6,#1baf7a">
+              <div class="graphe-entete">
+                <h3>Activité des 90 derniers jours</h3>
+                <button type="button" class="lien-tableau" id="btn-table-toggle" aria-expanded="false">
+                  Voir les données en tableau
+                </button>
+              </div>
+              <div id="chart-root" class="chart-root" role="img" aria-label="Graphe des photos passées en revue et supprimées sur les 90 derniers jours"></div>
+              <div id="table-stats" class="table-stats" hidden></div>
+            </div>
+          </div>
+
+          <p id="stats-indisponibles" class="section-intro" hidden>
+            Statistiques bientôt disponibles.
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="pied">
+      <div class="conteneur pied-interieur">
+        <p>Krino — Licence MIT. Logiciel fourni « tel quel », sans garantie.</p>
+        <nav class="nav-pied">
+          <a href="https://github.com/Bastien-Gaffet/krino">Dépôt GitHub</a>
+          <a href="https://github.com/Bastien-Gaffet/krino/blob/main/docs/CONFIDENTIALITE.md">Confidentialité</a>
+          <a href="https://ko-fi.com/G2G71YFHWX">Soutenir sur Ko-fi</a>
+        </nav>
+      </div>
+    </footer>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

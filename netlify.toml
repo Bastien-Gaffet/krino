@@ -1,0 +1,12 @@
+# Configuration Netlify pour le site vitrine (site/). Le déploiement réel est
+# piloté par .github/workflows/site.yml (netlify-cli), ce fichier sert surtout
+# de référence si le site est un jour reconnecté à l'intégration Git native de
+# Netlify.
+
+[build]
+  base = "site"
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "20"

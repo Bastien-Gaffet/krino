@@ -1,0 +1,56 @@
+name: Site
+
+# Build et déploiement du site vitrine (site/) sur Netlify, via netlify-cli
+# (pas l'intégration Git native de Netlify — voir site/README.md). Se
+# déclenche sur push touchant site/, ou manuellement.
+#
+# Prérequis (à configurer UNE fois, voir site/README.md) :
+#   Settings > Secrets and variables > Actions :
+#     - NETLIFY_AUTH_TOKEN, NETLIFY_SITE_ID
+#     - VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY (optionnels : sans eux, le
+#       site build quand même, la section statistiques affiche juste un repli)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - ".github/workflows/site.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: site-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: site
+    env:
+      VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: site/package-lock.json
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - name: Déployer sur Netlify
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: |
+          if [ -z "$NETLIFY_AUTH_TOKEN" ] || [ -z "$NETLIFY_SITE_ID" ]; then
+            echo "::error::NETLIFY_AUTH_TOKEN ou NETLIFY_SITE_ID absent (Settings > Secrets and variables > Actions). Voir site/README.md."
+            exit 1
+          fi
+          npx netlify-cli deploy --prod --dir=dist

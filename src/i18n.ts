@@ -280,6 +280,19 @@ const FR: Dico = {
 
   "dialogue.ok": "OK",
   "dialogue.annuler": "Annuler",
+
+  /* ── Mobile (pré-tri) ── */
+  "mobile.titre": "Mes photos",
+  "mobile.accroche": "Fais le tri dans tes photos d'un coup de pouce. Garde à droite, jette à gauche.",
+  "mobile.point1": "Rien n'est supprimé sans que tu valides le mois.",
+  "mobile.point2": "Les photos jetées partent à la corbeille de ton téléphone, récupérables 30 jours.",
+  "mobile.autoriser": "Autoriser l'accès aux photos",
+  "mobile.permRefusee": "Krino a besoin d'accéder à tes photos pour pouvoir les trier.",
+  "mobile.permPartielle": "Tu n'as autorisé qu'une partie de tes photos. Krino ne pourra trier que celles-là.",
+  "mobile.aucunePhoto": "Aucune photo à trier.",
+  "mobile.corbeilleSysteme": "Les photos jetées sont dans la corbeille de ton téléphone. Elles y restent 30 jours, puis sont supprimées automatiquement.",
+  "mobile.demo": "Démo — photos fictives, rien n'est supprimé",
+  "mobile.reinitDemo": "Réinitialiser la démo",
 };
 
 const EN: Dico = {
@@ -556,6 +569,19 @@ const EN: Dico = {
 
   "dialogue.ok": "OK",
   "dialogue.annuler": "Cancel",
+
+  /* ── Mobile (pre-sorting) ── */
+  "mobile.titre": "My photos",
+  "mobile.accroche": "Sort your photos with your thumb. Swipe right to keep, left to bin.",
+  "mobile.point1": "Nothing is deleted until you confirm the month.",
+  "mobile.point2": "Binned photos go to your phone's trash, recoverable for 30 days.",
+  "mobile.autoriser": "Allow access to photos",
+  "mobile.permRefusee": "Krino needs access to your photos in order to sort them.",
+  "mobile.permPartielle": "You only allowed access to some of your photos. Krino can sort those only.",
+  "mobile.aucunePhoto": "No photos to sort.",
+  "mobile.corbeilleSysteme": "Binned photos are in your phone's trash. They stay there for 30 days, then are deleted automatically.",
+  "mobile.demo": "Demo — fake photos, nothing is deleted",
+  "mobile.reinitDemo": "Reset demo",
 };
 
 const DICOS: Record<Langue, Dico> = { fr: FR, en: EN };

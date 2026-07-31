@@ -1,0 +1,63 @@
+name: Aperçu mobile
+
+# Déploie `mobile.html` (le pré-tri mobile, voir docs/MOBILE.md) sur Netlify en
+# déploiement BROUILLON, pour pouvoir l'essayer au doigt sur un vrai téléphone
+# sans chaîne de build Android.
+#
+# `netlify deploy` SANS `--prod` : l'URL produite est propre à ce déploiement et
+# ne remplace jamais krino.netlify.app. Rien à configurer de plus, les secrets
+# NETLIFY_AUTH_TOKEN / NETLIFY_SITE_ID sont déjà en place pour le site vitrine.
+#
+# Déclenchement manuel uniquement : Actions > Aperçu mobile > Run workflow.
+# L'URL à ouvrir sur le téléphone est affichée dans le résumé du run.
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: apercu-mobile
+  cancel-in-progress: true
+
+jobs:
+  apercu:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - run: npm ci
+
+      - run: npm run build
+
+      - name: Déployer l'aperçu sur Netlify
+        id: netlify
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: |
+          if [ -z "$NETLIFY_AUTH_TOKEN" ] || [ -z "$NETLIFY_SITE_ID" ]; then
+            echo "::error::NETLIFY_AUTH_TOKEN ou NETLIFY_SITE_ID absent (Settings > Secrets and variables > Actions)."
+            exit 1
+          fi
+          # --json donne l'URL du brouillon de façon fiable, sans la gratter du log.
+          npx netlify-cli deploy --dir=dist --json > deploy.json
+          url="$(node -p "require('./deploy.json').deploy_url")"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Afficher le lien à ouvrir sur le téléphone
+        run: |
+          {
+            echo "## Aperçu mobile prêt"
+            echo
+            echo "Ouvre ce lien sur ton téléphone :"
+            echo
+            echo "**${{ steps.netlify.outputs.url }}/mobile.html**"
+            echo
+            echo "_Démo : photos fictives, rien n'est supprimé. Déploiement brouillon,"
+            echo "krino.netlify.app n'est pas touché._"
+          } >> "$GITHUB_STEP_SUMMARY"

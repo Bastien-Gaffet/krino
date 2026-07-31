@@ -1,10 +1,31 @@
 import { defineConfig } from "vite";
+import { fileURLToPath } from "node:url";
 
 // @ts-expect-error process is a nodejs global
 const host = process.env.TAURI_DEV_HOST;
 
+const racine = (f: string) => fileURLToPath(new URL(f, import.meta.url));
+
 // https://vite.dev/config/
 export default defineConfig(async () => ({
+
+  // Deux pages : `index.html` (desktop, Tauri) et `mobile.html` (pré-tri mobile).
+  build: {
+    rollupOptions: {
+      input: {
+        desktop: racine("index.html"),
+        mobile: racine("mobile.html"),
+      },
+    },
+  },
+
+  // Prévisualisation sur un vrai téléphone via un tunnel public : le serveur doit
+  // écouter sur toutes les interfaces et accepter l'hôte du tunnel.
+  preview: {
+    host: true,
+    port: 4173,
+    allowedHosts: [".trycloudflare.com"],
+  },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //

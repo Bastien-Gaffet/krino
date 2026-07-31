@@ -1,0 +1,386 @@
+/**
+ * Surcouche mobile de `src/styles.css`.
+ *
+ * On garde les variables de thème, les cartes et les vignettes du desktop, et on
+ * ne corrige ici que ce qui ne peut pas fonctionner sur un téléphone : hauteur
+ * de viewport, encoches, cibles tactiles et grilles à une colonne.
+ */
+
+/* ── Viewport ──
+   `100vh` est faux sur mobile : la barre d'URL du navigateur est comptée dedans,
+   donc le pied de page passe sous l'écran tant qu'on n'a pas scrollé. `dvh` suit
+   la hauteur réellement visible. */
+body.mobile,
+body.mobile .vue {
+  height: 100dvh;
+}
+
+body.mobile {
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Encoches et barre gestuelle ── */
+body.mobile .barre-mobile {
+  padding-top: calc(0.6em + env(safe-area-inset-top));
+  flex-wrap: nowrap;
+  gap: 0.5em;
+}
+body.mobile .pied-tri-mobile,
+body.mobile .pied-action,
+body.mobile .pied-demo {
+  padding-bottom: calc(0.7em + env(safe-area-inset-bottom));
+}
+
+body.mobile .titre-dossier {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Cibles tactiles ──
+   44 px est le minimum confortable au pouce ; les boutons desktop sont calibrés
+   pour la souris. */
+body.mobile .btn {
+  min-height: 44px;
+  font-size: 1em;
+}
+body.mobile .btn-ico {
+  min-width: 44px;
+  display: grid;
+  place-items: center;
+}
+body.mobile .btn-ico svg {
+  width: 22px;
+  height: 22px;
+}
+body.mobile .btn-large {
+  width: 100%;
+  min-height: 52px;
+  font-size: 1.05em;
+}
+body.mobile .btn-petit {
+  min-height: 34px;
+  font-size: 0.85em;
+  padding: 0.2em 0.7em;
+}
+
+/* ── Accueil ── */
+.vue-onboard {
+  justify-content: center;
+  padding: 2em 1.6em calc(2em + env(safe-area-inset-bottom));
+}
+.onboard-contenu {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1em;
+  text-align: center;
+  max-width: 26em;
+  margin: 0 auto;
+}
+.onboard-logo {
+  border-radius: 22%;
+  box-shadow: 0 8px 30px var(--ombre);
+}
+.onboard-accroche {
+  color: var(--sourd);
+  line-height: 1.5;
+}
+.onboard-points {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6em;
+  text-align: left;
+  color: var(--sourd);
+  font-size: 0.92em;
+  line-height: 1.45;
+}
+.onboard-points li {
+  padding-left: 1.5em;
+  position: relative;
+}
+.onboard-points li::before {
+  content: "";
+  position: absolute;
+  left: 0.35em;
+  top: 0.5em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--vert);
+}
+.onboard-etat {
+  color: var(--sourd);
+  font-size: 0.9em;
+  min-height: 1.2em;
+}
+
+/* ── Liste des mois : une seule colonne ── */
+body.mobile .conteneur-mois {
+  flex: 1;
+  padding: 0.9em;
+}
+body.mobile .grille-mois {
+  grid-template-columns: 1fr;
+  gap: 0.8em;
+}
+/* Les cartes de mois sont des `<button>` ici (cible tactile + accessibilité),
+   alors qu'elles sont des `<div>` sur desktop : il faut neutraliser les styles
+   par défaut du navigateur, sinon le titre hérite d'un noir illisible sur fond
+   sombre. */
+body.mobile .carte-mois {
+  color: var(--texte);
+  font: inherit;
+  text-align: left;
+  width: 100%;
+}
+body.mobile .carte-mois h3 {
+  font-size: 1.05em;
+}
+body.mobile .carte-mois:hover {
+  transform: none;
+}
+
+.pied-demo {
+  display: flex;
+  align-items: center;
+  gap: 0.7em;
+  padding: 0.7em 0.9em;
+  border-top: 1px solid var(--bord);
+  background: var(--panneau);
+  color: var(--discret);
+  font-size: 0.82em;
+}
+.pied-demo span {
+  flex: 1;
+}
+
+/* ── Carte de tri ──
+   Plein cadre : sur téléphone la photo doit occuper tout l'espace disponible. */
+body.mobile .scene {
+  padding: 0.6em;
+}
+body.mobile .carte {
+  width: 100%;
+  height: 100%;
+  border-radius: 18px;
+}
+body.mobile .carte-visuel img {
+  object-fit: contain;
+}
+/* Une photo paysage dans une carte portrait laisse d'énormes bandes noires.
+   On remplit le cadre avec la même image, floutée et assombrie, et la photo
+   entière reste lisible par-dessus. */
+body.mobile .carte-visuel .apercu-fond {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: blur(44px) brightness(0.3) saturate(1.4);
+  transform: scale(1.35);
+  z-index: 0;
+}
+body.mobile .carte-visuel #apercu-img,
+body.mobile .carte-visuel #apercu-video {
+  position: relative;
+  z-index: 1;
+}
+body.mobile .carte-infos {
+  font-size: 0.82em;
+  padding: 0.5em 0.9em;
+}
+body.mobile .badge {
+  font-size: 1.6em;
+  top: 5%;
+}
+
+/* ── Pied de tri : boutons ronds à portée de pouce ── */
+.pied-tri-mobile {
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+  gap: 0.6em;
+  padding: 0.7em 1em;
+  border-top: 1px solid var(--bord);
+  background: var(--panneau);
+}
+.btn-rond {
+  width: 62px;
+  height: 62px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  border: 2px solid var(--carte-bord);
+  background: var(--carte1);
+  color: var(--texte);
+  cursor: pointer;
+  transition: transform 0.12s ease, background 0.12s ease;
+}
+.btn-rond:active {
+  transform: scale(0.9);
+}
+.btn-rond svg {
+  width: 26px;
+  height: 26px;
+}
+.btn-rond-petit {
+  width: 46px;
+  height: 46px;
+}
+.btn-rond-petit svg {
+  width: 19px;
+  height: 19px;
+}
+.btn-rond-jeter {
+  border-color: var(--rouge);
+  color: var(--rouge);
+}
+.btn-rond-garder {
+  border-color: var(--vert);
+  color: var(--vert);
+}
+.btn-rond.actif {
+  background: var(--favori);
+  border-color: var(--favori);
+  color: #fff;
+}
+.btn-rond:disabled {
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* ── Revue et corbeille ── */
+body.mobile .defilable {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 0 0.9em 1em;
+}
+body.mobile .grille-vignettes {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(94px, 1fr));
+  gap: 0.45em;
+}
+body.mobile .aide-revue {
+  color: var(--sourd);
+  font-size: 0.85em;
+  padding: 0.8em 0.9em 0.4em;
+}
+.aide-corbeille {
+  line-height: 1.45;
+}
+.titre-groupe {
+  padding: 1em 0 0.5em;
+  font-size: 0.95em;
+}
+.titre-groupe.garder {
+  color: var(--vert);
+}
+.titre-groupe.jeter {
+  color: var(--rouge);
+}
+
+.sous-barre {
+  padding: 0.6em 0.9em;
+  color: var(--sourd);
+  font-size: 0.88em;
+  border-bottom: 1px solid var(--bord);
+  background: var(--panneau);
+}
+
+.pied-action {
+  padding: 0.7em 0.9em;
+  border-top: 1px solid var(--bord);
+  background: var(--panneau);
+}
+.pied-action-double {
+  display: flex;
+  gap: 0.6em;
+}
+.pied-action-double .btn {
+  flex: 1;
+}
+
+/* ── Vignettes ── */
+.vignette {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: 9px;
+  overflow: hidden;
+  border: 2px solid transparent;
+  background: var(--visuel);
+  cursor: pointer;
+}
+.vignette img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.vignette.garder {
+  border-color: var(--vert);
+}
+.vignette.jeter {
+  border-color: var(--rouge);
+}
+.vignette.jeter img {
+  opacity: 0.45;
+}
+.vignette .marque-video {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
+  background: #000000aa;
+  color: #fff;
+  border-radius: 4px;
+  font-size: 0.65em;
+  padding: 0.1em 0.35em;
+}
+.vignette.selection {
+  outline: 3px solid var(--accent);
+  outline-offset: -3px;
+}
+
+/* ── Voile de chargement ── */
+.voile-chargement {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1em;
+  background: var(--fond);
+  color: var(--sourd);
+}
+.rond-chargement {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 3px solid var(--bord);
+  border-top-color: var(--accent);
+  animation: tourne 0.8s linear infinite;
+}
+@keyframes tourne {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Respecte le réglage système de réduction des animations. */
+@media (prefers-reduced-motion: reduce) {
+  .rond-chargement {
+    animation-duration: 2.4s;
+  }
+  .btn-rond:active {
+    transform: none;
+  }
+  body.mobile .carte {
+    transition: none !important;
+  }
+}

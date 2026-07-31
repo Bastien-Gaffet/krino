@@ -8,10 +8,16 @@ name: Aperçu mobile
 # ne remplace jamais krino.netlify.app. Rien à configurer de plus, les secrets
 # NETLIFY_AUTH_TOKEN / NETLIFY_SITE_ID sont déjà en place pour le site vitrine.
 #
-# Déclenchement manuel uniquement : Actions > Aperçu mobile > Run workflow.
+# Se déclenche à chaque push sur la branche mobile. Le déclenchement manuel
+# (`workflow_dispatch`) n'est possible que pour les workflows présents sur la
+# branche par défaut — tant que ce travail n'est pas fusionné dans `main`, c'est
+# le push qui fait foi.
+#
 # L'URL à ouvrir sur le téléphone est affichée dans le résumé du run.
 
 on:
+  push:
+    branches: [mobile-pre-tri]
   workflow_dispatch:
 
 concurrency:

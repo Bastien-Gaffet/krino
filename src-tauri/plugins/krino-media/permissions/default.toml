@@ -1,0 +1,10 @@
+"$schema" = "schemas/schema.json"
+
+[default]
+description = "Lecture de la photothèque : état et demande d'autorisation, énumération des médias, vignettes."
+permissions = [
+  "allow-permission",
+  "allow-demander-permission",
+  "allow-scanner",
+  "allow-vignette",
+]

@@ -1,0 +1,8 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "desktop",
+  "description": "Permissions réservées au bureau : l'updater maison n'est pas compilé sur Android, où les mises à jour passent par le Play Store.",
+  "platforms": ["windows", "linux", "macOS"],
+  "windows": ["main"],
+  "permissions": ["updater:default"]
+}

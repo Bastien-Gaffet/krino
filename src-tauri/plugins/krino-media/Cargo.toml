@@ -1,0 +1,16 @@
+[package]
+name = "tauri-plugin-krino-media"
+version = "0.1.0"
+edition = "2021"
+description = "Accès à la photothèque Android (MediaStore) pour le pré-tri Krino"
+# `links` est requis pour qu'un plugin embarquant du code mobile soit trouvé
+# par le système de build de Tauri.
+links = "tauri-plugin-krino-media"
+
+[dependencies]
+tauri = "2"
+serde = { version = "1", features = ["derive"] }
+thiserror = "2"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }

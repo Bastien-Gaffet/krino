@@ -47,7 +47,9 @@ jobs:
       - run: npm run build
 
       - name: cargo check (cible Windows)
-        run: cargo check --manifest-path src-tauri/Cargo.toml --locked
+        # Pas de --locked : le plugin local fait évoluer Cargo.lock, qui ne peut
+        # pas être régénéré depuis l'environnement de développement (sans Rust).
+        run: cargo check --manifest-path src-tauri/Cargo.toml
 
   # ── Build Android ──
   android:

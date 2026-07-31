@@ -28,9 +28,15 @@ kamadak-exif = "0.6.1"
 base64 = "0.22.1"
 filetime = "0.2.29"
 rayon = "1.12.0"
-tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 sha2 = "0.10"
+# Accès à la photothèque Android (MediaStore) — voir docs/MOBILE.md.
+tauri-plugin-krino-media = { path = "plugins/krino-media" }
+
+# L'updater maison ne sert que sur le bureau : le Play Store gère les mises à
+# jour Android, et ce plugin ne cible pas mobile.
+[target.'cfg(desktop)'.dependencies]
+tauri-plugin-updater = "2"
 
 # Windows Imaging Component : décodage HEIC/TIFF, miniatures, orientation EXIF.
 # Déclarée par cible, sinon la compilation Android échoue à la résolution des

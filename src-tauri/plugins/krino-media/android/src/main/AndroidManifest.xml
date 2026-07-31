@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Lecture de la photothèque. Ces permissions sont « sensibles » au sens
+         de Google Play : la gestion de photos devant être la fonction
+         principale de l'application, un formulaire de déclaration sera à
+         remplir lors de la publication (voir docs/MOBILE.md). -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
+
+    <!-- Android 14+ : l'utilisateur peut n'accorder l'accès qu'à une sélection
+         de photos. Déclarer cette permission permet de détecter ce cas plutôt
+         que de le confondre avec un refus. -->
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+
+</manifest>

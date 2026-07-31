@@ -1126,11 +1126,22 @@ mod wic {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    tauri::Builder::default()
+    #[allow(unused_mut)]
+    let mut constructeur = tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
+        .plugin(tauri_plugin_krino_media::init());
+
+    // L'updater maison (manifeste GitHub + signature minisign) ne concerne que
+    // le bureau : sur Android c'est le Play Store qui gère les mises à jour, et
+    // le plugin ne cible pas mobile.
+    #[cfg(desktop)]
+    {
+        constructeur = constructeur.plugin(tauri_plugin_updater::Builder::new().build());
+    }
+
+    constructeur
         .invoke_handler(tauri::generate_handler![
             scanner,
             lire_etat,

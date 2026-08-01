@@ -1,6 +1,8 @@
 # Krino mobile — étude et architecture cible
 
-> Statut : **étude validée, pas encore commencée.** Décisions prises le 2026-07-31.
+> Statut (2026-08-01) : **frontend, plugin MediaStore (lecture + corbeille) et
+> backend Android écrits et compilés en CI.** Jamais testé sur un vrai
+> téléphone. Décisions prises le 2026-07-31.
 > Ce document existe pour qu'on puisse attaquer sans re-réfléchir.
 
 ## Objectif
@@ -127,14 +129,17 @@ une confirmation système par lot, avec des règles propres), compte développeu
 
 ## Prochaines étapes
 
-1. Déplacer la dépendance `windows` sous `[target.'cfg(windows)'.dependencies]`.
-2. Extraire `wic` de `lib.rs` vers `wic.rs` et poser la surface de commandes
-   commune derrière `#[cfg]` — refactor pur, vérifiable sur desktop.
-3. Adapter le frontend au périmètre mobile (mode Trier seul, plus d'écran
-   d'ouverture de dossier). **Vérifiable sur téléphone sans aucun outillage
-   Rust**, via un simple serveur Vite exposé.
-4. Écrire le plugin Kotlin MediaStore (scan, vignettes, trash, restauration).
-5. Chaîne de build APK + installation directe sur le téléphone pour test réel.
+1. ~~Déplacer la dépendance `windows` sous `[target.'cfg(windows)'.dependencies]`.~~ Fait.
+2. ~~Extraire `wic` de `lib.rs` vers `wic.rs` et poser la surface de commandes
+   commune derrière `#[cfg]`.~~ Fait.
+3. ~~Adapter le frontend au périmètre mobile (mode Trier seul, plus d'écran
+   d'ouverture de dossier).~~ Fait.
+4. ~~Écrire le plugin Kotlin MediaStore (scan, vignettes, trash, restauration).~~
+   Fait, `BackendAndroid` branché.
+5. **Reste à faire** : premier test sur un vrai téléphone. Le plugin compile en
+   CI et l'APK signé se construit, mais rien n'a encore été vérifié à l'usage
+   (permissions, vignettes HEIC, corbeille système). Voir aussi le point de
+   vigilance sur la stabilité des `_ID` MediaStore ci-dessus, non traité.
 
 Les étapes 1 à 3 ne demandent ni SDK Android ni appareil : elles peuvent être
 faites dès maintenant.

@@ -132,6 +132,24 @@ function chargerImage(img: HTMLImageElement, url: string) {
   img.src = url;
 }
 
+/**
+ * Enchaîne `backend.vignette()` puis `chargerImage()`. Si la commande native
+ * rejette, le motif part dans `alt`/`title` plutôt que de laisser une carte
+ * blanche silencieuse — un échec vignette() n'a jusqu'ici jamais laissé de
+ * trace exploitable.
+ */
+function chargerVignette(img: HTMLImageElement, m: Media, taille: number) {
+  backend.vignette(m, taille).then(
+    (url) => chargerImage(img, url),
+    (erreur: unknown) => {
+      img.classList.add("image-absente");
+      const texte = erreur instanceof Error ? erreur.message : String(erreur);
+      img.alt = texte;
+      img.title = texte;
+    },
+  );
+}
+
 /* ══ Démarrage ══ */
 
 async function demarrer() {
@@ -302,7 +320,7 @@ function afficherMois() {
     for (const m of g.medias.slice(0, 3)) {
       const vignette = document.createElement("img");
       vignette.alt = "";
-      void backend.vignette(m, 300).then((url) => chargerImage(vignette, url));
+      chargerVignette(vignette, m, 300);
       eventail.append(vignette);
     }
 
@@ -387,10 +405,18 @@ function peupler(carte: HTMLElement, m: Media, avecInfos: boolean) {
     // Comme pour les vignettes de la grille des mois : un <img src="m.uri">
     // (content://) ne charge rien dans la WebView Android, dont le rendu
     // s'exécute hors du processus qui détient les permissions MediaStore.
-    void backend.vignette(m, tailleCarte()).then((url) => {
-      chargerImage(photo, url);
-      chargerImage(flou, url);
-    });
+    backend.vignette(m, tailleCarte()).then(
+      (url) => {
+        chargerImage(photo, url);
+        chargerImage(flou, url);
+      },
+      (erreur: unknown) => {
+        photo.classList.add("image-absente");
+        const texte = erreur instanceof Error ? erreur.message : String(erreur);
+        photo.alt = texte;
+        photo.title = texte;
+      },
+    );
   }
 
   const infos = carte.querySelector(".carte-infos");
@@ -504,6 +530,12 @@ function installerSwipe() {
 
   const appliquerPosition = () => {
     framePrevu = false;
+    // Le doigt a pu être relâché entre la planification de cette frame et son
+    // exécution : sans ce garde-fou, une frame en retard réappliquait une
+    // opacité de badge obsolète juste après que `relacher()` l'ait remise à
+    // zéro — la carte suivante héritait de la mention « garder »/« jeter »
+    // au lieu de l'effacer.
+    if (!actif) return;
     carte.style.transform = `translateX(${dx}px) rotate(${dx / 30}deg)`;
     badgeG.style.opacity = String(Math.max(0, Math.min(1, dx / seuil())));
     badgeJ.style.opacity = String(Math.max(0, Math.min(1, -dx / seuil())));
@@ -599,7 +631,7 @@ function creerVignette(m: Media, classe: string, auClic?: () => void): HTMLEleme
   const img = document.createElement("img");
   img.alt = "";
   img.loading = "lazy";
-  void backend.vignette(m, 200).then((url) => chargerImage(img, url));
+  chargerVignette(img, m, 200);
   el.append(img);
 
   if (m.video) {

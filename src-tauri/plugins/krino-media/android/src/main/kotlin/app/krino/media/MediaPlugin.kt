@@ -15,6 +15,8 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.core.content.ContextCompat
 import app.tauri.annotation.ActivityCallback
 import app.tauri.annotation.Command
+import app.tauri.annotation.Permission
+import app.tauri.annotation.PermissionCallback
 import app.tauri.annotation.TauriPlugin
 import app.tauri.plugin.JSArray
 import app.tauri.plugin.JSObject
@@ -28,7 +30,14 @@ import app.tauri.plugin.Plugin
  * HEIC, renvoie des vignettes déjà orientées selon l'EXIF, et expose `DATE_TAKEN`
  * déjà extrait — d'où l'absence totale de code de décodage ici.
  */
-@TauriPlugin
+@TauriPlugin(
+    permissions = [
+        Permission(
+            strings = [Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO],
+            alias = ALIAS_LECTURE,
+        ),
+    ],
+)
 class MediaPlugin(private val activity: Activity) : Plugin(activity) {
 
     private val permissionsLecture: Array<String>
@@ -82,10 +91,16 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
             reponseEtat(invoke)
             return
         }
-        // `requestPermissions` de la classe Plugin de Tauri rappelle
-        // `onPermissionsResult`, mais pour rester simple à ce stade on répond
-        // après la demande système via le rappel standard d'activité.
-        activity.requestPermissions(permissionsLecture, DEMANDE_LECTURE)
+        // La demande système est asynchrone : répondre tout de suite renverrait
+        // systématiquement « refusee », l'utilisateur n'ayant pas encore eu le
+        // temps de répondre à la boîte. `requestPermissionForAlias` fait
+        // patienter `invoke` jusqu'au résultat réel, relayé par
+        // `resultatPermission` ci-dessous.
+        requestPermissionForAlias(ALIAS_LECTURE, invoke, "resultatPermission")
+    }
+
+    @PermissionCallback
+    fun resultatPermission(invoke: Invoke) {
         reponseEtat(invoke)
     }
 
@@ -300,7 +315,7 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
     )
 
     companion object {
-        private const val DEMANDE_LECTURE = 4001
+        private const val ALIAS_LECTURE = "lecture"
     }
 }
 

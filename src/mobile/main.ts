@@ -31,12 +31,13 @@ import {
   libelleMois,
 } from "./backend";
 import { BackendDemo } from "./backend-demo";
+import { BackendAndroid } from "./backend-android";
 
 /* ══ Sélection du backend ══
-   Sous Tauri (application Android empaquetée) on branchera le backend MediaStore ;
+   Sous Tauri (application Android empaquetée) on branche le backend MediaStore ;
    dans un navigateur, c'est la démo. */
 const SOUS_TAURI = "__TAURI_INTERNALS__" in window;
-const backend: Backend = new BackendDemo();
+const backend: Backend = SOUS_TAURI ? new BackendAndroid() : new BackendDemo();
 const estDemo = !SOUS_TAURI;
 
 /* ══ Préférences ══ */

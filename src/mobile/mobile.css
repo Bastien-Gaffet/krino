@@ -180,8 +180,17 @@ body.mobile .carte {
      padding ci-dessus n'avait donc aucun effet sur la carte, qui touchait
      les bords bien plus près que prévu (et sortait d'autant plus de l'écran
      une fois inclinée pendant le swipe). `inset` reproduit la même marge
-     explicitement. */
+     explicitement — mais seul, il ne suffit pas : le desktop fixe déjà
+     `width`/`height` (`min(560px, 88vw)` / `min(78vh, calc(100vh - 170px))`),
+     qui restent appliqués tant que rien ne les recouvre. Avec `inset` ET une
+     largeur/hauteur fixes toutes les deux définies, le système est
+     sur-contraint et le navigateur ignore silencieusement `right`/`bottom` —
+     la carte gardait donc sa taille desktop, calée sur `100vh` (faux sur
+     mobile) en plus. `width/height: auto` laisse `inset` seul déterminer la
+     taille. */
   inset: 1.1em 1.2em;
+  width: auto;
+  height: auto;
   border-radius: 20px;
   will-change: transform;
 }

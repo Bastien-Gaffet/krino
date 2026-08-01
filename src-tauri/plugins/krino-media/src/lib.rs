@@ -155,8 +155,9 @@ async fn vignette<R: Runtime>(
     app: tauri::AppHandle<R>,
     id: String,
     taille: u32,
+    video: bool,
 ) -> Result<VignetteReponse> {
-    app.krino_media().vignette(VignetteArgs { id, taille })
+    app.krino_media().vignette(VignetteArgs { id, taille, video })
 }
 
 #[tauri::command]

@@ -42,6 +42,10 @@ pub struct SansArgument {}
 pub struct VignetteArgs {
     pub id: String,
     pub taille: u32,
+    /// Détermine la collection MediaStore (images ou vidéos) utilisée pour
+    /// reconstruire l'URI côté Android — voir le commentaire de `vignette()`
+    /// dans le plugin Kotlin.
+    pub video: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

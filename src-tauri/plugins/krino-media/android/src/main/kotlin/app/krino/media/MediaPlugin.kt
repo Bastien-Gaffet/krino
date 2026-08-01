@@ -217,16 +217,26 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
      * processus séparé de l'application, qui n'hérite pas de ses permissions
      * MediaStore — un `<img src="content://…">` n'y charge tout simplement
      * rien, sans erreur visible.
+     *
+     * On reconstruit l'URI depuis la collection typée (images ou vidéos) —
+     * la même que celle utilisée par `scanner()` — plutôt que depuis la
+     * collection générique `Files` : `loadThumbnail` s'est révélé peu fiable
+     * sur cette dernière selon les appareils.
      */
     @Command
     fun vignette(invoke: Invoke) {
         val args = invoke.parseArgs(ArgsVignette::class.java)
-        val uri = uriDepuisId(args.id)
+        val collection = if (args.video) {
+            MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+        } else {
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+        }
+        val uri = ContentUris.withAppendedId(collection, args.id.toLong())
 
         val bitmap = try {
             activity.contentResolver.loadThumbnail(uri, Size(args.taille, args.taille), null)
         } catch (e: Exception) {
-            invoke.reject("vignette indisponible : ${e.message}")
+            invoke.reject("vignette indisponible (id=${args.id}, video=${args.video}) : ${e.javaClass.simpleName} ${e.message}")
             return
         }
 
@@ -340,6 +350,7 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
 class ArgsVignette {
     lateinit var id: String
     var taille: Int = 200
+    var video: Boolean = false
 }
 
 class ArgsIds {

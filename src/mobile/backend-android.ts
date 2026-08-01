@@ -44,7 +44,11 @@ export class BackendAndroid implements Backend {
 
   async vignette(media: Media, taille: number): Promise<string> {
     return (
-      await invoke<VignetteReponse>(cmd("vignette"), { id: media.id, taille })
+      await invoke<VignetteReponse>(cmd("vignette"), {
+        id: media.id,
+        taille,
+        video: media.video,
+      })
     ).uri;
   }
 

@@ -241,7 +241,18 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
         }
 
         val flux = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 82, flux)
+        val compresse = bitmap.compress(Bitmap.CompressFormat.JPEG, 82, flux)
+        if (!compresse || flux.size() == 0) {
+            // `compress` renvoie un booléen de succès qu'il est facile
+            // d'ignorer par erreur : un échec silencieux ici produirait une
+            // data URI vide, donc une résolution « réussie » mais une image
+            // introuvable côté WebView — indiscernable d'un vrai bug de
+            // rendu sans ce garde-fou explicite.
+            invoke.reject(
+                "vignette indisponible (id=${args.id}) : compression JPEG vide (ok=$compresse, octets=${flux.size()}, bitmap=${bitmap.width}x${bitmap.height})",
+            )
+            return
+        }
         val base64 = Base64.encodeToString(flux.toByteArray(), Base64.NO_WRAP)
 
         val ret = JSObject()

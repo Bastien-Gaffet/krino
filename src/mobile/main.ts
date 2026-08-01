@@ -109,24 +109,70 @@ function locale() {
 }
 
 /**
+ * Bandeau de diagnostic temporaire, tant que le chargement des photos reste
+ * fragile sur Android.
+ *
+ * `alt`/`title` sur un <img> qui n'a jamais eu de `src` valide ne s'affichent
+ * pas dans cette WebView (essayé, vérifié sur téléphone) : rien d'autre ne
+ * rendait les échecs visibles sans outillage de debug distant. À retirer une
+ * fois le chargement fiable.
+ */
+function journaliserEchec(texte: string) {
+  let bandeau = document.getElementById("debug-echecs");
+  if (!bandeau) {
+    bandeau = document.createElement("div");
+    bandeau.id = "debug-echecs";
+    bandeau.style.cssText = [
+      "position:fixed",
+      "left:0",
+      "right:0",
+      "bottom:0",
+      "max-height:38vh",
+      "overflow-y:auto",
+      "background:#000000e6",
+      "color:#ff9a9a",
+      "font:11px/1.4 monospace",
+      "padding:6px 8px",
+      "z-index:99999",
+      "white-space:pre-wrap",
+      "word-break:break-all",
+      "pointer-events:none",
+    ].join(";");
+    document.body.append(bandeau);
+  }
+  const ligne = document.createElement("div");
+  ligne.textContent = texte;
+  bandeau.append(ligne);
+  // Ne garde que les dernières lignes pour ne pas grossir indéfiniment.
+  while (bandeau.childNodes.length > 12) bandeau.firstChild?.remove();
+}
+
+/**
  * Charge une image en tolérant un échec réseau.
  *
  * Les vignettes de démo viennent d'un service externe qui limite le débit :
- * sans nouvel essai, une partie de la grille restait vide. Le backend Android
- * n'aura pas ce problème (URIs locales), mais la robustesse reste utile.
+ * sans nouvel essai, une partie de la grille restait vide. Une `data:` URI
+ * (backend Android) qui échoue une première fois n'a en revanche aucune
+ * raison de réussir en réessayant les mêmes octets — pire, y ajouter
+ * `?r=N` casserait un encodage base64 qui ne supporte pas de suffixe. On ne
+ * retente donc que pour les URLs réseau.
  */
 function chargerImage(img: HTMLImageElement, url: string) {
   let essais = 0;
+  const reseau = !url.startsWith("data:");
   img.classList.remove("image-absente");
   img.onerror = () => {
     essais++;
-    if (essais <= 2) {
+    if (reseau && essais <= 2) {
       // Le paramètre force le navigateur à refaire la requête plutôt que de
       // resservir l'échec depuis son cache.
       window.setTimeout(() => (img.src = `${url}${url.includes("?") ? "&" : "?"}r=${essais}`), 400 * essais);
     } else {
       img.removeAttribute("src");
       img.classList.add("image-absente");
+      journaliserEchec(
+        `<img> n'a pas pu décoder l'URL (${url.length} car., début « ${url.slice(0, 40)}… »)`,
+      );
     }
   };
   img.src = url;
@@ -134,9 +180,8 @@ function chargerImage(img: HTMLImageElement, url: string) {
 
 /**
  * Enchaîne `backend.vignette()` puis `chargerImage()`. Si la commande native
- * rejette, le motif part dans `alt`/`title` plutôt que de laisser une carte
- * blanche silencieuse — un échec vignette() n'a jusqu'ici jamais laissé de
- * trace exploitable.
+ * rejette, le motif part dans le bandeau de diagnostic plutôt que de laisser
+ * une carte blanche silencieuse.
  */
 function chargerVignette(img: HTMLImageElement, m: Media, taille: number) {
   backend.vignette(m, taille).then(
@@ -144,8 +189,7 @@ function chargerVignette(img: HTMLImageElement, m: Media, taille: number) {
     (erreur: unknown) => {
       img.classList.add("image-absente");
       const texte = erreur instanceof Error ? erreur.message : String(erreur);
-      img.alt = texte;
-      img.title = texte;
+      journaliserEchec(`vignette() rejetée (id=${m.id}) : ${texte}`);
     },
   );
 }
@@ -413,8 +457,7 @@ function peupler(carte: HTMLElement, m: Media, avecInfos: boolean) {
       (erreur: unknown) => {
         photo.classList.add("image-absente");
         const texte = erreur instanceof Error ? erreur.message : String(erreur);
-        photo.alt = texte;
-        photo.title = texte;
+        journaliserEchec(`vignette() rejetée (id=${m.id}, carte) : ${texte}`);
       },
     );
   }

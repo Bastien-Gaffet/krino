@@ -24,6 +24,11 @@ android {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
+    // `IntentSenderRequest`/`ActivityResult`, pour la boîte système de
+    // createTrashRequest/createDeleteRequest. Non exposée par
+    // `project(":tauri-android")` : ses dépendances sont en `implementation`,
+    // donc invisibles hors de son propre module.
+    implementation("androidx.activity:activity-ktx:1.9.3")
     // Fournie par l'application hôte générée par Tauri.
     implementation(project(":tauri-android"))
 }

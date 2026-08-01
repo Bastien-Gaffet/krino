@@ -30,24 +30,35 @@ import app.tauri.plugin.Plugin
  * HEIC, renvoie des vignettes déjà orientées selon l'EXIF, et expose `DATE_TAKEN`
  * déjà extrait — d'où l'absence totale de code de décodage ici.
  */
-// L'alias "lecture" est répété en dur dans demanderPermission() ci-dessous :
-// une constante de companion object n'est pas résolvable depuis l'annotation
-// de sa propre classe (limitation du compilateur Kotlin).
+// READ_MEDIA_IMAGES/READ_MEDIA_VIDEO n'existent pas avant l'API 33 : sur un
+// appareil plus ancien (minSdk 30), demander une permission que l'OS ne
+// connaît pas ne déclenche AUCUNE boîte système — la demande se termine
+// silencieusement, sans dialogue et sans erreur. D'où deux alias distincts,
+// choisis à l'exécution dans demanderPermission() ci-dessous ; les alias
+// d'une annotation ne peuvent pas être calculés dynamiquement.
+// Les deux alias sont répétés en dur dans demanderPermission() : une
+// constante de companion object n'est pas résolvable depuis l'annotation de
+// sa propre classe (limitation du compilateur Kotlin).
 @TauriPlugin(
     permissions = [
         Permission(
             strings = [Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO],
-            alias = "lecture",
+            alias = "lecture33",
+        ),
+        Permission(
+            strings = [Manifest.permission.READ_EXTERNAL_STORAGE],
+            alias = "lectureLegacy",
         ),
     ],
 )
 class MediaPlugin(private val activity: Activity) : Plugin(activity) {
 
     private val permissionsLecture: Array<String>
-        get() = arrayOf(
-            Manifest.permission.READ_MEDIA_IMAGES,
-            Manifest.permission.READ_MEDIA_VIDEO,
-        )
+        get() = if (Build.VERSION.SDK_INT >= 33) {
+            arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
+        } else {
+            arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
+        }
 
     // `createTrashRequest`/`createDeleteRequest` ne renvoient que le code de
     // résultat de la boîte système, pas la liste des URIs traitées : on se
@@ -99,7 +110,8 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
         // temps de répondre à la boîte. `requestPermissionForAlias` fait
         // patienter `invoke` jusqu'au résultat réel, relayé par
         // `resultatPermission` ci-dessous.
-        requestPermissionForAlias("lecture", invoke, "resultatPermission")
+        val alias = if (Build.VERSION.SDK_INT >= 33) "lecture33" else "lectureLegacy"
+        requestPermissionForAlias(alias, invoke, "resultatPermission")
     }
 
     @PermissionCallback

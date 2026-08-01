@@ -13,4 +13,12 @@
          que de le confondre avec un refus. -->
     <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
 
+    <!-- Android 11-12 (minSdk 30) : READ_MEDIA_IMAGES/VIDEO n'existent pas
+         encore, il faut l'ancienne permission de stockage. maxSdkVersion=32
+         évite de la redemander sur un appareil qui a déjà les permissions
+         granulaires. -->
+    <uses-permission
+        android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+
 </manifest>

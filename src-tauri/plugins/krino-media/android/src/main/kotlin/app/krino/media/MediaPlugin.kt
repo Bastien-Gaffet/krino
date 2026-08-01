@@ -5,10 +5,12 @@ import android.app.Activity
 import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.pm.PackageManager
+import android.graphics.Bitmap
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.MediaStore
+import android.util.Base64
 import android.util.Size
 import androidx.activity.result.ActivityResult
 import androidx.activity.result.IntentSenderRequest
@@ -22,6 +24,7 @@ import app.tauri.plugin.JSArray
 import app.tauri.plugin.JSObject
 import app.tauri.plugin.Invoke
 import app.tauri.plugin.Plugin
+import java.io.ByteArrayOutputStream
 
 /**
  * Accès à la photothèque via MediaStore.
@@ -206,29 +209,33 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     /**
-     * Vignette carrée.
+     * Vignette carrée, encodée en data URI.
      *
      * `loadThumbnail` décode le HEIC nativement et applique déjà l'orientation
-     * EXIF. On renvoie l'URI du média : la WebView sait l'afficher directement,
-     * inutile de recopier des octets à travers le pont.
+     * EXIF. On encode le résultat en base64 plutôt que de renvoyer l'URI
+     * `content://` : le rendu de la WebView Android s'exécute dans un
+     * processus séparé de l'application, qui n'hérite pas de ses permissions
+     * MediaStore — un `<img src="content://…">` n'y charge tout simplement
+     * rien, sans erreur visible.
      */
     @Command
     fun vignette(invoke: Invoke) {
         val args = invoke.parseArgs(ArgsVignette::class.java)
         val uri = uriDepuisId(args.id)
 
-        // On vérifie que la vignette est effectivement décodable avant de
-        // renvoyer l'URI : un média corrompu doit échouer ici, pas silencieusement
-        // dans la WebView.
-        try {
+        val bitmap = try {
             activity.contentResolver.loadThumbnail(uri, Size(args.taille, args.taille), null)
         } catch (e: Exception) {
             invoke.reject("vignette indisponible : ${e.message}")
             return
         }
 
+        val flux = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 82, flux)
+        val base64 = Base64.encodeToString(flux.toByteArray(), Base64.NO_WRAP)
+
         val ret = JSObject()
-        ret.put("uri", uri.toString())
+        ret.put("uri", "data:image/jpeg;base64,$base64")
         invoke.resolve(ret)
     }
 

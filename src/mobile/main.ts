@@ -362,6 +362,10 @@ function ouvrirTri(cle: string) {
 
 const courant = (): Media | undefined => file[idx];
 
+/** Taille de décodage demandée pour la photo plein cadre de la carte de tri. */
+const tailleCarte = () =>
+  Math.min(1400, Math.round(Math.max(window.innerWidth, window.innerHeight) * (window.devicePixelRatio || 1)));
+
 /** Remplit une carte (active ou de fond) avec un média. Structure identique. */
 function peupler(carte: HTMLElement, m: Media, avecInfos: boolean) {
   const flou = carte.querySelector<HTMLImageElement>(".apercu-fond")!;
@@ -379,9 +383,14 @@ function peupler(carte: HTMLElement, m: Media, avecInfos: boolean) {
       video.removeAttribute("src");
     }
     photo.hidden = false;
-    chargerImage(photo, m.uri);
     flou.hidden = false;
-    chargerImage(flou, m.uri);
+    // Comme pour les vignettes de la grille des mois : un <img src="m.uri">
+    // (content://) ne charge rien dans la WebView Android, dont le rendu
+    // s'exécute hors du processus qui détient les permissions MediaStore.
+    void backend.vignette(m, tailleCarte()).then((url) => {
+      chargerImage(photo, url);
+      chargerImage(flou, url);
+    });
   }
 
   const infos = carte.querySelector(".carte-infos");
@@ -439,14 +448,27 @@ function decider(choix: Decision) {
 
   // La carte part dans la direction du choix avant de laisser place à la suivante.
   const carte = $("#carte");
+  const fond = $("#carte-fond");
   const sens = choix === "garder" ? 1 : -1;
   carte.style.transition = "transform 0.22s ease-out, opacity 0.22s ease-out";
   carte.style.transform = `translateX(${sens * window.innerWidth}px) rotate(${sens * 18}deg)`;
   carte.style.opacity = "0";
 
+  // La carte de fond grandit et s'éclaircit en même temps que l'autre s'en
+  // va, plutôt que d'apparaître d'un coup déjà à pleine taille une fois la
+  // carte active repeuplée.
+  if (!fond.hidden) {
+    fond.style.transition = "transform 0.22s ease-out, filter 0.22s ease-out";
+    fond.style.transform = "none";
+    fond.style.filter = "none";
+  }
+
   window.setTimeout(() => {
     carte.style.transition = "";
     carte.style.opacity = "";
+    fond.style.transition = "";
+    fond.style.transform = "";
+    fond.style.filter = "";
     idx++;
     rendreCarte();
     void backend.ecrireEtat(etat);
@@ -474,6 +496,19 @@ function installerSwipe() {
 
   const seuil = () => Math.min(120, window.innerWidth * 0.28);
 
+  // Un `style.transform` par `pointermove` brut peut arriver bien plus vite
+  // que l'écran ne rafraîchit (le tactile Android échantillonne souvent au-
+  // delà de 60 Hz) : on ne garde que la dernière position et on ne touche le
+  // DOM qu'une fois par frame, sinon le glissé est saccadé.
+  let framePrevu = false;
+
+  const appliquerPosition = () => {
+    framePrevu = false;
+    carte.style.transform = `translateX(${dx}px) rotate(${dx / 30}deg)`;
+    badgeG.style.opacity = String(Math.max(0, Math.min(1, dx / seuil())));
+    badgeJ.style.opacity = String(Math.max(0, Math.min(1, -dx / seuil())));
+  };
+
   carte.addEventListener("pointerdown", (e) => {
     if ((e.target as HTMLElement).tagName === "VIDEO") return;
     actif = true;
@@ -490,9 +525,10 @@ function installerSwipe() {
     dx = e.clientX - x0;
     // Geste vertical : on laisse la main au défilement plutôt que de swiper.
     if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 12) return;
-    carte.style.transform = `translateX(${dx}px) rotate(${dx / 30}deg)`;
-    badgeG.style.opacity = String(Math.max(0, Math.min(1, dx / seuil())));
-    badgeJ.style.opacity = String(Math.max(0, Math.min(1, -dx / seuil())));
+    if (!framePrevu) {
+      framePrevu = true;
+      requestAnimationFrame(appliquerPosition);
+    }
   });
 
   const relacher = () => {

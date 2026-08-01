@@ -175,9 +175,15 @@ body.mobile .scene {
   padding: 1.1em 1.2em;
 }
 body.mobile .carte {
-  width: 100%;
-  height: 100%;
+  /* `width/height: 100%` sur un élément en position absolute se calcule par
+     rapport à la boîte de padding de `.scene`, pas de son contenu : le
+     padding ci-dessus n'avait donc aucun effet sur la carte, qui touchait
+     les bords bien plus près que prévu (et sortait d'autant plus de l'écran
+     une fois inclinée pendant le swipe). `inset` reproduit la même marge
+     explicitement. */
+  inset: 1.1em 1.2em;
   border-radius: 20px;
+  will-change: transform;
 }
 body.mobile .carte-visuel img.apercu-photo,
 body.mobile .carte-visuel video.apercu-photo {
@@ -200,6 +206,10 @@ body.mobile .carte-visuel .apercu-fond {
   filter: blur(44px) brightness(0.3) saturate(1.4);
   transform: scale(1.35);
   z-index: 0;
+  /* Le flou est coûteux à recalculer : sans cet indice, le navigateur le
+     referait à chaque frame pendant que la carte parente translate/tourne
+     au doigt, d'où une partie du saccadé constaté au swipe. */
+  will-change: filter, transform;
 }
 body.mobile .carte-visuel .apercu-photo {
   position: relative;
@@ -215,9 +225,33 @@ body.mobile .carte-infos {
   font-size: 0.82em;
   padding: 0.5em 0.9em;
 }
+/* Le badge desktop (coin, rotation, bordure) sort entièrement de l'écran sur
+   une carte mobile déjà proche des bords : on teinte tout le visuel plutôt,
+   avec une mention minimaliste au centre — l'opacité reste pilotée en JS
+   selon la distance de glissement. */
 body.mobile .badge {
-  font-size: 1.6em;
-  top: 5%;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  transform: none;
+  font-size: 1.05em;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.45);
+}
+body.mobile .badge-garder {
+  right: 0;
+  background: rgba(62, 207, 142, 0.4);
+}
+body.mobile .badge-jeter {
+  left: 0;
+  background: rgba(255, 93, 93, 0.4);
 }
 
 /* ── Pied de tri : boutons ronds à portée de pouce ── */

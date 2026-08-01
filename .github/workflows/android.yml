@@ -89,6 +89,15 @@ jobs:
           NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.2.12479018
         run: npx tauri android init --ci
 
+      - name: Installer l'icône Krino
+        # `tauri android init` scaffolde le projet avec l'icône Tauri par
+        # défaut : `tauri icon` n'écrit dans gen/android/.../res/ QUE si ce
+        # dossier existe déjà au moment où on le lance, ce qui n'est jamais
+        # le cas ici puisque gen/android est régénéré à chaque run. D'où la
+        # copie manuelle de src-tauri/icons/android/, déjà généré à l'avance
+        # (mipmap + icône adaptative + couche monochrome).
+        run: cp -rv src-tauri/icons/android/* src-tauri/gen/android/app/src/main/res/
+
       - name: Compiler l'APK
         env:
           NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.2.12479018

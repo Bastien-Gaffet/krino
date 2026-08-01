@@ -80,7 +80,9 @@ body.mobile .btn-petit {
   margin: 0 auto;
 }
 .onboard-logo {
-  border-radius: 22%;
+  /* logo.png a déjà ses coins arrondis et sa bordure dessinés dans l'image :
+     un border-radius ici les recoupait à un rayon différent, tronquant la
+     bordure bleue par endroits. */
   box-shadow: 0 8px 30px var(--ombre);
 }
 .onboard-accroche {

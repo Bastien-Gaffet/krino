@@ -2,12 +2,18 @@ package app.krino.media
 
 import android.Manifest
 import android.app.Activity
+import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.provider.MediaStore
 import android.util.Size
+import androidx.activity.result.ActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.core.content.ContextCompat
+import app.tauri.annotation.ActivityCallback
 import app.tauri.annotation.Command
 import app.tauri.annotation.TauriPlugin
 import app.tauri.plugin.JSArray
@@ -30,6 +36,16 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
             Manifest.permission.READ_MEDIA_IMAGES,
             Manifest.permission.READ_MEDIA_VIDEO,
         )
+
+    // `createTrashRequest`/`createDeleteRequest` ne renvoient que le code de
+    // résultat de la boîte système, pas la liste des URIs traitées : on se
+    // souvient ici de la taille de la dernière demande pour construire la
+    // réponse dans le callback d'activité correspondant. Un champ par
+    // opération car les trois s'appuient sur le même mécanisme de callback
+    // mais ne peuvent pas se chevaucher (une seule boîte système à la fois).
+    private var tailleDemandeCorbeille = 0
+    private var tailleDemandeRestauration = 0
+    private var tailleDemandeSuppression = 0
 
     private fun accorde(permission: String): Boolean =
         ContextCompat.checkSelfPermission(activity, permission) == PackageManager.PERMISSION_GRANTED
@@ -73,40 +89,49 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
         reponseEtat(invoke)
     }
 
+    private val colonnesMedia = arrayOf(
+        MediaStore.MediaColumns._ID,
+        MediaStore.MediaColumns.DISPLAY_NAME,
+        MediaStore.MediaColumns.SIZE,
+        MediaStore.MediaColumns.MIME_TYPE,
+        MediaStore.MediaColumns.DATE_TAKEN,
+        MediaStore.MediaColumns.DATE_MODIFIED,
+    )
+
     /**
-     * Énumère images et vidéos, hors éléments déjà à la corbeille.
+     * Interroge images et vidéos.
      *
      * `DATE_TAKEN` est en millisecondes ; il est absent sur certains fichiers
      * (captures d'écran, fichiers copiés), auquel cas on retombe sur
      * `DATE_MODIFIED`, exprimé lui en secondes.
+     *
+     * @param corbeille Si vrai, ne renvoie que les éléments `IS_TRASHED = 1`
+     *   (par défaut MediaStore les exclut déjà des requêtes normales).
      */
-    @Command
-    fun scanner(invoke: Invoke) {
+    private fun interrogerMedias(corbeille: Boolean): JSArray {
         val medias = JSArray()
-
-        val colonnes = arrayOf(
-            MediaStore.MediaColumns._ID,
-            MediaStore.MediaColumns.DISPLAY_NAME,
-            MediaStore.MediaColumns.SIZE,
-            MediaStore.MediaColumns.MIME_TYPE,
-            MediaStore.MediaColumns.DATE_TAKEN,
-            MediaStore.MediaColumns.DATE_MODIFIED,
-        )
 
         val sources = listOf(
             MediaStore.Images.Media.EXTERNAL_CONTENT_URI to false,
             MediaStore.Video.Media.EXTERNAL_CONTENT_URI to true,
         )
 
+        val args = Bundle().apply {
+            putString(
+                ContentResolver.QUERY_ARG_SQL_SORT_ORDER,
+                "${MediaStore.MediaColumns.DATE_TAKEN} DESC",
+            )
+            if (corbeille) {
+                putInt(MediaStore.QUERY_ARG_MATCH_TRASHED, MediaStore.MATCH_ONLY)
+            }
+        }
+
         for ((collection, estVideo) in sources) {
             activity.contentResolver.query(
                 collection,
-                colonnes,
-                // IS_TRASHED n'est pas exposé comme filtre ici : par défaut
-                // MediaStore exclut déjà les éléments à la corbeille.
+                colonnesMedia,
+                args,
                 null,
-                null,
-                "${MediaStore.MediaColumns.DATE_TAKEN} DESC",
             )?.use { curseur ->
                 val iId = curseur.getColumnIndexOrThrow(MediaStore.MediaColumns._ID)
                 val iNom = curseur.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME)
@@ -131,8 +156,22 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
             }
         }
 
+        return medias
+    }
+
+    /** Énumère images et vidéos, hors éléments déjà à la corbeille. */
+    @Command
+    fun scanner(invoke: Invoke) {
         val ret = JSObject()
-        ret.put("medias", medias)
+        ret.put("medias", interrogerMedias(corbeille = false))
+        invoke.resolve(ret)
+    }
+
+    /** Médias actuellement à la corbeille (`IS_TRASHED = 1`). */
+    @Command
+    fun listerCorbeille(invoke: Invoke) {
+        val ret = JSObject()
+        ret.put("medias", interrogerMedias(corbeille = true))
         invoke.resolve(ret)
     }
 
@@ -145,19 +184,14 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
      */
     @Command
     fun vignette(invoke: Invoke) {
-        val id = invoke.parseArgs(ArgsVignette::class.java).id
-        val taille = invoke.parseArgs(ArgsVignette::class.java).taille
-
-        val uri = ContentUris.withAppendedId(
-            MediaStore.Files.getContentUri("external"),
-            id.toLong(),
-        )
+        val args = invoke.parseArgs(ArgsVignette::class.java)
+        val uri = uriDepuisId(args.id)
 
         // On vérifie que la vignette est effectivement décodable avant de
         // renvoyer l'URI : un média corrompu doit échouer ici, pas silencieusement
         // dans la WebView.
         try {
-            activity.contentResolver.loadThumbnail(uri, Size(taille, taille), null)
+            activity.contentResolver.loadThumbnail(uri, Size(args.taille, args.taille), null)
         } catch (e: Exception) {
             invoke.reject("vignette indisponible : ${e.message}")
             return
@@ -168,6 +202,103 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
         invoke.resolve(ret)
     }
 
+    /**
+     * Envoie les médias à la corbeille système.
+     *
+     * Une seule confirmation utilisateur pour jusqu'à 2000 URIs : c'est ce qui
+     * permet de ne demander qu'une confirmation par mois validé, pas une par
+     * photo. `createTrashRequest` ne consent pas silencieusement pour les
+     * médias possédés par une autre application (le cas courant : appareil
+     * photo, messagerie…), d'où le passage par une activité système.
+     */
+    @Command
+    fun mettreCorbeille(invoke: Invoke) {
+        val ids = invoke.parseArgs(ArgsIds::class.java).ids
+        if (ids.isEmpty()) {
+            val ret = JSObject()
+            ret.put("nombre", 0)
+            invoke.resolve(ret)
+            return
+        }
+        val uris = ids.map { uriDepuisId(it) }
+        tailleDemandeCorbeille = uris.size
+        val pending = MediaStore.createTrashRequest(activity.contentResolver, uris, true)
+        startIntentSenderForResult(
+            invoke,
+            IntentSenderRequest.Builder(pending.intentSender).build(),
+            "resultatCorbeille",
+        )
+    }
+
+    @ActivityCallback
+    fun resultatCorbeille(invoke: Invoke, result: ActivityResult) {
+        val ret = JSObject()
+        // `createTrashRequest` est tout ou rien : soit l'utilisateur confirme
+        // et les `n` URIs partent à la corbeille, soit il refuse et rien ne
+        // bouge — il n'y a pas de résultat partiel à distinguer ici.
+        ret.put("nombre", if (result.resultCode == Activity.RESULT_OK) tailleDemandeCorbeille else 0)
+        invoke.resolve(ret)
+    }
+
+    /** Sort les médias de la corbeille (`IS_TRASHED = 0`). */
+    @Command
+    fun restaurer(invoke: Invoke) {
+        val ids = invoke.parseArgs(ArgsIds::class.java).ids
+        if (ids.isEmpty()) {
+            val ret = JSObject()
+            ret.put("nombre", 0)
+            invoke.resolve(ret)
+            return
+        }
+        val uris = ids.map { uriDepuisId(it) }
+        tailleDemandeRestauration = uris.size
+        val pending = MediaStore.createTrashRequest(activity.contentResolver, uris, false)
+        startIntentSenderForResult(
+            invoke,
+            IntentSenderRequest.Builder(pending.intentSender).build(),
+            "resultatRestauration",
+        )
+    }
+
+    @ActivityCallback
+    fun resultatRestauration(invoke: Invoke, result: ActivityResult) {
+        val ret = JSObject()
+        ret.put("nombre", if (result.resultCode == Activity.RESULT_OK) tailleDemandeRestauration else 0)
+        invoke.resolve(ret)
+    }
+
+    /** Suppression irréversible (`MediaStore.createDeleteRequest`). */
+    @Command
+    fun supprimerDefinitivement(invoke: Invoke) {
+        val ids = invoke.parseArgs(ArgsIds::class.java).ids
+        if (ids.isEmpty()) {
+            val ret = JSObject()
+            ret.put("nombre", 0)
+            invoke.resolve(ret)
+            return
+        }
+        val uris = ids.map { uriDepuisId(it) }
+        tailleDemandeSuppression = uris.size
+        val pending = MediaStore.createDeleteRequest(activity.contentResolver, uris)
+        startIntentSenderForResult(
+            invoke,
+            IntentSenderRequest.Builder(pending.intentSender).build(),
+            "resultatSuppression",
+        )
+    }
+
+    @ActivityCallback
+    fun resultatSuppression(invoke: Invoke, result: ActivityResult) {
+        val ret = JSObject()
+        ret.put("nombre", if (result.resultCode == Activity.RESULT_OK) tailleDemandeSuppression else 0)
+        invoke.resolve(ret)
+    }
+
+    private fun uriDepuisId(id: String): Uri = ContentUris.withAppendedId(
+        MediaStore.Files.getContentUri("external"),
+        id.toLong(),
+    )
+
     companion object {
         private const val DEMANDE_LECTURE = 4001
     }
@@ -176,4 +307,8 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
 class ArgsVignette {
     lateinit var id: String
     var taille: Int = 200
+}
+
+class ArgsIds {
+    lateinit var ids: Array<String>
 }

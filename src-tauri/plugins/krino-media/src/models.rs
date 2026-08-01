@@ -59,6 +59,23 @@ pub struct ScanReponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct IdsArgs {
+    pub ids: Vec<String>,
+}
+
+/// Nombre de médias réellement traités par une opération de corbeille.
+///
+/// `createTrashRequest`/`createDeleteRequest` sont tout ou rien : une seule
+/// confirmation système couvre tous les identifiants, donc ce nombre vaut soit
+/// `ids.len()`, soit `0` si l'utilisateur a refusé la boîte de dialogue.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NombreReponse {
+    pub nombre: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PermissionReponse {
     pub etat: PermissionEtat,
 }

@@ -63,6 +63,30 @@ impl<R: Runtime> KrinoMedia<R> {
             .run_mobile_plugin("vignette", args)
             .map_err(Into::into)
     }
+
+    pub fn lister_corbeille(&self) -> Result<ScanReponse> {
+        self.handle
+            .run_mobile_plugin("listerCorbeille", SansArgument {})
+            .map_err(Into::into)
+    }
+
+    pub fn mettre_corbeille(&self, args: IdsArgs) -> Result<NombreReponse> {
+        self.handle
+            .run_mobile_plugin("mettreCorbeille", args)
+            .map_err(Into::into)
+    }
+
+    pub fn restaurer(&self, args: IdsArgs) -> Result<NombreReponse> {
+        self.handle
+            .run_mobile_plugin("restaurer", args)
+            .map_err(Into::into)
+    }
+
+    pub fn supprimer_definitivement(&self, args: IdsArgs) -> Result<NombreReponse> {
+        self.handle
+            .run_mobile_plugin("supprimerDefinitivement", args)
+            .map_err(Into::into)
+    }
 }
 
 #[cfg(not(mobile))]
@@ -80,6 +104,22 @@ impl<R: Runtime> KrinoMedia<R> {
     }
 
     pub fn vignette(&self, _args: VignetteArgs) -> Result<VignetteReponse> {
+        Err(Error::HorsAndroid)
+    }
+
+    pub fn lister_corbeille(&self) -> Result<ScanReponse> {
+        Err(Error::HorsAndroid)
+    }
+
+    pub fn mettre_corbeille(&self, _args: IdsArgs) -> Result<NombreReponse> {
+        Err(Error::HorsAndroid)
+    }
+
+    pub fn restaurer(&self, _args: IdsArgs) -> Result<NombreReponse> {
+        Err(Error::HorsAndroid)
+    }
+
+    pub fn supprimer_definitivement(&self, _args: IdsArgs) -> Result<NombreReponse> {
         Err(Error::HorsAndroid)
     }
 }
@@ -119,13 +159,46 @@ async fn vignette<R: Runtime>(
     app.krino_media().vignette(VignetteArgs { id, taille })
 }
 
+#[tauri::command]
+async fn lister_corbeille<R: Runtime>(app: tauri::AppHandle<R>) -> Result<ScanReponse> {
+    app.krino_media().lister_corbeille()
+}
+
+#[tauri::command]
+async fn mettre_corbeille<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    ids: Vec<String>,
+) -> Result<NombreReponse> {
+    app.krino_media().mettre_corbeille(IdsArgs { ids })
+}
+
+#[tauri::command]
+async fn restaurer<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    ids: Vec<String>,
+) -> Result<NombreReponse> {
+    app.krino_media().restaurer(IdsArgs { ids })
+}
+
+#[tauri::command]
+async fn supprimer_definitivement<R: Runtime>(
+    app: tauri::AppHandle<R>,
+    ids: Vec<String>,
+) -> Result<NombreReponse> {
+    app.krino_media().supprimer_definitivement(IdsArgs { ids })
+}
+
 pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("krino-media")
         .invoke_handler(tauri::generate_handler![
             permission,
             demander_permission,
             scanner,
-            vignette
+            vignette,
+            lister_corbeille,
+            mettre_corbeille,
+            restaurer,
+            supprimer_definitivement
         ])
         .setup(|app, _api| {
             // iOS viendra plus tard, avec un backend PhotoKit distinct.

@@ -30,11 +30,14 @@ import app.tauri.plugin.Plugin
  * HEIC, renvoie des vignettes déjà orientées selon l'EXIF, et expose `DATE_TAKEN`
  * déjà extrait — d'où l'absence totale de code de décodage ici.
  */
+// L'alias "lecture" est répété en dur dans demanderPermission() ci-dessous :
+// une constante de companion object n'est pas résolvable depuis l'annotation
+// de sa propre classe (limitation du compilateur Kotlin).
 @TauriPlugin(
     permissions = [
         Permission(
             strings = [Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO],
-            alias = ALIAS_LECTURE,
+            alias = "lecture",
         ),
     ],
 )
@@ -96,7 +99,7 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
         // temps de répondre à la boîte. `requestPermissionForAlias` fait
         // patienter `invoke` jusqu'au résultat réel, relayé par
         // `resultatPermission` ci-dessous.
-        requestPermissionForAlias(ALIAS_LECTURE, invoke, "resultatPermission")
+        requestPermissionForAlias("lecture", invoke, "resultatPermission")
     }
 
     @PermissionCallback
@@ -313,10 +316,6 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
         MediaStore.Files.getContentUri("external"),
         id.toLong(),
     )
-
-    companion object {
-        private const val ALIAS_LECTURE = "lecture"
-    }
 }
 
 class ArgsVignette {

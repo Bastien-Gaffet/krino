@@ -496,6 +496,28 @@ const courant = (): Media | undefined => file[idx];
 const tailleCarte = () =>
   Math.min(1400, Math.round(Math.max(window.innerWidth, window.innerHeight) * (window.devicePixelRatio || 1)));
 
+/**
+ * Vignettes de carte déjà résolues, indexées par id média.
+ *
+ * Sans ce cache, promouvoir la carte de fond en carte active relançait un
+ * décodage natif complet pour une image déjà affichée l'instant d'avant
+ * dans l'autre carte : le temps de cet aller-retour, la carte redevenait
+ * visible avec son ANCIEN contenu encore en place — un flicker de l'ancienne
+ * photo devant la nouvelle. La carte de fond a largement le temps de
+ * résoudre sa vignette pendant que l'utilisateur regarde la carte active ;
+ * la promotion la retrouve donc déjà en cache.
+ */
+const cacheVignetteCarte = new Map<string, string>();
+const TAILLE_CACHE_CARTE = 6;
+
+function memoriserVignetteCarte(id: string, url: string) {
+  cacheVignetteCarte.set(id, url);
+  if (cacheVignetteCarte.size > TAILLE_CACHE_CARTE) {
+    const plusAncien = cacheVignetteCarte.keys().next().value;
+    if (plusAncien !== undefined) cacheVignetteCarte.delete(plusAncien);
+  }
+}
+
 /** Remplit une carte (active ou de fond) avec un média. Structure identique. */
 function peupler(carte: HTMLElement, m: Media, avecInfos: boolean) {
   const flou = carte.querySelector<HTMLImageElement>(".apercu-fond")!;
@@ -514,20 +536,27 @@ function peupler(carte: HTMLElement, m: Media, avecInfos: boolean) {
     }
     photo.hidden = false;
     flou.hidden = false;
-    // Comme pour les vignettes de la grille des mois : un <img src="m.uri">
-    // (content://) ne charge rien dans la WebView Android, dont le rendu
-    // s'exécute hors du processus qui détient les permissions MediaStore.
-    backend.vignette(m, tailleCarte()).then(
-      (url) => {
-        chargerImage(photo, url);
-        chargerImage(flou, url);
-      },
-      (erreur: unknown) => {
-        photo.classList.add("image-absente");
-        const texte = erreur instanceof Error ? erreur.message : String(erreur);
-        journaliserEchec(`vignette() rejetée (id=${m.id}, carte) : ${texte}`);
-      },
-    );
+    const enCache = cacheVignetteCarte.get(m.id);
+    if (enCache) {
+      chargerImage(photo, enCache);
+      chargerImage(flou, enCache);
+    } else {
+      // Comme pour les vignettes de la grille des mois : un <img src="m.uri">
+      // (content://) ne charge rien dans la WebView Android, dont le rendu
+      // s'exécute hors du processus qui détient les permissions MediaStore.
+      backend.vignette(m, tailleCarte()).then(
+        (url) => {
+          memoriserVignetteCarte(m.id, url);
+          chargerImage(photo, url);
+          chargerImage(flou, url);
+        },
+        (erreur: unknown) => {
+          photo.classList.add("image-absente");
+          const texte = erreur instanceof Error ? erreur.message : String(erreur);
+          journaliserEchec(`vignette() rejetée (id=${m.id}, carte) : ${texte}`);
+        },
+      );
+    }
   }
 
   const infos = carte.querySelector(".carte-infos");

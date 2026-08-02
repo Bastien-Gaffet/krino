@@ -297,6 +297,7 @@ const FR: Dico = {
   "mobile.soutien": "Soutenir Krino",
   "mobile.soutienAide": "Krino est gratuit et sans compte. Si l'application t'a fait gagner du temps, tu peux offrir un café à son auteur.",
   "mobile.kofi": "Offrir un café",
+  "mobile.siteWeb": "Voir le site de Krino",
   "mobile.moisVide": "Aucune photo à trier dans ce mois.",
 };
 
@@ -591,6 +592,7 @@ const EN: Dico = {
   "mobile.soutien": "Support Krino",
   "mobile.soutienAide": "Krino is free and account-free. If the app saved you time, you can buy its author a coffee.",
   "mobile.kofi": "Buy a coffee",
+  "mobile.siteWeb": "Visit the Krino website",
   "mobile.moisVide": "No photos left to sort in this month.",
 };
 

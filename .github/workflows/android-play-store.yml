@@ -13,8 +13,6 @@ name: Android — AAB Play Store
 
 on:
   workflow_dispatch:
-  push: # TEMPORAIRE — à retirer après vérification, voir commentaire ci-dessus
-    branches: [mobile-pre-tri]
 
 jobs:
   aab:

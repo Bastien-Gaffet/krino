@@ -32,6 +32,7 @@ import {
 } from "./backend";
 import { BackendDemo } from "./backend-demo";
 import { BackendAndroid } from "./backend-android";
+import kofiSymbole from "../assets/kofi-symbol.png";
 
 /* ══ Sélection du backend ══
    Sous Tauri (application Android empaquetée) on branche le backend MediaStore ;
@@ -249,15 +250,7 @@ async function autoriser() {
   bouton.disabled = true;
   $("#onboard-etat").textContent = "…";
 
-  // Diagnostic temporaire : cette demande est déjà restée bloquée
-  // indéfiniment sur téléphone, sans jamais résoudre ni rejeter (probable
-  // méthode de callback native renommée par R8, comme pour vignette()).
-  const alerte = window.setTimeout(
-    () => journaliserEchec("demanderPermission() n'a pas répondu après 6 s — probablement bloquée côté natif."),
-    6000,
-  );
   const resultat = await backend.demanderPermission();
-  window.clearTimeout(alerte);
   bouton.disabled = false;
 
   if (resultat === "refusee") {
@@ -322,6 +315,8 @@ function installerReglages() {
   });
 
   $("#anon-id").textContent = anonId();
+
+  ($("#kofi-symbole") as HTMLImageElement).src = kofiSymbole;
 }
 
 function ouvrirReglages() {
@@ -822,6 +817,16 @@ async function validerMois() {
 
   await informer(t("valide.texte", { n: misCorbeille, t: formaterTaille(octets) }));
   afficherMois();
+
+  // Jalons de soutien, mêmes seuils que le desktop : tous les 6 mois validés,
+  // ou quand il n'y a plus aucun mois à trier — jamais après une simple
+  // validation isolée, pour ne pas être insistant.
+  const toutFait = grouper().every((g) => etat.moisFaits.includes(g.cle));
+  if (etat.moisFaits.length % 6 === 0 || toutFait) {
+    if (await confirmer(t("kofi.texte"))) {
+      $<HTMLAnchorElement>("#lien-kofi").click();
+    }
+  }
 }
 
 /* ══ Corbeille ══ */

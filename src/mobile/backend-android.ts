@@ -35,7 +35,29 @@ export class BackendAndroid implements Backend {
   }
 
   async demanderPermission(): Promise<PermissionEtat> {
-    return (await invoke<PermissionReponse>(cmd("demander_permission"))).etat;
+    const etat = (await invoke<PermissionReponse>(cmd("demander_permission"))).etat;
+    // Si l'état n'était pas déjà "refusee", demander_permission() n'a fait
+    // que relire l'état courant (déjà accordé) sans ouvrir de boîte système
+    // — la réponse est donc déjà définitive.
+    if (etat !== "refusee") return etat;
+
+    // Sinon, côté Kotlin, demander_permission() a seulement DÉCLENCHÉ la
+    // boîte système et répondu tout de suite avec l'état actuel (donc
+    // encore "refusee"), sans attendre l'utilisateur : le mécanisme de
+    // callback natif de Tauri pour ça s'est révélé peu fiable sur au moins
+    // un appareil réel (la promesse restait bloquée indéfiniment, même
+    // après une réponse système en bonne et due forme). On réévalue l'état
+    // réel via permission() — une commande simple, sans ce mécanisme —
+    // quand la page redevient visible, signe que la boîte système vient de
+    // se fermer.
+    return new Promise<PermissionEtat>((resolve) => {
+      const surRetourVisible = () => {
+        if (document.visibilityState !== "visible") return;
+        document.removeEventListener("visibilitychange", surRetourVisible);
+        resolve(this.permission());
+      };
+      document.addEventListener("visibilitychange", surRetourVisible);
+    });
   }
 
   async scanner(): Promise<Media[]> {

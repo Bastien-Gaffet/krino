@@ -95,12 +95,28 @@ L'accès à la photothèque est donc la fonction principale de l'application,
 pas un usage secondaire.
 ```
 
+## Captures d'écran
+
+`docs/play-store/captures-demo/` — 6 images 1080×1919 (ratio 16:9, conforme
+aux exigences Play Store), générées en rendu automatisé du mode démo
+(Playwright, navigateur headless), bandeau « Démo » masqué :
+
+1. `1-accueil.png` — écran d'accueil / autorisation
+2. `2-mois.png` — liste des mois, regroupés par année
+3. `3-tri.png` — carte de tri, photo plein cadre
+4. `4-swipe.png` — glissement vers la droite, teinte « GARDER »
+5. `5-revue.png` — revue de fin de mois, gardées/jetées
+6. `6-corbeille.png` — corbeille avec fichiers en attente
+
+**Ce sont des photos de démonstration (banque d'images libres, pas de vraies
+photos)** — utilisables telles quelles pour une première soumission, mais à
+remplacer par de vraies captures prises sur l'APK dès que possible (plus
+fidèles, et Google peut être plus exigeant sur l'authenticité des captures
+avec le temps). Si tu préfères, prends-les toi-même depuis ton téléphone —
+même écrans, même ordre.
+
 ## Ce qu'il reste — à faire dans la Play Console, pas préparable à l'avance
 
-- **Captures d'écran** (2 minimum, jusqu'à 8) — besoin d'un appareil réel ou
-  d'un émulateur pour les prendre proprement ; je peux en générer des
-  approximations via un rendu du mode démo si utile, mais des captures
-  prises sur l'APK réel seront plus fidèles.
 - **Image de couverture (feature graphic, 1024×500)** — travail graphique,
   pas fait ici.
 - **Questionnaire de classification par âge (IARC)** — questionnaire

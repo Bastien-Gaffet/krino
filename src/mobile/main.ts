@@ -32,6 +32,8 @@ import {
 } from "./backend";
 import { BackendDemo } from "./backend-demo";
 import { BackendAndroid } from "./backend-android";
+import { onBackButtonPress } from "@tauri-apps/api/app";
+import { exit } from "@tauri-apps/plugin-process";
 import kofiSymbole from "../assets/kofi-symbol.png";
 
 /* ══ Sélection du backend ══
@@ -98,6 +100,31 @@ const VUES = [
 
 function montrer(id: string) {
   for (const v of VUES) $(`#${v}`).hidden = v !== id;
+}
+
+/**
+ * Bouton retour matériel Android.
+ *
+ * L'appli est une SPA sans navigation `history.pushState` : la WebView n'a
+ * donc aucun historique où reculer, et Tauri ferme directement l'activité
+ * (voir `AppPlugin.kt` — sans écouteur enregistré, le geste retombe sur
+ * `webView.canGoBack()` puis `activity.onBackPressed()`). On réutilise les
+ * mêmes fonctions que les boutons « retour » déjà présents dans chaque
+ * écran plutôt que de dupliquer leur logique.
+ */
+function installerRetourAndroid() {
+  if (!SOUS_TAURI) return;
+  void onBackButtonPress(() => {
+    if (!$("#vue-revue").hidden) {
+      ouvrirTri(moisCourant);
+    } else if (!$("#vue-tri").hidden || !$("#vue-corbeille").hidden || !$("#vue-reglages").hidden) {
+      void retourMois();
+    } else {
+      // vue-mois (racine) ou vue-onboard : le retour quitte l'application,
+      // comportement standard Android.
+      void exit();
+    }
+  });
 }
 
 function chargement(texte: string | null) {
@@ -237,6 +264,7 @@ async function demarrer() {
 
   installerReglages();
   installerSwipe();
+  installerRetourAndroid();
 
   $("#bandeau-demo").textContent = estDemo ? t("mobile.demo") : "";
   $(".pied-demo").hidden = !estDemo;

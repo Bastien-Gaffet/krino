@@ -17,6 +17,7 @@ import androidx.activity.result.IntentSenderRequest
 import androidx.core.content.ContextCompat
 import app.tauri.annotation.ActivityCallback
 import app.tauri.annotation.Command
+import app.tauri.annotation.InvokeArg
 import app.tauri.annotation.Permission
 import app.tauri.annotation.PermissionCallback
 import app.tauri.annotation.TauriPlugin
@@ -358,12 +359,20 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
     )
 }
 
+// `@InvokeArg` protège la classe de l'obfuscation R8 en build release : sans
+// elle, Jackson ne peut plus reconstruire l'objet par réflexion une fois le
+// constructeur/les champs renommés — `invoke.parseArgs()` rejette alors
+// TOUJOURS l'appel, silencieusement pour l'utilisateur (la vignette reste
+// blanche). C'est très exactement ce qui s'est produit ici, absent depuis la
+// toute première version de ce fichier.
+@InvokeArg
 class ArgsVignette {
     lateinit var id: String
     var taille: Int = 200
     var video: Boolean = false
 }
 
+@InvokeArg
 class ArgsIds {
     lateinit var ids: Array<String>
 }

@@ -1,0 +1,119 @@
+name: Android — AAB Play Store
+
+# Produit l'App Bundle (.aab) signé destiné au Play Store, distinct de l'APK
+# de test (android.yml) : format différent (bundletool/Play App Signing, pas
+# apksigner), multi-ABI (le Play Store livre à chaque appareil l'ABI qu'il
+# lui faut), et volontairement PAS déclenché à chaque push — seulement à la
+# demande, quand on prépare réellement une soumission.
+#
+# versionCode/versionName sont calculés automatiquement par Tauri depuis
+# `"version"` dans tauri.conf.json (voir generate_tauri_properties côté CLI) :
+# rien à maintenir ici, juste s'assurer que la version a été montée avant de
+# déclencher ce workflow si on veut un nouvel envoi au Play Store.
+
+on:
+  workflow_dispatch:
+
+jobs:
+  aab:
+    name: AAB signé
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Installer le NDK
+        run: sdkmanager --install "ndk;27.2.12479018" "platforms;android-35" "build-tools;35.0.0"
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android,armv7-linux-androideabi,x86_64-linux-android
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      - name: Initialiser le projet Android
+        env:
+          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.2.12479018
+        run: npx tauri android init --ci
+
+      - name: Installer l'icône Krino
+        # Voir le commentaire équivalent dans android.yml : tauri android init
+        # ne copie jamais src-tauri/icons/android/ tout seul.
+        run: cp -rv src-tauri/icons/android/* src-tauri/gen/android/app/src/main/res/
+
+      - name: Compiler l'AAB (arm64, armv7, x86_64)
+        env:
+          NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.2.12479018
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+        run: npx tauri android build --aab --target aarch64 armv7 x86_64
+
+      - name: Vérifier que la page embarquée est bien celle du mobile
+        run: |
+          set -euo pipefail
+          if ! grep -q "vue-onboard" dist/index.html; then
+            echo "::error::dist/index.html n'est PAS la page mobile — l'AAB embarquerait l'interface PC."
+            exit 1
+          fi
+          echo "OK : la page embarquée est bien le pré-tri mobile."
+
+      - name: Signer l'AAB
+        # Les .aab ne se signent pas avec apksigner (schéma v2/v3, propre aux
+        # APK) mais avec la signature JAR classique — la même clé d'envoi que
+        # l'APK de test convient : c'est la clé qu'attend le Play Store pour
+        # activer Play App Signing (Google gère ensuite la vraie clé de
+        # signature de l'app, distincte de cette clé d'envoi).
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          set -euo pipefail
+          if [ -z "$KEYSTORE_B64" ]; then
+            echo "::error::ANDROID_KEYSTORE_BASE64 absent."
+            exit 1
+          fi
+
+          cle="$RUNNER_TEMP/upload.jks"
+          printf '%s' "$KEYSTORE_B64" | base64 -d > "$cle"
+
+          echo "AAB produits par le build :"
+          find src-tauri/gen/android -type f -name '*.aab' -print
+
+          brut="$(find src-tauri/gen/android -type f -name '*.aab' | head -1)"
+          if [ -z "$brut" ]; then
+            echo "::error::Aucun AAB produit par le build."
+            exit 1
+          fi
+          echo "AAB à signer : $brut"
+
+          jarsigner -keystore "$cle" \
+            -storepass "$KEYSTORE_PASSWORD" \
+            -keypass "$KEYSTORE_PASSWORD" \
+            -signedjar krino.aab "$brut" "$KEY_ALIAS"
+
+          # Une signature non vérifiée ne vaut rien : on le prouve.
+          jarsigner -verify -verbose -certs krino.aab | tail -5
+          rm -f "$cle"
+
+      - name: Publier l'AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: krino-aab
+          path: krino.aab
+          if-no-files-found: error

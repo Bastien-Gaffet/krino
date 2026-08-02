@@ -89,6 +89,9 @@ jobs:
           NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.2.12479018
         run: npx tauri android init --ci
 
+      - name: DIAGNOSTIC TEMPORAIRE — compileSdk/targetSdk générés
+        run: cat src-tauri/gen/android/app/build.gradle.kts
+
       - name: Installer l'icône Krino
         # `tauri android init` scaffolde le projet avec l'icône Tauri par
         # défaut : `tauri icon` n'écrit dans gen/android/.../res/ QUE si ce
@@ -101,6 +104,11 @@ jobs:
       - name: Compiler l'APK
         env:
           NDK_HOME: ${{ env.ANDROID_HOME }}/ndk/27.2.12479018
+          # `beforeBuildCommand` relance `npm run build:mobile` (Vite) à
+          # cette étape : ces variables doivent être présentes ici, pas
+          # seulement sur un step `npm run build` séparé.
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
         run: npx tauri android build --apk --target aarch64
 
       - name: Vérifier que la page embarquée est bien celle du mobile

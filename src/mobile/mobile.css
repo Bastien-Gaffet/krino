@@ -120,7 +120,24 @@ body.mobile .btn-petit {
   min-height: 1.2em;
 }
 
-/* ── Liste des mois : une seule colonne ── */
+/* ── Liste des mois : tri/filtre, regroupement par année, une seule colonne ── */
+.sous-barre-mois {
+  display: flex;
+  align-items: center;
+  gap: 0.6em;
+  padding: 0.5em 0.9em;
+  border-bottom: 1px solid var(--bord);
+  background: var(--panneau);
+  flex-wrap: wrap;
+}
+.sous-barre-mois select#tri-mois {
+  flex: 1;
+  min-width: 0;
+}
+.sous-barre-mois .filtre-faits {
+  font-size: 0.85em;
+  white-space: nowrap;
+}
 body.mobile .conteneur-mois {
   flex: 1;
   padding: 0.9em;

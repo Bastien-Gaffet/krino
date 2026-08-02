@@ -45,6 +45,7 @@ type Prefs = {
   theme: "auto" | "clair" | "sombre";
   langue: "auto" | "fr" | "en";
   telemetrieActivee: boolean;
+  parAnnee: boolean;
 };
 
 const CLE_PREFS = "krino-mobile-prefs";
@@ -53,8 +54,12 @@ const prefs: Prefs = {
   theme: "auto",
   langue: "auto",
   telemetrieActivee: true,
+  parAnnee: true,
   ...JSON.parse(localStorage.getItem(CLE_PREFS) ?? "{}"),
 };
+
+/** Inversion du sens de tri des mois — pas une préférence persistée, comme sur desktop. */
+let sensInverse = false;
 
 function sauverPrefs() {
   localStorage.setItem(CLE_PREFS, JSON.stringify(prefs));
@@ -221,6 +226,13 @@ async function demarrer() {
     (backend as BackendDemo).reinitialiser();
     location.reload();
   });
+  $("#tri-mois").addEventListener("change", () => afficherMois());
+  $("#btn-sens").addEventListener("click", () => {
+    sensInverse = !sensInverse;
+    $("#btn-sens").classList.toggle("inverse", sensInverse);
+    afficherMois();
+  });
+  $("#masquer-faits").addEventListener("change", () => afficherMois());
 
   installerReglages();
   installerSwipe();
@@ -285,6 +297,14 @@ function installerReglages() {
     });
   }
 
+  const optAnnees = $<HTMLInputElement>("#opt-annees");
+  optAnnees.checked = prefs.parAnnee;
+  optAnnees.addEventListener("change", () => {
+    prefs.parAnnee = optAnnees.checked;
+    sauverPrefs();
+    if (!$("#vue-mois").hidden) afficherMois();
+  });
+
   const opt = $<HTMLInputElement>("#opt-telemetrie");
   opt.checked = prefs.telemetrieActivee;
   opt.addEventListener("change", () => {
@@ -332,12 +352,86 @@ function grouper(): GroupeMois[] {
     .sort((a, b) => b.cle.localeCompare(a.cle));
 }
 
+/** Ordre d'affichage des mois, repris du desktop (date/taille/nombre/restants, sens inversable). */
+function comparerMois(critere: string) {
+  return (a: GroupeMois, b: GroupeMois) => {
+    let c: number;
+    switch (critere) {
+      case "taille":
+        c = a.taille - b.taille;
+        break;
+      case "nombre":
+        c = a.medias.length - b.medias.length;
+        break;
+      case "restants":
+        c = a.medias.length - a.decides - (b.medias.length - b.decides);
+        break;
+      default:
+        c = a.cle.localeCompare(b.cle);
+    }
+    return sensInverse ? -c : c;
+  };
+}
+
+function carteDeMois(g: GroupeMois): HTMLElement {
+  const fait = etat.moisFaits.includes(g.cle);
+  const carte = document.createElement("button");
+  carte.className = `carte-mois${fait ? " fait" : ""}`;
+
+  const titre = document.createElement("h3");
+  titre.textContent = libelleMois(g.cle, locale());
+
+  // Aperçu en éventail, repris du desktop : on reconnaît le mois d'un coup
+  // d'œil au lieu de lire une date.
+  const eventail = document.createElement("div");
+  eventail.className = "eventail";
+  for (const m of g.medias.slice(0, 3)) {
+    const vignette = document.createElement("img");
+    vignette.alt = "";
+    chargerVignette(vignette, m, 300);
+    eventail.append(vignette);
+  }
+
+  const stats = document.createElement("div");
+  stats.className = "stats";
+  stats.textContent = t("mois.fichiers", {
+    n: g.medias.length,
+    t: formaterTaille(g.taille),
+  });
+
+  const jauge = document.createElement("div");
+  jauge.className = "jauge";
+  const barre = document.createElement("div");
+  barre.style.width = `${Math.round((g.decides / g.medias.length) * 100)}%`;
+  jauge.append(barre);
+
+  const avancement = document.createElement("div");
+  avancement.className = "stats";
+  if (fait) {
+    const etiquette = document.createElement("span");
+    etiquette.className = "etiquette-fait";
+    etiquette.textContent = t("mois.fait");
+    avancement.append(etiquette);
+  } else {
+    avancement.textContent = t("mois.decides", { a: g.decides, b: g.medias.length });
+  }
+
+  carte.append(titre, eventail, stats, jauge, avancement);
+  carte.addEventListener("click", () => ouvrirTri(g.cle));
+  return carte;
+}
+
 function afficherMois() {
   montrer("vue-mois");
   const conteneur = $("#conteneur-mois");
   conteneur.textContent = "";
 
-  const groupes = grouper();
+  const critere = $<HTMLSelectElement>("#tri-mois").value;
+  const masquerFaits = $<HTMLInputElement>("#masquer-faits").checked;
+  let groupes = grouper();
+  if (masquerFaits) groupes = groupes.filter((g) => !etat.moisFaits.includes(g.cle));
+  groupes.sort(comparerMois(critere));
+
   if (groupes.length === 0) {
     const vide = document.createElement("p");
     vide.className = "aide-revue";
@@ -346,57 +440,31 @@ function afficherMois() {
     return;
   }
 
-  const grille = document.createElement("div");
-  grille.className = "grille-mois";
-
-  for (const g of groupes) {
-    const fait = etat.moisFaits.includes(g.cle);
-    const carte = document.createElement("button");
-    carte.className = `carte-mois${fait ? " fait" : ""}`;
-
-    const titre = document.createElement("h3");
-    titre.textContent = libelleMois(g.cle, locale());
-
-    // Aperçu en éventail, repris du desktop : on reconnaît le mois d'un coup
-    // d'œil au lieu de lire une date.
-    const eventail = document.createElement("div");
-    eventail.className = "eventail";
-    for (const m of g.medias.slice(0, 3)) {
-      const vignette = document.createElement("img");
-      vignette.alt = "";
-      chargerVignette(vignette, m, 300);
-      eventail.append(vignette);
+  if (prefs.parAnnee) {
+    const annees: string[] = [];
+    for (const g of groupes) {
+      const a = g.cle.slice(0, 4);
+      if (!annees.includes(a)) annees.push(a);
     }
+    for (const annee of annees) {
+      const titreAnnee = document.createElement("h2");
+      titreAnnee.className = "titre-annee";
+      titreAnnee.textContent = annee;
+      conteneur.append(titreAnnee);
 
-    const stats = document.createElement("div");
-    stats.className = "stats";
-    stats.textContent = t("mois.fichiers", {
-      n: g.medias.length,
-      t: formaterTaille(g.taille),
-    });
-
-    const jauge = document.createElement("div");
-    jauge.className = "jauge";
-    const barre = document.createElement("div");
-    barre.style.width = `${Math.round((g.decides / g.medias.length) * 100)}%`;
-    jauge.append(barre);
-
-    const avancement = document.createElement("div");
-    avancement.className = "stats";
-    if (fait) {
-      const etiquette = document.createElement("span");
-      etiquette.className = "etiquette-fait";
-      etiquette.textContent = t("mois.fait");
-      avancement.append(etiquette);
-    } else {
-      avancement.textContent = t("mois.decides", { a: g.decides, b: g.medias.length });
+      const grille = document.createElement("div");
+      grille.className = "grille-mois";
+      for (const g of groupes.filter((x) => x.cle.startsWith(annee))) {
+        grille.append(carteDeMois(g));
+      }
+      conteneur.append(grille);
     }
-
-    carte.append(titre, eventail, stats, jauge, avancement);
-    carte.addEventListener("click", () => ouvrirTri(g.cle));
-    grille.append(carte);
+  } else {
+    const grille = document.createElement("div");
+    grille.className = "grille-mois";
+    for (const g of groupes) grille.append(carteDeMois(g));
+    conteneur.append(grille);
   }
-  conteneur.append(grille);
 }
 
 async function retourMois() {

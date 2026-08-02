@@ -38,6 +38,16 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
         </button>
       </header>
+      <div class="sous-barre-mois">
+        <select id="tri-mois" class="btn">
+          <option value="chrono" data-i18n="tri.date"></option>
+          <option value="taille" data-i18n="tri.taille"></option>
+          <option value="nombre" data-i18n="tri.nombre"></option>
+          <option value="restants" data-i18n="tri.restants"></option>
+        </select>
+        <span id="btn-sens" class="sens" data-i18n-title="mois.inverser" role="button" tabindex="0"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M8 3v10M4 7l4-4 4 4"/></svg></span>
+        <label class="filtre-faits"><input type="checkbox" id="masquer-faits" /> <span data-i18n="mois.masquerFaits"></span></label>
+      </div>
       <div id="conteneur-mois" class="conteneur-mois"></div>
       <footer class="pied-demo">
         <span id="bandeau-demo"></span>
@@ -148,6 +158,12 @@
           <label><input type="radio" name="langue" value="fr" />Français</label>
           <label><input type="radio" name="langue" value="en" />English</label>
         </div>
+
+        <h3 class="titre-groupe" data-i18n="reglages.affichage"></h3>
+        <label class="ligne-reglage">
+          <input type="checkbox" id="opt-annees" />
+          <span data-i18n="reglages.grouperAnnees"></span>
+        </label>
 
         <h3 class="titre-groupe" data-i18n="confidentialite.titre"></h3>
         <label class="ligne-reglage">

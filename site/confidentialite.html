@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Confidentialité — Krino</title>
+    <meta
+      name="description"
+      content="Ce que Krino fait de vos données et de vos photos, sur desktop comme sur Android : accès local uniquement, statistiques anonymes optionnelles."
+    />
+    <link rel="canonical" href="https://krino.netlify.app/confidentialite.html" />
+    <link rel="icon" href="/logo.png" />
+    <meta name="theme-color" content="#6c8cff" />
+    <meta name="robots" content="index, follow" />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://krino.netlify.app/confidentialite.html" />
+    <meta property="og:title" content="Confidentialité — Krino" />
+    <meta property="og:description" content="Ce que Krino fait de vos données et de vos photos, sur desktop comme sur Android." />
+    <meta property="og:image" content="https://krino.netlify.app/apercu.png" />
+    <meta property="og:locale" content="fr_FR" />
+
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <header class="entete">
+      <div class="conteneur entete-interieur">
+        <a class="marque" href="/">
+          <img src="/logo.png" alt="" width="32" height="32" />
+          <span>Krino</span>
+        </a>
+        <nav class="nav-entete">
+          <a href="/#fonctionnalites">Fonctionnalités</a>
+          <a href="https://github.com/Bastien-Gaffet/krino">GitHub</a>
+        </nav>
+        <div class="entete-actions">
+          <a class="btn btn-primaire" href="/#accueil">Retour à l'accueil</a>
+        </div>
+      </div>
+    </header>
+
+    <main>
+      <section class="section">
+        <div class="conteneur page-legale">
+          <h1>Confidentialité</h1>
+          <p class="page-legale-maj">
+            Krino existe en deux versions — desktop (Windows) et mobile
+            (Android) — qui partagent le même principe mais accèdent
+            différemment à vos photos ; les deux sont décrites ci-dessous.
+          </p>
+
+          <h2>Ce que Krino ne fait jamais</h2>
+          <p>
+            Krino trie vos photos et vidéos <strong>entièrement en local</strong>.
+            Le contenu de vos fichiers, leurs noms, leurs chemins de dossiers
+            ne sont jamais lus par un serveur, transmis sur le réseau, ni
+            stockés ailleurs que sur votre appareil.
+          </p>
+          <p>Les deux seuls échanges réseau de Krino sont :</p>
+          <ol>
+            <li>
+              sur desktop, la vérification de mise à jour au démarrage
+              (requête vers GitHub) — sur Android, les mises à jour passent
+              par le Play Store, Krino ne fait aucune requête de ce type ;
+            </li>
+            <li>
+              si vous laissez les statistiques anonymes activées (réglage par
+              défaut), l'envoi périodique des compteurs décrits plus bas.
+            </li>
+          </ol>
+
+          <h2>Accès à vos photos</h2>
+          <p>
+            <strong>Desktop (Windows).</strong> Vous choisissez explicitement
+            un dossier à trier. Krino ne voit que ce dossier ; les photos
+            jetées sont déplacées dans une corbeille interne à ce dossier
+            (<code>.krino/corbeille</code>), et ne sont supprimées
+            définitivement que lorsque vous le demandez.
+          </p>
+          <p>
+            <strong>Mobile (Android).</strong> Krino demande l'autorisation
+            d'accéder à votre photothèque (permission « Photos et vidéos »),
+            nécessaire pour afficher vos photos et vous permettre de les
+            trier — c'est la fonction même de l'application, elle ne peut pas
+            fonctionner sans. Les photos jetées sont envoyées à
+            <strong>la corbeille du système Android</strong> (la même que
+            celle de l'application Fichiers ou Google Photos), avec une
+            rétention de 30 jours et une confirmation explicite du système à
+            chaque envoi — jamais de suppression silencieuse. Aucune photo,
+            vignette ou métadonnée n'est jamais transmise hors de votre
+            appareil : le tri, l'affichage des vignettes et la mise à la
+            corbeille se font entièrement via les API Android locales
+            (MediaStore).
+          </p>
+
+          <h3>Permissions demandées sur Android</h3>
+          <table>
+            <thead>
+              <tr><th>Permission</th><th>Pourquoi</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Photos et vidéos<br /><code>READ_MEDIA_IMAGES</code>, <code>READ_MEDIA_VIDEO</code></td>
+                <td>Afficher votre photothèque pour la trier — la fonction principale de l'application.</td>
+              </tr>
+              <tr>
+                <td>Accès limité aux photos sélectionnées<br /><code>READ_MEDIA_VISUAL_USER_SELECTED</code> (Android 14+)</td>
+                <td>Détecter le cas où vous n'avez autorisé qu'une sélection de photos, pour vous en informer plutôt que de le confondre avec un refus.</td>
+              </tr>
+            </tbody>
+          </table>
+          <p>
+            Aucune autre permission n'est demandée : ni localisation, ni
+            contacts, ni réseau/téléphone, ni stockage plus large que la
+            photothèque.
+          </p>
+
+          <h2>Responsable du traitement</h2>
+          <p>
+            Bastien Gaffet, auteur et éditeur de Krino.<br />
+            Contact : <a href="mailto:krino.app@gmail.com">krino.app@gmail.com</a>
+          </p>
+
+          <h2>Données collectées</h2>
+          <p>
+            Si le réglage « Envoyer des statistiques d'usage anonymes » est
+            activé (Réglages → Statistiques anonymes) :
+          </p>
+          <table>
+            <thead>
+              <tr><th>Donnée</th><th>Détail</th></tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>Identifiant anonyme</td>
+                <td>UUID aléatoire généré sur l'appareil au premier lancement, stocké localement. Ne contient et ne permet de retrouver aucune information sur vous.</td>
+              </tr>
+              <tr>
+                <td>Nombre de photos passées en revue</td>
+                <td>Incrémenté à chaque décision « garder »/« jeter » prise dans l'application.</td>
+              </tr>
+              <tr>
+                <td>Nombre de photos supprimées</td>
+                <td>Incrémenté à chaque envoi à la corbeille (validation de mois, doublons, sélection dans la galerie).</td>
+              </tr>
+              <tr>
+                <td>Date</td>
+                <td>Date (jour) à laquelle ces compteurs sont envoyés.</td>
+              </tr>
+            </tbody>
+          </table>
+          <p>
+            Aucune photo, aucun nom de fichier, aucun chemin de dossier,
+            aucune adresse IP n'est enregistré par le serveur au-delà du temps
+            strictement nécessaire au traitement de la requête HTTP.
+          </p>
+
+          <h2>Finalité et base légale</h2>
+          <p>
+            Ces compteurs, agrégés à ceux de l'ensemble des utilisateurs,
+            servent à afficher des statistiques publiques (nombre
+            d'installations, nombre de photos triées/supprimées par la
+            communauté) sur ce site, et à suivre l'usage général de
+            l'application pour orienter son développement.
+          </p>
+          <p>
+            Base légale retenue : <strong>intérêt légitime</strong> (RGPD art.
+            6.1.f), compte tenu du caractère anonyme, agrégé et minimal des
+            données — aucun profilage, aucune donnée permettant d'identifier
+            directement ou indirectement une personne physique.
+          </p>
+
+          <h2>Conservation</h2>
+          <p>
+            Architecture volontairement minimisée : le serveur
+            <strong>ne conserve aucun historique quotidien lié à un
+            identifiant précis</strong>. Chaque envoi incrémente directement
+            des compteurs globaux, communs à tous les utilisateurs. Seule une
+            petite table associe votre identifiant anonyme à deux dates
+            (première et dernière utilisation), pour compter les
+            installations sans les compter deux fois — rien de plus n'y est
+            jamais écrit.
+          </p>
+
+          <h2>Destinataires et hébergement</h2>
+          <p>
+            Personne d'autre que l'auteur de Krino n'a accès à ces données.
+            Elles sont hébergées chez
+            <a href="https://supabase.com" target="_blank" rel="noopener">Supabase</a>,
+            dans une région de l'Union européenne. Aucune vente, aucun
+            partage à des fins publicitaires ou commerciales.
+          </p>
+
+          <h2>Vos droits</h2>
+          <ul>
+            <li>
+              <strong>Opposition immédiate</strong> : décochez « Envoyer des
+              statistiques d'usage anonymes » dans Réglages — plus rien n'est
+              envoyé à partir de cet instant.
+            </li>
+            <li>
+              <strong>Effacement local</strong> : le bouton « Réinitialiser
+              mes statistiques » dans Réglages supprime votre identifiant
+              anonyme et les compteurs en attente sur votre appareil. Un
+              nouvel identifiant sera généré si vous réactivez le réglage
+              plus tard, ce qui comptera comme une nouvelle installation côté
+              serveur.
+            </li>
+            <li>
+              <strong>Effacement côté serveur / question</strong> : contactez
+              l'adresse ci-dessus en indiquant votre identifiant anonyme,
+              affiché dans Réglages (bouton « Copier » sur desktop,
+              sélectionnable directement sur mobile).
+            </li>
+          </ul>
+
+          <h2>Désinstallation</h2>
+          <p>
+            <strong>Android.</strong> La désinstallation standard (comme
+            n'importe quelle application) supprime tout ce que Krino a
+            stocké sur l'appareil, identifiant anonyme compris — aucune étape
+            supplémentaire. Vos photos, elles, ne sont jamais affectées :
+            Krino ne fait qu'y accéder via MediaStore, il n'en est jamais
+            propriétaire.
+          </p>
+          <p>
+            <strong>Windows.</strong> Le désinstalleur Krino propose, en fin
+            de désinstallation, un choix explicite : conserver vos réglages
+            et votre identifiant anonyme (pour les retrouver en cas de
+            réinstallation), ou tout supprimer proprement, identifiant
+            anonyme compris.
+          </p>
+
+          <h2>Sécurité</h2>
+          <p>
+            Les échanges avec le serveur se font en HTTPS. Côté base de
+            données, la sécurité au niveau des lignes (Row Level Security)
+            est activée sans aucune policy directe : un client ne peut ni
+            lire, ni modifier les données d'une autre installation ; tous les
+            accès passent par des fonctions serveur dédiées et contrôlées
+            (code source public sur
+            <a href="https://github.com/Bastien-Gaffet/krino" target="_blank" rel="noopener">GitHub</a>).
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer class="pied">
+      <div class="conteneur pied-interieur">
+        <div class="pied-credit">
+          <p>Krino — Licence MIT. Logiciel fourni « tel quel », sans garantie.</p>
+          <p>Développé par <a href="https://bastiengaffet.fr">Bastien Gaffet</a>, développeur indépendant.</p>
+        </div>
+        <nav class="nav-pied">
+          <a href="https://github.com/Bastien-Gaffet/krino">Dépôt GitHub</a>
+          <a href="/confidentialite.html">Confidentialité</a>
+          <a href="mailto:krino.app@gmail.com">Contact</a>
+          <a href="https://ko-fi.com/G2G71YFHWX">Soutenir sur Ko-fi</a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>

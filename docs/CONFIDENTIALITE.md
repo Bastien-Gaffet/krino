@@ -1,22 +1,52 @@
 # Confidentialité — Krino
 
-Cette page est la notice complète (destinée au dépôt et au futur site
-vitrine). La version affichée dans l'application (Réglages → Confidentialité)
-en est un résumé identique sur le fond.
+Cette page est la notice complète (dépôt, site vitrine, et fiche Play Store).
+La version affichée dans l'application (Réglages → Confidentialité) en est un
+résumé identique sur le fond. Krino existe en deux versions — desktop
+(Windows) et mobile (Android) — qui partagent le même principe mais accèdent
+différemment à vos photos ; les deux sont décrites ci-dessous.
 
 ## Ce que Krino ne fait jamais
 
 Krino trie vos photos et vidéos **entièrement en local**. Le contenu de vos
 fichiers, leurs noms, leurs chemins de dossiers ne sont jamais lus par un
-serveur, transmis sur le réseau, ni stockés ailleurs que sur votre machine
-(dans le dossier que vous avez choisi, y compris la corbeille interne
-`.krino/corbeille`).
+serveur, transmis sur le réseau, ni stockés ailleurs que sur votre appareil.
 
 Les deux seuls échanges réseau de Krino sont :
 
-1. la vérification de mise à jour au démarrage (requête vers GitHub) ;
+1. sur desktop, la vérification de mise à jour au démarrage (requête vers
+   GitHub) — sur Android, les mises à jour passent par le Play Store, Krino
+   ne fait aucune requête de ce type ;
 2. si vous laissez les statistiques anonymes activées (réglage par défaut),
    l'envoi périodique des compteurs décrits ci-dessous.
+
+## Accès à vos photos
+
+**Desktop (Windows).** Vous choisissez explicitement un dossier à trier.
+Krino ne voit que ce dossier ; les photos jetées sont déplacées dans une
+corbeille interne à ce dossier (`.krino/corbeille`), et ne sont supprimées
+définitivement que lorsque vous le demandez.
+
+**Mobile (Android).** Krino demande l'autorisation d'accéder à votre
+photothèque (permission « Photos et vidéos »), nécessaire pour afficher vos
+photos et vous permettre de les trier — c'est la fonction même de
+l'application, elle ne peut pas fonctionner sans. Les photos jetées sont
+envoyées à **la corbeille du système Android** (la même que celle de
+l'application Fichiers ou Google Photos), avec une rétention de 30 jours et
+une confirmation explicite du système à chaque envoi — jamais de suppression
+silencieuse. Aucune photo, vignette ou métadonnée n'est jamais transmise hors
+de votre appareil : le tri, l'affichage des vignettes et la mise à la
+corbeille se font entièrement via les API Android locales (MediaStore).
+
+### Permissions demandées sur Android
+
+| Permission | Pourquoi |
+|---|---|
+| Photos et vidéos (`READ_MEDIA_IMAGES`, `READ_MEDIA_VIDEO`) | Afficher votre photothèque pour la trier — la fonction principale de l'application. |
+| Accès limité aux photos sélectionnées (`READ_MEDIA_VISUAL_USER_SELECTED`, Android 14+) | Détecter le cas où vous n'avez autorisé qu'une sélection de photos, pour vous en informer plutôt que de le confondre avec un refus. |
+
+Aucune autre permission n'est demandée : ni localisation, ni contacts, ni
+réseau/téléphone, ni stockage plus large que la photothèque.
 
 ## Responsable du traitement
 
@@ -77,12 +107,18 @@ commerciales.
   réglage plus tard, ce qui comptera comme une nouvelle installation côté
   serveur.
 - **Effacement côté serveur / question** : contactez l'adresse ci-dessus en
-  indiquant votre identifiant anonyme (affiché dans Réglages, bouton
-  « Copier »).
+  indiquant votre identifiant anonyme, affiché dans Réglages (bouton
+  « Copier » sur desktop, sélectionnable directement sur mobile).
 
 ## Désinstallation
 
-Le désinstalleur Windows de Krino propose, en fin de désinstallation, un
+**Android.** La désinstallation standard (comme n'importe quelle application)
+supprime tout ce que Krino a stocké sur l'appareil, identifiant anonyme
+compris — aucune étape supplémentaire. Vos photos, elles, ne sont jamais
+affectées : Krino ne fait qu'y accéder via MediaStore, il n'en est jamais
+propriétaire.
+
+**Windows.** Le désinstalleur Krino propose, en fin de désinstallation, un
 choix explicite : conserver vos réglages et votre identifiant anonyme (pour
 les retrouver en cas de réinstallation), ou tout supprimer proprement,
 identifiant anonyme compris. Voir la section « Désinstallation » du README.

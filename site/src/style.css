@@ -163,6 +163,21 @@ a { color: inherit; }
 .section-intro { color: var(--sourd); max-width: 640px; margin: 0 0 2em; }
 .section-intro a { color: var(--accent); }
 
+/* Pages légales (confidentialité…) : texte long, pas de mise en page landing. */
+.page-legale { max-width: 720px; padding-top: 1em; padding-bottom: 2em; }
+.page-legale h1 { font-size: 2em; margin: 0 0 0.5em; }
+.page-legale h2 { font-size: 1.3em; margin: 1.8em 0 0.5em; }
+.page-legale h3 { font-size: 1.05em; margin: 1.4em 0 0.5em; color: var(--sourd); }
+.page-legale p, .page-legale li { color: var(--texte); }
+.page-legale ul, .page-legale ol { padding-left: 1.3em; }
+.page-legale li + li { margin-top: 0.4em; }
+.page-legale a { color: var(--accent); }
+.page-legale code { background: var(--fond-sourd); border-radius: 4px; padding: 0.1em 0.4em; font-size: 0.9em; }
+.page-legale-maj { color: var(--sourd); font-size: 0.92em; }
+.page-legale table { width: 100%; border-collapse: collapse; margin: 1em 0; font-size: 0.92em; }
+.page-legale th, .page-legale td { text-align: left; padding: 0.6em 0.7em; border-bottom: 1px solid var(--bordure); vertical-align: top; }
+.page-legale th { color: var(--sourd); font-weight: 600; }
+
 .grille-fonctionnalites { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1em; margin-top: 1.5em; }
 @media (min-width: 640px) {
   .grille-fonctionnalites { gap: 1.2em; margin-top: 2em; }

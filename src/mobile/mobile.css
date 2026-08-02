@@ -340,7 +340,13 @@ body.mobile .defilable {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 0 0.9em 1em;
+  /* `.reglages { padding-bottom: calc(1.5em + env(safe-area-inset-bottom)); }`
+     ne s'applique jamais : même spécificité de propriété, mais ce sélecteur
+     `body.mobile .defilable` est plus spécifique et gagne toujours — le
+     dernier élément (lien du site) se retrouvait donc collé au bord bas,
+     sous la zone gestuelle. On inclut directement la marge de sécurité ici,
+     pour tous les écrans défilables (réglages, revue, corbeille). */
+  padding: 0 0.9em calc(1em + env(safe-area-inset-bottom));
 }
 body.mobile .grille-vignettes {
   display: grid;
@@ -388,9 +394,6 @@ body.mobile .aide-revue {
 }
 
 /* ── Réglages ── */
-.reglages {
-  padding-bottom: calc(1.5em + env(safe-area-inset-bottom));
-}
 .groupe-choix {
   display: flex;
   flex-direction: column;
@@ -430,7 +433,10 @@ body.mobile .aide-revue {
   margin-top: 0.4em;
 }
 .kofi-symbole {
-  width: 22px;
+  /* L'image (321×258) n'est pas carrée : lui imposer width ET height la
+     déformait (aplatie horizontalement). Seule la hauteur est contrainte,
+     la largeur suit le ratio naturel. */
+  width: auto;
   height: 22px;
   flex: none;
 }

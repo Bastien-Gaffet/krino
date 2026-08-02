@@ -189,7 +189,42 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     /**
-     * Vignette carrée, encodée en data URI.
+     * Taille de décodage au ratio du média, plutôt qu'un carré forcé.
+     *
+     * `Size(taille, taille)` déforme les photos dont le ratio original
+     * s'éloigne du carré — vu sur téléphone, mêmes symptômes que l'icône
+     * Ko-fi aplatie par une taille CSS imposée : `loadThumbnail` ne garantit
+     * pas de préserver le ratio pour chaque format/codec. `WIDTH`/`HEIGHT`
+     * sont déjà dans MediaStore, pas besoin de décoder l'image pour les
+     * connaître.
+     */
+    private fun tailleDecodage(uri: Uri, cible: Int): Size {
+        val dimensions = activity.contentResolver.query(
+            uri,
+            arrayOf(MediaStore.MediaColumns.WIDTH, MediaStore.MediaColumns.HEIGHT),
+            null,
+            null,
+            null,
+        )?.use { curseur ->
+            if (curseur.moveToFirst()) {
+                val largeur = curseur.getInt(0)
+                val hauteur = curseur.getInt(1)
+                if (largeur > 0 && hauteur > 0) largeur to hauteur else null
+            } else {
+                null
+            }
+        } ?: return Size(cible, cible)
+
+        val (largeur, hauteur) = dimensions
+        return if (largeur >= hauteur) {
+            Size(cible, (cible.toLong() * hauteur / largeur).toInt().coerceAtLeast(1))
+        } else {
+            Size((cible.toLong() * largeur / hauteur).toInt().coerceAtLeast(1), cible)
+        }
+    }
+
+    /**
+     * Vignette au ratio d'origine, encodée en data URI.
      *
      * `loadThumbnail` décode le HEIC nativement et applique déjà l'orientation
      * EXIF. On encode le résultat en base64 plutôt que de renvoyer l'URI
@@ -214,7 +249,7 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
         val uri = ContentUris.withAppendedId(collection, args.id.toLong())
 
         val bitmap = try {
-            activity.contentResolver.loadThumbnail(uri, Size(args.taille, args.taille), null)
+            activity.contentResolver.loadThumbnail(uri, tailleDecodage(uri, args.taille), null)
         } catch (e: Exception) {
             invoke.reject("vignette indisponible (id=${args.id}, video=${args.video}) : ${e.javaClass.simpleName} ${e.message}")
             return

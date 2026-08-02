@@ -10,6 +10,7 @@ android {
     defaultConfig {
         // createTrashRequest, IS_TRASHED et loadThumbnail exigent Android 11.
         minSdk = 30
+        consumerProguardFiles("proguard-rules.pro")
     }
 
     compileOptions {

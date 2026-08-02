@@ -249,7 +249,15 @@ async function autoriser() {
   bouton.disabled = true;
   $("#onboard-etat").textContent = "…";
 
+  // Diagnostic temporaire : cette demande est déjà restée bloquée
+  // indéfiniment sur téléphone, sans jamais résoudre ni rejeter (probable
+  // méthode de callback native renommée par R8, comme pour vignette()).
+  const alerte = window.setTimeout(
+    () => journaliserEchec("demanderPermission() n'a pas répondu après 6 s — probablement bloquée côté natif."),
+    6000,
+  );
   const resultat = await backend.demanderPermission();
+  window.clearTimeout(alerte);
   bouton.disabled = false;
 
   if (resultat === "refusee") {

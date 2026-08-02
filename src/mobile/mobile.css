@@ -229,7 +229,12 @@ body.mobile .carte-visuel .apercu-fond {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  filter: blur(44px) brightness(0.3) saturate(1.4);
+  /* 44px était trop coûteux pour rester fluide au swipe sur une WebView
+     Android, même avec `will-change` ci-dessous (constaté sur téléphone) :
+     le flou gaussien coûte à peu près le carré de son rayon. 20px donne un
+     résultat encore net (l'effet ne sert qu'à combler les bandes noires,
+     pas à être regardé de près) pour une fraction du coût. */
+  filter: blur(20px) brightness(0.3) saturate(1.4);
   transform: scale(1.35);
   z-index: 0;
   /* Le flou est coûteux à recalculer : sans cet indice, le navigateur le

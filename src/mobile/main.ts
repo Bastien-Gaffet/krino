@@ -19,7 +19,9 @@ import {
   enregistrerRevue,
   enregistrerSuppression,
   envoyerTelemetrie,
+  signalerErreur,
 } from "../telemetrie";
+import { getVersion } from "@tauri-apps/api/app";
 import {
   type Backend,
   type Decision,
@@ -142,15 +144,28 @@ function locale() {
 }
 
 /**
- * Bandeau de diagnostic temporaire, tant que le chargement des photos reste
- * fragile sur Android.
- *
- * `alt`/`title` sur un <img> qui n'a jamais eu de `src` valide ne s'affichent
- * pas dans cette WebView (essayé, vérifié sur téléphone) : rien d'autre ne
- * rendait les échecs visibles sans outillage de debug distant. À retirer une
- * fois le chargement fiable.
+ * `localStorage.setItem("krino.debug", "1")` puis recharger affiche le
+ * bandeau d'échecs à l'écran (utile en session de debug avec un testeur à
+ * distance). Sans ça, toujours loggé en console mais invisible — ce bandeau
+ * s'affichait par défaut jusqu'ici et une testeuse l'a pris pour un bug
+ * (texte rouge qui envahit le bas de l'écran et masque les boutons).
  */
+function debugActif(): boolean {
+  try {
+    return localStorage.getItem("krino.debug") === "1";
+  } catch {
+    return false;
+  }
+}
+
+// Renseigné au démarrage (demarrer()) — getVersion() est asynchrone,
+// journaliserEchec() ne l'est pas.
+let versionApp = "?";
+
 function journaliserEchec(texte: string) {
+  console.error("[krino]", texte);
+  void signalerErreur(texte, versionApp);
+  if (!debugActif()) return;
   let bandeau = document.getElementById("debug-echecs");
   if (!bandeau) {
     bandeau = document.createElement("div");
@@ -235,6 +250,7 @@ async function demarrer() {
   appliquerTheme();
   definirTelemetrieActivee(prefs.telemetrieActivee);
   appliquerTraductions();
+  void getVersion().then((v) => (versionApp = v));
 
   $("#btn-autoriser").addEventListener("click", () => void autoriser());
   $("#btn-corbeille").addEventListener("click", () => void ouvrirCorbeille());

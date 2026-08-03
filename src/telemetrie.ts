@@ -2,7 +2,13 @@
    désactivables dans Réglages) : nombre de photos passées en revue, nombre
    de photos supprimées, et fait d'installation — pour le graphe public du
    site de Krino. Aucun nom de fichier, chemin de dossier, ni contenu d'image
-   n'est jamais lu ou transmis par ce module. Voir docs/CONFIDENTIALITE.md. */
+   n'est jamais lu ou transmis par ce module. Voir docs/CONFIDENTIALITE.md.
+
+   Ce module envoie aussi, sous le même réglage opt-in, des rapports de
+   diagnostic technique (modèle d'appareil, version d'OS, version de l'app,
+   message d'erreur déjà assaini par l'appelant — jamais de nom de fichier ni
+   de chemin) pour pouvoir déboguer des bugs signalés par des testeurs sans
+   accès à leur appareil. Voir signalerErreur(). */
 
 const CLE_ANON_ID = "krino-anon-id";
 const CLE_ATTENTE = "krino-stats-attente";
@@ -104,4 +110,47 @@ export function reinitialiserTelemetrie() {
   localStorage.removeItem(CLE_ANON_ID);
   localStorage.removeItem(CLE_ATTENTE);
   localStorage.removeItem(CLE_DERNIER_ENVOI);
+}
+
+const MAX_DIAGNOSTICS_SESSION = 20;
+const diagnosticsEnvoyes = new Set<string>();
+
+/** Modèle d'appareil + version d'OS, lus depuis le user-agent de la WebView
+ *  Android (ex. "Mozilla/5.0 (Linux; Android 13; SM-G991B) ..."). Aucune
+ *  commande native dédiée : cette info y est déjà, pas besoin d'y toucher. */
+function infosAppareil(): { appareil: string; os: string } {
+  const m = navigator.userAgent.match(/Android\s([\d.]+);\s*([^)]+)\)/);
+  return { os: m?.[1] ?? "?", appareil: (m?.[2] ?? "?").trim() };
+}
+
+/** Envoie un rapport de diagnostic technique (best-effort, jamais de retry
+ *  pour ne pas boucler sur une erreur réseau). Dédupliqué par message exact
+ *  et plafonné par session : une erreur qui se répète pendant qu'un
+ *  utilisateur navigue ne doit pas inonder la table. `message` doit déjà
+ *  être assaini par l'appelant (aucun nom de fichier, aucun chemin). */
+export async function signalerErreur(message: string, versionApp: string): Promise<void> {
+  if (!activee || !SUPABASE_URL || !SUPABASE_ANON_KEY) return;
+  if (diagnosticsEnvoyes.has(message) || diagnosticsEnvoyes.size >= MAX_DIAGNOSTICS_SESSION) return;
+  diagnosticsEnvoyes.add(message);
+
+  const { appareil, os } = infosAppareil();
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/rpc/krino_diagnostic`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({
+        p_anon_id: anonId(),
+        p_appareil: appareil,
+        p_os: os,
+        p_version_app: versionApp,
+        p_message: message.slice(0, 500),
+      }),
+    });
+  } catch {
+    // Hors ligne ou réseau indisponible : tant pis pour ce rapport, pas de retry.
+  }
 }

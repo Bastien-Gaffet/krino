@@ -69,12 +69,33 @@ Aucune photo, aucun nom de fichier, aucun chemin de dossier, aucune adresse IP
 n'est enregistré par le serveur au-delà du temps strictement nécessaire au
 traitement de la requête HTTP.
 
+### Rapports de diagnostic technique
+
+Sous ce même réglage (il n'y en a pas de séparé), quand une opération
+technique échoue dans l'application (par exemple : une vignette de photo qui
+ne se charge pas), un rapport est envoyé pour permettre de comprendre et
+corriger le problème :
+
+| Donnée | Détail |
+|---|---|
+| Identifiant anonyme | Le même UUID que ci-dessus. |
+| Modèle d'appareil et version d'Android | Ex. « SM-G991B », « Android 13 ». Lus depuis des informations déjà fournies par votre navigateur/système à toute application, pas depuis un identifiant matériel unique. |
+| Version de Krino | Ex. « 0.10.0 ». |
+| Message d'erreur technique | Un texte court généré par le code de l'application (type d'échec, identifiant interne de la photo concernée). Ne contient jamais de nom de fichier, de chemin, ni de contenu de photo. |
+
+Ces rapports sont limités à 20 par session d'utilisation et dédupliqués (la
+même erreur répétée n'est envoyée qu'une fois), pour éviter tout envoi
+excessif. Ils sont conservés séparément des compteurs d'usage, pendant une
+durée limitée (30 jours), le temps de diagnostiquer un bug puis supprimés.
+
 ## Finalité et base légale
 
 Ces compteurs, agrégés à ceux de l'ensemble des utilisateurs, servent à
 afficher des statistiques publiques (nombre d'installations, nombre de photos
 triées/supprimées par la communauté) sur le site de Krino, et à suivre
-l'usage général de l'application pour orienter son développement.
+l'usage général de l'application pour orienter son développement. Les
+rapports de diagnostic technique servent uniquement à identifier et corriger
+des bugs réels rencontrés par des utilisateurs.
 
 Base légale retenue : **intérêt légitime** (RGPD art. 6.1.f), compte tenu du
 caractère anonyme, agrégé et minimal des données — aucun profilage, aucune

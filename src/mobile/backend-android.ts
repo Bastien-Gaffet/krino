@@ -76,7 +76,11 @@ export class BackendAndroid implements Backend {
 
   async mettreCorbeille(ids: string[]): Promise<number> {
     if (ids.length === 0) return 0;
-    return (await invoke<NombreReponse>(cmd("mettre_corbeille"), { ids })).nombre;
+    return this.confirmerViaCorbeille(
+      ids,
+      () => invoke<NombreReponse>(cmd("mettre_corbeille"), { ids }),
+      true,
+    );
   }
 
   async listerCorbeille(): Promise<Media[]> {
@@ -85,14 +89,74 @@ export class BackendAndroid implements Backend {
 
   async restaurer(ids: string[]): Promise<number> {
     if (ids.length === 0) return 0;
-    return (await invoke<NombreReponse>(cmd("restaurer"), { ids })).nombre;
+    return this.confirmerViaCorbeille(
+      ids,
+      () => invoke<NombreReponse>(cmd("restaurer"), { ids }),
+      false,
+    );
   }
 
   async supprimerDefinitivement(ids: string[]): Promise<number> {
     if (ids.length === 0) return 0;
-    return (
-      await invoke<NombreReponse>(cmd("supprimer_definitivement"), { ids })
-    ).nombre;
+    return this.confirmerViaCorbeille(
+      ids,
+      () => invoke<NombreReponse>(cmd("supprimer_definitivement"), { ids }),
+      false,
+    );
+  }
+
+  /**
+   * `mettreCorbeille`/`restaurer`/`supprimerDefinitivement` attendent tous
+   * une confirmation système (`createTrashRequest`/`createDeleteRequest`)
+   * relayée par le callback natif Tauri `@ActivityCallback` — le même
+   * mécanisme qui, pour la permission photos (voir `demanderPermission`
+   * ci-dessus), s'est révélé bloqué indéfiniment sur au moins un appareil
+   * réel malgré une confirmation système en bonne et due forme. Une testeuse
+   * a rapporté exactement ce symptôme ici : la mise à la corbeille tourne
+   * en rond sans jamais aboutir.
+   *
+   * Donc, comme pour la permission : dès que l'app redevient visible (signe
+   * que la boîte système vient de se fermer), on revérifie l'état réel via
+   * `listerCorbeille()` plutôt que de ne compter que sur le callback natif.
+   * Le premier des deux à trancher gagne — sur un appareil où le callback
+   * natif fonctionne, il répond bien avant le secours.
+   */
+  private async confirmerViaCorbeille(
+    ids: string[],
+    invoquerNatif: () => Promise<NombreReponse>,
+    attendrePresenceEnCorbeille: boolean,
+  ): Promise<number> {
+    let regle = false;
+    let detacher: (() => void) | null = null;
+
+    const promesseNative = invoquerNatif()
+      .then((r) => r.nombre)
+      .finally(() => {
+        regle = true;
+        detacher?.();
+      });
+
+    const promesseSecours = new Promise<number>((resolve) => {
+      const surRetourVisible = () => {
+        if (regle || document.visibilityState !== "visible") return;
+        // Laisse le temps à MediaStore de refléter la confirmation système
+        // avant de vérifier — sinon on risque de lire un état pas encore à
+        // jour juste après la fermeture de la boîte de dialogue.
+        window.setTimeout(async () => {
+          if (regle) return;
+          const corbeille = await this.listerCorbeille();
+          const dansCorbeille = new Set(corbeille.map((m) => m.id));
+          resolve(
+            ids.filter((id) => dansCorbeille.has(id) === attendrePresenceEnCorbeille)
+              .length,
+          );
+        }, 800);
+      };
+      document.addEventListener("visibilitychange", surRetourVisible);
+      detacher = () => document.removeEventListener("visibilitychange", surRetourVisible);
+    });
+
+    return Promise.race([promesseNative, promesseSecours]);
   }
 
   async lireEtat(): Promise<Etat> {

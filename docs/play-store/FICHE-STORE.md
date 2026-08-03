@@ -72,6 +72,12 @@ les faits à reporter, quels que soient les intitulés exacts du moment :
   serveur (Supabase), mais uniquement si l'utilisateur laisse activé le
   réglage « statistiques anonymes » (activé par défaut, désactivable). Ne
   permet pas d'identifier la personne. Pas de partage avec un tiers.
+- **Diagnostics** (modèle d'appareil, version d'OS, version de l'app, message
+  d'erreur technique sans nom de fichier ni chemin) : transmis sous le même
+  réglage opt-in, uniquement en cas d'échec technique réel dans l'app, pour
+  le débogage. Correspond à la catégorie Play Store « App info and
+  performance » / « Crash logs » ou « Diagnostics » selon l'intitulé du
+  moment.
 - **Aucune donnée financière, de localisation, de contacts, de santé,
   d'identité, de messages.**
 - Chiffrement en transit : oui (HTTPS).
@@ -97,23 +103,26 @@ pas un usage secondaire.
 
 ## Captures d'écran
 
-`docs/play-store/captures-demo/` — 6 images 1080×1919 (ratio 16:9, conforme
-aux exigences Play Store), générées en rendu automatisé du mode démo
-(Playwright, navigateur headless), bandeau « Démo » masqué :
+`docs/play-store/captures-store/` — le jeu à uploader sur la fiche Play
+Store : 5 visuels marketing 1080×1920 par langue (`fr/`, `en/`), avec mockup
+de téléphone, titre accrocheur et fond travaillé (générés avec le skill
+`app-store-screenshots`, à partir de captures du mode démo) :
 
-1. `1-accueil.png` — écran d'accueil / autorisation
-2. `2-mois.png` — liste des mois, regroupés par année
-3. `3-tri.png` — carte de tri, photo plein cadre
-4. `4-swipe.png` — glissement vers la droite, teinte « GARDER »
-5. `5-revue.png` — revue de fin de mois, gardées/jetées
-6. `6-corbeille.png` — corbeille avec fichiers en attente
+1. `01-hero.png` — « Trie tes photos d'un swipe. » — carte de tri plein cadre
+2. `02-device-bottom.png` — « Mois par mois, sans effort. » — liste des mois
+3. `03-two-devices.png` — « Une confirmation. Tout le mois. » — swipe + revue de fin de mois
+4. `04-device-top.png` — « Récupérable 30 jours. Jamais perdu. » — corbeille système (fond sombre)
+5. `05-no-device.png` — « Gratuit, sans compte. 100% privé. » — slide texte seul
 
 **Ce sont des photos de démonstration (banque d'images libres, pas de vraies
 photos)** — utilisables telles quelles pour une première soumission, mais à
 remplacer par de vraies captures prises sur l'APK dès que possible (plus
 fidèles, et Google peut être plus exigeant sur l'authenticité des captures
-avec le temps). Si tu préfères, prends-les toi-même depuis ton téléphone —
-même écrans, même ordre.
+avec le temps).
+
+`docs/play-store/captures-demo/` — anciennes captures brutes (UI seule, sans
+mockup ni titre), conservées en fallback si besoin de simples captures
+d'écran plutôt que des visuels marketing.
 
 ## Ce qu'il reste — à faire dans la Play Console, pas préparable à l'avance
 

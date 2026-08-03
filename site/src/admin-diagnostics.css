@@ -1,0 +1,156 @@
+/* Styles propres à la page d'admin diagnostics — pas de dépendance externe
+   (pas de lib de graphes), juste des barres HTML/CSS proportionnelles. */
+
+.page-admin {
+  background: var(--fond);
+  color: var(--texte);
+  min-height: 100vh;
+  --admin-serie-1: #2a78d6;
+  --admin-serie-2: #1baf7a;
+}
+@media (prefers-color-scheme: dark) {
+  .page-admin {
+    --admin-serie-1: #3987e5;
+    --admin-serie-2: #199e70;
+  }
+}
+.admin-titre-entete { font-weight: 700; color: var(--sourd); }
+
+.admin-conteneur {
+  padding: 2em 1.25em 4em;
+  display: grid;
+  /* Colonne unique explicitement flexible (minmax(0,1fr)) : un track "auto"
+     implicite se dimensionne sur le max-content de son contenu, ce qui
+     laissait le graphe 30 jours (min-content ~930px) faire déborder toute
+     la page malgré min-width:0 sur les items. */
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1.5em;
+}
+
+.admin-carte {
+  background: var(--carte);
+  border: 1px solid var(--bordure);
+  border-radius: 0.9em;
+  padding: 1.4em 1.5em;
+  /* Sans ça, le graphe 30 jours (largeur min-content) fait déborder toute la
+     grille au lieu de scroller dans son propre cadre — bug classique de
+     "grid blowout". */
+  min-width: 0;
+}
+.admin-carte h1 { margin-top: 0; }
+.admin-carte h2 { margin: 0 0 1em; font-size: 1.05em; }
+
+#admin-connexion { max-width: 420px; margin: 2em auto; }
+#admin-form-connexion { display: grid; gap: 1em; margin-top: 1em; }
+#admin-form-connexion label { display: grid; gap: 0.4em; font-size: 0.9em; color: var(--sourd); }
+#admin-form-connexion input {
+  padding: 0.6em 0.8em;
+  border-radius: 0.5em;
+  border: 1px solid var(--bordure);
+  background: var(--fond);
+  color: var(--texte);
+  font-size: 1em;
+}
+.admin-note { color: var(--discret); font-size: 0.9em; }
+.admin-erreur { color: #d64545; font-size: 0.9em; }
+
+.admin-entete-tableau {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1em;
+  flex-wrap: wrap;
+}
+
+.admin-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 1em;
+  margin: 1.5em 0;
+  min-width: 0;
+}
+.admin-kpi {
+  background: var(--carte);
+  border: 1px solid var(--bordure);
+  border-radius: 0.8em;
+  padding: 1em 1.2em;
+  display: grid;
+  gap: 0.3em;
+}
+.admin-kpi-valeur { font-size: 1.8em; font-weight: 800; }
+.admin-kpi span:last-child { color: var(--discret); font-size: 0.85em; }
+
+.admin-grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 1.5em;
+  margin-bottom: 1.5em;
+  min-width: 0;
+}
+
+.admin-groupe { margin-bottom: 1.1em; }
+.admin-groupe:last-child { margin-bottom: 0; }
+.admin-groupe-titre {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.6em;
+  font-weight: 700;
+  margin-bottom: 0.4em;
+}
+.admin-taux { font-weight: 400; color: var(--discret); font-size: 0.82em; }
+
+.admin-barre-ligne {
+  display: grid;
+  grid-template-columns: 6.5em 1fr 2.5em;
+  align-items: center;
+  gap: 0.6em;
+  font-size: 0.85em;
+  margin-bottom: 0.25em;
+}
+.admin-barre-label { color: var(--sourd); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.admin-barre-piste { background: var(--fond-sourd); border-radius: 0.3em; overflow: hidden; height: 0.7em; }
+.admin-barre { height: 100%; border-radius: 0.3em; }
+.admin-barre--utilisateurs { background: var(--admin-serie-1); }
+.admin-barre--bugs { background: var(--admin-serie-2); }
+.admin-barre-valeur { text-align: right; font-variant-numeric: tabular-nums; color: var(--sourd); }
+
+.admin-graphe-jours { overflow-x: auto; }
+.admin-colonnes {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.35em;
+  height: 140px;
+  min-width: max-content;
+  padding-top: 0.5em;
+}
+.admin-colonne {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  width: 1.6em;
+  height: 100%;
+}
+.admin-colonne-barre {
+  width: 100%;
+  background: var(--admin-serie-2);
+  border-radius: 0.2em 0.2em 0 0;
+  min-height: 2px;
+}
+.admin-colonne-label {
+  font-size: 0.62em;
+  color: var(--discret);
+  margin-top: 0.3em;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  white-space: nowrap;
+}
+
+.admin-table { width: 100%; border-collapse: collapse; font-size: 0.88em; }
+.admin-table th, .admin-table td {
+  text-align: left;
+  padding: 0.55em 0.7em;
+  border-bottom: 1px solid var(--bordure);
+}
+.admin-message-cellule { font-family: ui-monospace, monospace; font-size: 0.92em; }

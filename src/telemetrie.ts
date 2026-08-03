@@ -114,6 +114,8 @@ export function reinitialiserTelemetrie() {
 
 const MAX_DIAGNOSTICS_SESSION = 20;
 const diagnosticsEnvoyes = new Set<string>();
+const CLE_DERNIER_PING_APPAREIL = "krino-appareil-dernier-ping";
+const INTERVALLE_PING_APPAREIL_MS = 24 * 60 * 60 * 1000;
 
 /** Modèle d'appareil + version d'OS, lus depuis le user-agent de la WebView
  *  Android (ex. "Mozilla/5.0 (Linux; Android 13; SM-G991B) ..."). Aucune
@@ -121,6 +123,39 @@ const diagnosticsEnvoyes = new Set<string>();
 function infosAppareil(): { appareil: string; os: string } {
   const m = navigator.userAgent.match(/Android\s([\d.]+);\s*([^)]+)\)/);
   return { os: m?.[1] ?? "?", appareil: (m?.[2] ?? "?").trim() };
+}
+
+/** Signale la présence de cet appareil (une fois par jour maximum), pour
+ *  connaître la population totale par OS/modèle — sans ça, la page d'admin
+ *  ne verrait que les appareils qui plantent, impossible de savoir si une
+ *  plateforme est réellement plus fragile ou juste plus utilisée. À appeler
+ *  une fois au démarrage, indépendamment de toute activité de l'utilisateur. */
+export async function enregistrerAppareil(versionApp: string): Promise<void> {
+  if (!activee || !SUPABASE_URL || !SUPABASE_ANON_KEY) return;
+  const dernier = Number(localStorage.getItem(CLE_DERNIER_PING_APPAREIL) ?? 0);
+  if (Date.now() - dernier < INTERVALLE_PING_APPAREIL_MS) return;
+
+  const { appareil, os } = infosAppareil();
+  try {
+    const rep = await fetch(`${SUPABASE_URL}/rest/v1/rpc/krino_appareil`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+      },
+      body: JSON.stringify({
+        p_anon_id: anonId(),
+        p_appareil: appareil,
+        p_os: os,
+        p_version_app: versionApp,
+      }),
+    });
+    if (!rep.ok) return;
+    localStorage.setItem(CLE_DERNIER_PING_APPAREIL, String(Date.now()));
+  } catch {
+    // Hors ligne : on retentera au prochain démarrage.
+  }
 }
 
 /** Envoie un rapport de diagnostic technique (best-effort, jamais de retry

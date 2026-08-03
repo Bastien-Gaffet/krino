@@ -16,6 +16,7 @@ import { confirmer, informer } from "../dialogues";
 import {
   anonId,
   definirTelemetrieActivee,
+  enregistrerAppareil,
   enregistrerRevue,
   enregistrerSuppression,
   envoyerTelemetrie,
@@ -250,7 +251,10 @@ async function demarrer() {
   appliquerTheme();
   definirTelemetrieActivee(prefs.telemetrieActivee);
   appliquerTraductions();
-  void getVersion().then((v) => (versionApp = v));
+  void getVersion().then((v) => {
+    versionApp = v;
+    void enregistrerAppareil(v);
+  });
 
   $("#btn-autoriser").addEventListener("click", () => void autoriser());
   $("#btn-corbeille").addEventListener("click", () => void ouvrirCorbeille());

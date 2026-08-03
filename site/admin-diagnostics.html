@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Diagnostics — Krino</title>
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" href="/logo.png" />
+    <meta name="theme-color" content="#6c8cff" />
+
+    <link rel="stylesheet" href="/src/style.css" />
+    <link rel="stylesheet" href="/src/admin-diagnostics.css" />
+  </head>
+  <body class="page-admin">
+    <header class="entete">
+      <div class="conteneur entete-interieur">
+        <a class="marque" href="/">
+          <img src="/logo.png" alt="" width="32" height="32" />
+          <span>Krino</span>
+        </a>
+        <span class="admin-titre-entete">Diagnostics</span>
+      </div>
+    </header>
+
+    <main class="conteneur admin-conteneur">
+      <section id="admin-connexion" class="admin-carte">
+        <h1>Connexion</h1>
+        <p class="admin-note">Réservé — compte Supabase de l'auteur.</p>
+        <form id="admin-form-connexion">
+          <label>
+            E-mail
+            <input type="email" id="admin-email" autocomplete="username" required />
+          </label>
+          <label>
+            Mot de passe
+            <input type="password" id="admin-mdp" autocomplete="current-password" required />
+          </label>
+          <button type="submit" class="btn btn-primaire">Se connecter</button>
+          <p id="admin-erreur-connexion" class="admin-erreur" hidden></p>
+        </form>
+      </section>
+
+      <section id="admin-tableau" hidden>
+        <div class="admin-entete-tableau">
+          <h1>Diagnostics</h1>
+          <button type="button" id="admin-deconnexion" class="btn">Se déconnecter</button>
+        </div>
+
+        <div id="admin-kpis" class="admin-kpis"></div>
+
+        <div class="admin-grille">
+          <article class="admin-carte">
+            <h2>Par version d'Android</h2>
+            <div id="admin-graphe-os" class="admin-graphe"></div>
+          </article>
+          <article class="admin-carte">
+            <h2>Par marque d'appareil</h2>
+            <div id="admin-graphe-marque" class="admin-graphe"></div>
+          </article>
+          <article class="admin-carte">
+            <h2>Par version de l'app</h2>
+            <div id="admin-graphe-version" class="admin-graphe"></div>
+          </article>
+        </div>
+
+        <article class="admin-carte">
+          <h2>Rapports de bugs — 30 derniers jours</h2>
+          <div id="admin-graphe-jours" class="admin-graphe admin-graphe-jours"></div>
+        </article>
+
+        <article class="admin-carte">
+          <h2>Messages d'erreur les plus fréquents</h2>
+          <table class="admin-table" id="admin-table-messages">
+            <thead>
+              <tr><th>Message</th><th>Occurrences</th><th>Dernière fois</th></tr>
+            </thead>
+            <tbody></tbody>
+          </table>
+        </article>
+      </section>
+    </main>
+
+    <script type="module" src="/src/admin-diagnostics.ts"></script>
+  </body>
+</html>

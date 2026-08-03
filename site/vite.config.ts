@@ -9,6 +9,7 @@ export default defineConfig({
       input: {
         accueil: racine("index.html"),
         confidentialite: racine("confidentialite.html"),
+        adminDiagnostics: racine("admin-diagnostics.html"),
       },
     },
   },

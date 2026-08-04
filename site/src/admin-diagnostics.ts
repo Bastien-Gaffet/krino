@@ -40,15 +40,15 @@ const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)
 
 function lireSession(): Session | null {
   try {
-    return JSON.parse(sessionStorage.getItem(CLE_SESSION) ?? "null");
+    return JSON.parse(localStorage.getItem(CLE_SESSION) ?? "null");
   } catch {
     return null;
   }
 }
 
 function ecrireSession(s: Session | null) {
-  if (s) sessionStorage.setItem(CLE_SESSION, JSON.stringify(s));
-  else sessionStorage.removeItem(CLE_SESSION);
+  if (s) localStorage.setItem(CLE_SESSION, JSON.stringify(s));
+  else localStorage.removeItem(CLE_SESSION);
 }
 
 async function connecter(email: string, motDePasse: string): Promise<Session> {

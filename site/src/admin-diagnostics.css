@@ -51,6 +51,13 @@
   color: var(--texte);
   font-size: 1em;
 }
+/* .btn est display:inline-flex avec align-items:center (axe vertical) mais
+   sans justify-content — sans incidence tant que le bouton ne fait que la
+   largeur de son contenu, mais ici la grille du formulaire l'étire sur
+   toute la largeur : le texte se retrouvait plaqué à gauche du bouton. */
+#admin-form-connexion button[type="submit"] {
+  justify-content: center;
+}
 .admin-note { color: var(--discret); font-size: 0.9em; }
 .admin-erreur { color: #d64545; font-size: 0.9em; }
 
@@ -62,11 +69,19 @@
   flex-wrap: wrap;
 }
 
+/* #admin-tableau (le <section> englobant) n'avait ni gap ni marges
+   cohérentes entre ses propres enfants : la carte "Rapports de bugs — 30
+   derniers jours" et la carte "Messages d'erreur" juste après se
+   touchaient, sans le moindre espace. */
+#admin-tableau {
+  display: grid;
+  gap: 1.5em;
+}
+
 .admin-kpis {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 1em;
-  margin: 1.5em 0;
   min-width: 0;
 }
 .admin-kpi {
@@ -84,7 +99,6 @@
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 1.5em;
-  margin-bottom: 1.5em;
   min-width: 0;
 }
 
@@ -147,10 +161,22 @@
   white-space: nowrap;
 }
 
-.admin-table { width: 100%; border-collapse: collapse; font-size: 0.88em; }
+/* table-layout:fixed + word-break sur la cellule message : sans ça, les
+   messages d'erreur (longs, parfois un seul token sans espace) forçaient le
+   tableau à dépasser sa carte plutôt que de passer à la ligne, débordement
+   très visible sur petit écran. */
+.admin-table { width: 100%; border-collapse: collapse; font-size: 0.88em; table-layout: fixed; }
 .admin-table th, .admin-table td {
   text-align: left;
   padding: 0.55em 0.7em;
   border-bottom: 1px solid var(--bordure);
 }
-.admin-message-cellule { font-family: ui-monospace, monospace; font-size: 0.92em; }
+.admin-table th:nth-child(1), .admin-table td:nth-child(1) { width: 55%; }
+.admin-table th:nth-child(2), .admin-table td:nth-child(2) { width: 15%; }
+.admin-table th:nth-child(3), .admin-table td:nth-child(3) { width: 30%; }
+.admin-message-cellule {
+  font-family: ui-monospace, monospace;
+  font-size: 0.92em;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}

@@ -85,6 +85,7 @@ const FR: Dico = {
   "corbeille.supprimerDef": "Supprimer définitivement",
   "corbeille.restaures": "{n} fichiers restaurés.",
   "corbeille.videGrille": "La corbeille est vide.",
+  "corbeille.echecDeplacement": "Le déplacement vers la corbeille n'a pas abouti. Rien n'a été validé — réessaie, ou vérifie la corbeille de ton téléphone.",
   "vignette.video": "vidéo",
 
   "chargement.analyse": "Analyse du dossier…",
@@ -389,6 +390,7 @@ const EN: Dico = {
   "corbeille.supprimerDef": "Delete permanently",
   "corbeille.restaures": "{n} files restored.",
   "corbeille.videGrille": "The trash is empty.",
+  "corbeille.echecDeplacement": "Moving to trash didn't go through. Nothing was confirmed — try again, or check your phone's trash.",
   "vignette.video": "video",
 
   "chargement.analyse": "Analyzing folder…",

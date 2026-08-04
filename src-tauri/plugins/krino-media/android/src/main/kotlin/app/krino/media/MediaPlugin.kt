@@ -358,7 +358,7 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
             invoke.resolve(ret)
             return
         }
-        val uris = ids.map { uriDepuisId(it) }
+        val uris = urisDepuisIds(ids)
         tailleDemandeCorbeille = uris.size
         val pending = MediaStore.createTrashRequest(activity.contentResolver, uris, true)
         startIntentSenderForResult(
@@ -388,7 +388,7 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
             invoke.resolve(ret)
             return
         }
-        val uris = ids.map { uriDepuisId(it) }
+        val uris = urisDepuisIds(ids)
         tailleDemandeRestauration = uris.size
         val pending = MediaStore.createTrashRequest(activity.contentResolver, uris, false)
         startIntentSenderForResult(
@@ -415,7 +415,7 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
             invoke.resolve(ret)
             return
         }
-        val uris = ids.map { uriDepuisId(it) }
+        val uris = urisDepuisIds(ids)
         tailleDemandeSuppression = uris.size
         val pending = MediaStore.createDeleteRequest(activity.contentResolver, uris)
         startIntentSenderForResult(
@@ -432,10 +432,49 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
         invoke.resolve(ret)
     }
 
-    private fun uriDepuisId(id: String): Uri = ContentUris.withAppendedId(
-        MediaStore.Files.getContentUri("external"),
-        id.toLong(),
-    )
+    /**
+     * Construit les URIs typées (Images/Video) depuis des identifiants bruts.
+     *
+     * `createTrashRequest`/`createDeleteRequest` rejettent les URIs de la
+     * collection générique `Files` avec « All requested items must be Media
+     * items » (confirmé par un rapport de diagnostic réel) — même piège déjà
+     * rencontré et corrigé pour `loadThumbnail` (voir vignette()), mais pas
+     * ici : c'était la vraie cause de l'échec de la mise à la corbeille,
+     * pas juste un problème de timing. On interroge `Files` (valide en
+     * lecture, avec MEDIA_TYPE) pour connaître le type de chaque média, puis
+     * on reconstruit l'URI depuis la collection typée correspondante — en
+     * une seule requête groupée plutôt qu'une par id, vu que jusqu'à 2000
+     * ids peuvent arriver d'un coup (un mois entier). Les ids sont
+     * pré-validés par `.toLong()` (lève une exception sinon) avant d'être
+     * injectés tels quels dans la clause IN, donc sans risque d'injection —
+     * ça évite aussi la limite de ~999 paramètres liés de SQLite.
+     */
+    private fun urisDepuisIds(ids: List<String>): List<Uri> {
+        if (ids.isEmpty()) return emptyList()
+        val idsLong = ids.map { it.toLong() }
+        val typesParId = mutableMapOf<Long, Int>()
+        activity.contentResolver.query(
+            MediaStore.Files.getContentUri("external"),
+            arrayOf(MediaStore.Files.FileColumns._ID, MediaStore.Files.FileColumns.MEDIA_TYPE),
+            "${MediaStore.Files.FileColumns._ID} IN (${idsLong.joinToString(",")})",
+            null,
+            null,
+        )?.use { curseur ->
+            val idxId = curseur.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID)
+            val idxType = curseur.getColumnIndexOrThrow(MediaStore.Files.FileColumns.MEDIA_TYPE)
+            while (curseur.moveToNext()) {
+                typesParId[curseur.getLong(idxId)] = curseur.getInt(idxType)
+            }
+        }
+        return idsLong.map { id ->
+            val collection = if (typesParId[id] == MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO) {
+                MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+            } else {
+                MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+            }
+            ContentUris.withAppendedId(collection, id)
+        }
+    }
 
     companion object {
         private const val DEMANDE_LECTURE = 4001

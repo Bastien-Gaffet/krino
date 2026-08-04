@@ -960,8 +960,16 @@ async function validerMois() {
     chargement(null);
   }
 
-  // L'utilisateur peut refuser la boîte système : dans ce cas on ne valide rien.
-  if (jetees.length > 0 && misCorbeille === 0) return;
+  // L'utilisateur peut refuser la boîte système, ou l'opération peut avoir
+  // échoué techniquement : dans les deux cas on ne valide rien, mais rester
+  // muet laissait l'utilisateur sans aucun retour (rapporté par une
+  // testeuse). Un message générique convient aux deux cas : un refus
+  // volontaire ne surprend pas d'être confirmé, un échec technique n'est
+  // plus silencieux.
+  if (jetees.length > 0 && misCorbeille === 0) {
+    await informer(t("corbeille.echecDeplacement"));
+    return;
+  }
 
   if (!etat.moisFaits.includes(moisCourant)) etat.moisFaits.push(moisCourant);
   const partis = new Set(jetees.map((m) => m.id));

@@ -52,6 +52,7 @@ type Prefs = {
   langue: "auto" | "fr" | "en";
   telemetrieActivee: boolean;
   parAnnee: boolean;
+  tutoVu: boolean;
 };
 
 const CLE_PREFS = "krino-mobile-prefs";
@@ -61,6 +62,7 @@ const prefs: Prefs = {
   langue: "auto",
   telemetrieActivee: true,
   parAnnee: true,
+  tutoVu: false,
   ...JSON.parse(localStorage.getItem(CLE_PREFS) ?? "{}"),
 };
 
@@ -281,6 +283,8 @@ async function demarrer() {
     afficherMois();
   });
   $("#masquer-faits").addEventListener("change", () => afficherMois());
+  $("#tuto-suivant").addEventListener("click", () => void tutoAller(etapeTuto + 1));
+  $("#tuto-quitter").addEventListener("click", () => tutoFin());
 
   installerReglages();
   installerSwipe();
@@ -310,6 +314,11 @@ async function autoriser() {
     $("#onboard-etat").textContent = t("mobile.permPartielle");
   }
   await chargerPhototheque();
+
+  // Uniquement à l'octroi initial (pas aux lancements suivants, qui passent
+  // par la branche `permission() === "accordee"` de demarrer() sans jamais
+  // rappeler autoriser()).
+  if (!prefs.tutoVu && (await confirmer(t("mobile.confirmTuto")))) tutoDemarrer();
 }
 
 async function chargerPhototheque() {
@@ -365,6 +374,8 @@ function installerReglages() {
   $("#anon-id").textContent = anonId();
 
   ($("#kofi-symbole") as HTMLImageElement).src = kofiSymbole;
+
+  $("#btn-revoir-tuto").addEventListener("click", () => tutoDemarrer());
 }
 
 function ouvrirReglages() {
@@ -520,6 +531,75 @@ function afficherMois() {
 
 async function retourMois() {
   await backend.ecrireEtat(etat);
+  afficherMois();
+}
+
+/* ══ Tutoriel ══
+   Contrairement au desktop (dossier de démonstration dédié), le mobile n'a
+   pas d'équivalent utilisable en production du mode démo — ce tutoriel
+   s'appuie donc sur les vraies photos de l'utilisateur. Il reste strictement
+   en lecture : ouvrir un mois pour montrer l'écran de tri ne prend aucune
+   décision, mais on n'appelle jamais `decider()` ni ne simule la fin d'un
+   mois — la revue et la corbeille sont donc décrites plutôt que visitées de
+   force sur du contenu réel. */
+
+interface EtapeTuto {
+  cible?: string;
+  texte: string;
+  avant?: () => void | Promise<void>;
+}
+
+function construireEtapesTuto(): EtapeTuto[] {
+  const etapes: EtapeTuto[] = [
+    { cible: "#conteneur-mois", texte: "mobile.tuto.mois" },
+    { cible: ".sous-barre-mois", texte: "mobile.tuto.filtres" },
+  ];
+
+  const premier = grouper()[0];
+  if (premier) {
+    etapes.push(
+      { cible: ".carte-mois", texte: "mobile.tuto.carteMois" },
+      { avant: () => ouvrirTri(premier.cle), cible: "#carte", texte: "mobile.tuto.swipe" },
+      { cible: "#pied-tri", texte: "mobile.tuto.boutons" },
+      { avant: () => retourMois(), cible: "#btn-corbeille", texte: "mobile.tuto.corbeille" },
+    );
+  } else {
+    etapes.push({ cible: "#btn-corbeille", texte: "mobile.tuto.corbeille" });
+  }
+
+  etapes.push({ cible: "#btn-reglages", texte: "mobile.tuto.reglages" });
+  return etapes;
+}
+
+let etapesTuto: EtapeTuto[] = [];
+let etapeTuto = -1;
+
+async function tutoAller(i: number) {
+  document.querySelector(".tuto-cible")?.classList.remove("tuto-cible");
+  if (i >= etapesTuto.length) { tutoFin(); return; }
+  etapeTuto = i;
+  const etape = etapesTuto[i];
+  await etape.avant?.();
+  $("#tuto-texte").textContent = t(etape.texte);
+  $("#tuto-etape").textContent = `${i + 1}/${etapesTuto.length}`;
+  ($("#tuto-suivant") as unknown as HTMLButtonElement).textContent =
+    i === etapesTuto.length - 1 ? t("tuto.terminer") : t("tuto.suivant");
+  $("#tuto-bulle").hidden = false;
+  if (etape.cible) document.querySelector(etape.cible)?.classList.add("tuto-cible");
+}
+
+function tutoDemarrer() {
+  afficherMois();
+  etapesTuto = construireEtapesTuto();
+  void tutoAller(0);
+}
+
+function tutoFin() {
+  document.querySelector(".tuto-cible")?.classList.remove("tuto-cible");
+  $("#tuto-bulle").hidden = true;
+  etapeTuto = -1;
+  prefs.tutoVu = true;
+  sauverPrefs();
   afficherMois();
 }
 

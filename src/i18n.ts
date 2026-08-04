@@ -299,6 +299,15 @@ const FR: Dico = {
   "mobile.kofi": "Offrir un café",
   "mobile.siteWeb": "Voir le site de Krino",
   "mobile.moisVide": "Aucune photo à trier dans ce mois.",
+  "mobile.aide": "Aide",
+  "mobile.confirmTuto": "Première utilisation : suivre le petit tutoriel (30 secondes, sur tes vraies photos — rien n'est modifié) ?",
+  "mobile.tuto.mois": "Bienvenue dans Krino. Tes photos et vidéos sont regroupées par mois.",
+  "mobile.tuto.filtres": "Trie la liste par date, taille ou nombre de photos, et masque les mois déjà terminés.",
+  "mobile.tuto.carteMois": "Touche un mois pour commencer à le trier.",
+  "mobile.tuto.swipe": "Swipe à droite pour garder, à gauche pour jeter.",
+  "mobile.tuto.boutons": "Ou utilise ces boutons : jeter, annuler la dernière décision, garder.",
+  "mobile.tuto.corbeille": "Une fois le mois validé, les photos jetées vont dans la corbeille de ton téléphone — récupérables pendant 30 jours, jamais perdues d'un coup.",
+  "mobile.tuto.reglages": "Ici, dans Réglages : thème, langue, et ce bouton pour revoir ce tutoriel.",
 };
 
 const EN: Dico = {
@@ -594,6 +603,15 @@ const EN: Dico = {
   "mobile.kofi": "Buy a coffee",
   "mobile.siteWeb": "Visit the Krino website",
   "mobile.moisVide": "No photos left to sort in this month.",
+  "mobile.aide": "Help",
+  "mobile.confirmTuto": "First time here: follow the short tutorial (30 seconds, on your real photos — nothing is changed)?",
+  "mobile.tuto.mois": "Welcome to Krino. Your photos and videos are grouped by month.",
+  "mobile.tuto.filtres": "Sort the list by date, size, or photo count, and hide months you've already finished.",
+  "mobile.tuto.carteMois": "Tap a month to start sorting it.",
+  "mobile.tuto.swipe": "Swipe right to keep, left to discard.",
+  "mobile.tuto.boutons": "Or use these buttons: discard, undo the last decision, keep.",
+  "mobile.tuto.corbeille": "Once you confirm the month, discarded photos go to your phone's trash — recoverable for 30 days, never lost in one go.",
+  "mobile.tuto.reglages": "Here, in Settings: theme, language, and this button to replay the tutorial.",
 };
 
 const DICOS: Record<Langue, Dico> = { fr: FR, en: EN };

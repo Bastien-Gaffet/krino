@@ -165,6 +165,9 @@
           <span data-i18n="reglages.grouperAnnees"></span>
         </label>
 
+        <h3 class="titre-groupe" data-i18n="mobile.aide"></h3>
+        <button id="btn-revoir-tuto" class="btn" data-i18n="reglages.tuto"></button>
+
         <h3 class="titre-groupe" data-i18n="confidentialite.titre"></h3>
         <label class="ligne-reglage">
           <input type="checkbox" id="opt-telemetrie" />
@@ -215,6 +218,16 @@
       <div class="chargement-boite">
         <div class="loader"></div>
         <h2 id="chargement-titre"></h2>
+      </div>
+    </div>
+
+    <!-- ═══ Bulle de tutoriel (classes .tuto-bulle/.tuto-cible de styles.css) ═══ -->
+    <div id="tuto-bulle" class="tuto-bulle" hidden>
+      <p id="tuto-texte"></p>
+      <div class="rangee-boutons">
+        <span id="tuto-etape" class="etape espace"></span>
+        <button id="tuto-quitter" class="btn" data-i18n="tuto.quitter"></button>
+        <button id="tuto-suivant" class="btn btn-primaire"></button>
       </div>
     </div>
 

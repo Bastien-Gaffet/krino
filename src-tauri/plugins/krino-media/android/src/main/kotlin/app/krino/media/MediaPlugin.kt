@@ -449,7 +449,7 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
      * injectés tels quels dans la clause IN, donc sans risque d'injection —
      * ça évite aussi la limite de ~999 paramètres liés de SQLite.
      */
-    private fun urisDepuisIds(ids: List<String>): List<Uri> {
+    private fun urisDepuisIds(ids: Array<String>): List<Uri> {
         if (ids.isEmpty()) return emptyList()
         val idsLong = ids.map { it.toLong() }
         val typesParId = mutableMapOf<Long, Int>()

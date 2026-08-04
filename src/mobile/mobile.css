@@ -513,10 +513,16 @@ body.mobile .chargement-boite {
 
 /* ── Tutoriel ──
    La bulle du desktop est ancrée en bas (`.tuto-bulle` de styles.css) : sur
-   un petit écran, ça recouvrirait justement les boutons de pied de page
-   qu'une étape du tutoriel met en avant (#pied-tri). On l'ancre en haut,
-   sous la barre d'en-tête, à la place. */
+   un petit écran, une position fixe unique finit par recouvrir une cible
+   proche de ce bord (ex. la barre d'outils juste sous l'en-tête, ou les
+   boutons de pied de page #pied-tri). `positionnerBulle()` (main.ts) bascule
+   entre haut et bas selon la moitié de l'écran où se trouve la cible de
+   chaque étape. */
 body.mobile .tuto-bulle {
   top: calc(3.6em + env(safe-area-inset-top));
   bottom: auto;
+}
+body.mobile .tuto-bulle.tuto-bulle-bas {
+  top: auto;
+  bottom: calc(1em + env(safe-area-inset-bottom));
 }

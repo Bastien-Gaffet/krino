@@ -551,7 +551,10 @@ interface EtapeTuto {
 
 function construireEtapesTuto(): EtapeTuto[] {
   const etapes: EtapeTuto[] = [
-    { cible: "#conteneur-mois", texte: "mobile.tuto.mois" },
+    // Pas de cible : #conteneur-mois occupe presque tout l'écran, aucune
+    // position de bulle ne peut l'éviter — un simple message d'accueil n'en
+    // a de toute façon pas besoin.
+    { texte: "mobile.tuto.mois" },
     { cible: ".sous-barre-mois", texte: "mobile.tuto.filtres" },
   ];
 
@@ -574,6 +577,24 @@ function construireEtapesTuto(): EtapeTuto[] {
 let etapesTuto: EtapeTuto[] = [];
 let etapeTuto = -1;
 
+/**
+ * La bulle a une position fixe (haut ou bas de l'écran, voir mobile.css) : sur
+ * un petit écran, une position unique finit forcément par recouvrir une cible
+ * proche de ce bord (ex. la barre d'outils juste sous l'en-tête). On bascule
+ * donc entre haut et bas selon la moitié de l'écran où se trouve la cible —
+ * la bulle ne peut jamais couvrir ce qu'elle est censée montrer.
+ */
+function positionnerBulle(cible: Element | null) {
+  const bulle = $("#tuto-bulle");
+  if (!cible) {
+    bulle.classList.remove("tuto-bulle-bas");
+    return;
+  }
+  const rect = cible.getBoundingClientRect();
+  const milieuCible = rect.top + rect.height / 2;
+  bulle.classList.toggle("tuto-bulle-bas", milieuCible < window.innerHeight / 2);
+}
+
 async function tutoAller(i: number) {
   document.querySelector(".tuto-cible")?.classList.remove("tuto-cible");
   if (i >= etapesTuto.length) { tutoFin(); return; }
@@ -585,7 +606,9 @@ async function tutoAller(i: number) {
   ($("#tuto-suivant") as unknown as HTMLButtonElement).textContent =
     i === etapesTuto.length - 1 ? t("tuto.terminer") : t("tuto.suivant");
   $("#tuto-bulle").hidden = false;
-  if (etape.cible) document.querySelector(etape.cible)?.classList.add("tuto-cible");
+  const cible = etape.cible ? document.querySelector(etape.cible) : null;
+  cible?.classList.add("tuto-cible");
+  positionnerBulle(cible);
 }
 
 function tutoDemarrer() {

@@ -111,15 +111,18 @@ export class BackendAndroid implements Backend {
    * relayée par le callback natif Tauri `@ActivityCallback` — le même
    * mécanisme qui, pour la permission photos (voir `demanderPermission`
    * ci-dessus), s'est révélé bloqué indéfiniment sur au moins un appareil
-   * réel malgré une confirmation système en bonne et due forme. Une testeuse
-   * a rapporté exactement ce symptôme ici : la mise à la corbeille tourne
-   * en rond sans jamais aboutir.
+   * réel malgré une confirmation système en bonne et due forme.
    *
-   * Donc, comme pour la permission : dès que l'app redevient visible (signe
-   * que la boîte système vient de se fermer), on revérifie l'état réel via
-   * `listerCorbeille()` plutôt que de ne compter que sur le callback natif.
-   * Le premier des deux à trancher gagne — sur un appareil où le callback
-   * natif fonctionne, il répond bien avant le secours.
+   * Un premier secours (revérifier l'état réel via `listerCorbeille()` dès
+   * que l'app redevient visible) s'est révélé insuffisant à son tour : une
+   * testeuse a eu le même blocage indéfini malgré ce correctif, sur un
+   * Samsung Android 11, sans qu'aucune erreur ne remonte (voir
+   * signalerErreur) — signe que ni le callback natif NI l'évènement
+   * `visibilitychange` ne se déclenchent sur cet appareil pour ce dialogue
+   * système précis (contrairement à celui de la permission, qui fonctionne).
+   * On ajoute donc un filet supplémentaire, indépendant de tout signal du
+   * navigateur : une vérification différée dans le temps, qui se déclenche
+   * de toute façon même si rien d'autre ne s'est jamais manifesté.
    */
   private async confirmerViaCorbeille(
     ids: string[],
@@ -127,36 +130,48 @@ export class BackendAndroid implements Backend {
     attendrePresenceEnCorbeille: boolean,
   ): Promise<number> {
     let regle = false;
-    let detacher: (() => void) | null = null;
+    const nettoyeurs: Array<() => void> = [];
+    const nettoyer = () => {
+      regle = true;
+      nettoyeurs.forEach((fn) => fn());
+    };
+
+    const verifierEtat = async (): Promise<number> => {
+      const corbeille = await this.listerCorbeille();
+      const dansCorbeille = new Set(corbeille.map((m) => m.id));
+      return ids.filter((id) => dansCorbeille.has(id) === attendrePresenceEnCorbeille).length;
+    };
 
     const promesseNative = invoquerNatif()
       .then((r) => r.nombre)
-      .finally(() => {
-        regle = true;
-        detacher?.();
-      });
+      .finally(nettoyer);
 
-    const promesseSecours = new Promise<number>((resolve) => {
+    const promesseVisibilite = new Promise<number>((resolve) => {
       const surRetourVisible = () => {
         if (regle || document.visibilityState !== "visible") return;
         // Laisse le temps à MediaStore de refléter la confirmation système
         // avant de vérifier — sinon on risque de lire un état pas encore à
         // jour juste après la fermeture de la boîte de dialogue.
-        window.setTimeout(async () => {
-          if (regle) return;
-          const corbeille = await this.listerCorbeille();
-          const dansCorbeille = new Set(corbeille.map((m) => m.id));
-          resolve(
-            ids.filter((id) => dansCorbeille.has(id) === attendrePresenceEnCorbeille)
-              .length,
-          );
+        window.setTimeout(() => {
+          if (!regle) void verifierEtat().then(resolve);
         }, 800);
       };
       document.addEventListener("visibilitychange", surRetourVisible);
-      detacher = () => document.removeEventListener("visibilitychange", surRetourVisible);
+      nettoyeurs.push(() => document.removeEventListener("visibilitychange", surRetourVisible));
     });
 
-    return Promise.race([promesseNative, promesseSecours]);
+    // Filet de dernier recours : si ni le callback natif ni un changement de
+    // visibilité ne se sont manifestés après un délai généreux (le temps
+    // pour l'utilisateur de répondre à une boîte système), on vérifie quand
+    // même — plutôt qu'un chargement bloqué indéfiniment sans recours.
+    const promesseDelai = new Promise<number>((resolve) => {
+      const id = window.setTimeout(() => {
+        if (!regle) void verifierEtat().then(resolve);
+      }, 15000);
+      nettoyeurs.push(() => window.clearTimeout(id));
+    });
+
+    return Promise.race([promesseNative, promesseVisibilite, promesseDelai]);
   }
 
   async lireEtat(): Promise<Etat> {

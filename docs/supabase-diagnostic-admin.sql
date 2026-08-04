@@ -107,7 +107,7 @@ begin
   return query
     select public.krino_marque(a.appareil) as marque,
            count(distinct a.anon_id),
-           coalesce(sum(d.n), 0),
+           coalesce(sum(d.n), 0)::bigint,
            round(coalesce(sum(d.n), 0)::numeric / nullif(count(distinct a.anon_id), 0), 3)
     from public.krino_appareils a
     left join (

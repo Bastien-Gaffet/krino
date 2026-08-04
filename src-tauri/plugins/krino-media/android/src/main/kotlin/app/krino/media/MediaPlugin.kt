@@ -6,6 +6,9 @@ import android.content.ContentResolver
 import android.content.ContentUris
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
+import android.graphics.Matrix
+import android.media.ExifInterface
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -224,6 +227,56 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     /**
+     * Décode l'image depuis ses octets d'origine (`BitmapFactory` +
+     * `inSampleSize`), au lieu de passer par le cache de `loadThumbnail`.
+     * Contrepartie : contrairement à `loadThumbnail`, ce chemin n'applique
+     * pas l'orientation EXIF tout seul — on la relit et on tourne le bitmap
+     * nous-mêmes.
+     */
+    private fun decoderImageSource(uri: Uri, cible: Int): Bitmap {
+        val taille = tailleDecodage(uri, cible)
+
+        val bornes = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        activity.contentResolver.openInputStream(uri)?.use {
+            BitmapFactory.decodeStream(it, null, bornes)
+        }
+        if (bornes.outWidth <= 0 || bornes.outHeight <= 0) {
+            // Bornes illisibles (format exotique, fichier distant lent…) :
+            // le cache système reste un repli raisonnable.
+            return activity.contentResolver.loadThumbnail(uri, taille, null)
+        }
+
+        var echantillon = 1
+        while (
+            bornes.outWidth / (echantillon * 2) >= taille.width &&
+            bornes.outHeight / (echantillon * 2) >= taille.height
+        ) {
+            echantillon *= 2
+        }
+
+        val brut = activity.contentResolver.openInputStream(uri)?.use {
+            BitmapFactory.decodeStream(it, null, BitmapFactory.Options().apply { inSampleSize = echantillon })
+        } ?: return activity.contentResolver.loadThumbnail(uri, taille, null)
+
+        val rotation = try {
+            activity.contentResolver.openInputStream(uri)?.use { flux ->
+                when (ExifInterface(flux).getAttributeInt(ExifInterface.TAG_ORIENTATION, ExifInterface.ORIENTATION_NORMAL)) {
+                    ExifInterface.ORIENTATION_ROTATE_90 -> 90
+                    ExifInterface.ORIENTATION_ROTATE_180 -> 180
+                    ExifInterface.ORIENTATION_ROTATE_270 -> 270
+                    else -> 0
+                }
+            } ?: 0
+        } catch (e: Exception) {
+            0
+        }
+
+        if (rotation == 0) return brut
+        val matrice = Matrix().apply { postRotate(rotation.toFloat()) }
+        return Bitmap.createBitmap(brut, 0, 0, brut.width, brut.height, matrice, true)
+    }
+
+    /**
      * Vignette au ratio d'origine, encodée en data URI.
      *
      * `loadThumbnail` décode le HEIC nativement et applique déjà l'orientation
@@ -249,7 +302,19 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
         val uri = ContentUris.withAppendedId(collection, args.id.toLong())
 
         val bitmap = try {
-            activity.contentResolver.loadThumbnail(uri, tailleDecodage(uri, args.taille), null)
+            // `loadThumbnail` peut renvoyer une vignette mise en cache par le
+            // système, plus petite que la taille demandée — observé sur
+            // certains appareils (Samsung notamment) où la carte de tri
+            // (jusqu'à 1400px, voir tailleCarte() côté JS) ressortait
+            // visiblement moins nette que la vraie photo. En dessous de ce
+            // seuil (grille, éventail des cartes de mois), le cache système
+            // suffit largement et reste plus rapide — la nouvelle méthode ne
+            // sert que là où l'écart de netteté se voit vraiment.
+            if (!args.video && args.taille > SEUIL_DECODE_SOURCE) {
+                decoderImageSource(uri, args.taille)
+            } else {
+                activity.contentResolver.loadThumbnail(uri, tailleDecodage(uri, args.taille), null)
+            }
         } catch (e: Exception) {
             invoke.reject("vignette indisponible (id=${args.id}, video=${args.video}) : ${e.javaClass.simpleName} ${e.message}")
             return
@@ -374,6 +439,10 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
 
     companion object {
         private const val DEMANDE_LECTURE = 4001
+        // Au-dessus de ça, un décodage depuis la source (voir
+        // decoderImageSource) : en dessous, le cache loadThumbnail suffit et
+        // reste plus rapide (grille, éventail des cartes de mois).
+        private const val SEUIL_DECODE_SOURCE = 400
     }
 }
 

@@ -16,6 +16,7 @@ import {
   type PermissionEtat,
   ETAT_VIDE,
 } from "./backend";
+import { signalerErreur } from "../telemetrie";
 
 const CLE_ETAT = "krino.android.etat";
 
@@ -163,10 +164,17 @@ export class BackendAndroid implements Backend {
     // Filet de dernier recours : si ni le callback natif ni un changement de
     // visibilité ne se sont manifestés après un délai généreux (le temps
     // pour l'utilisateur de répondre à une boîte système), on vérifie quand
-    // même — plutôt qu'un chargement bloqué indéfiniment sans recours.
+    // même — plutôt qu'un chargement bloqué indéfiniment sans recours. On le
+    // signale (voir signalerErreur) : si ça se déclenche, ni le callback
+    // natif ni visibilitychange n'ont fonctionné sur cet appareil — utile à
+    // savoir sans avoir l'appareil en main.
     const promesseDelai = new Promise<number>((resolve) => {
       const id = window.setTimeout(() => {
-        if (!regle) void verifierEtat().then(resolve);
+        if (regle) return;
+        void signalerErreur(
+          `confirmerViaCorbeille : ni le callback natif ni visibilitychange après 15s (attendrePresence=${attendrePresenceEnCorbeille})`,
+        );
+        void verifierEtat().then(resolve);
       }, 15000);
       nettoyeurs.push(() => window.clearTimeout(id));
     });

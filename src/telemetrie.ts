@@ -24,10 +24,18 @@ interface Attente {
 }
 
 let activee = true;
+let versionAppCourante = "?";
 
 /** À appeler au chargement des préférences, et à chaque bascule du réglage. */
 export function definirTelemetrieActivee(v: boolean) {
   activee = v;
+}
+
+/** À appeler une fois au démarrage, dès que getVersion() (async) a répondu —
+ *  évite de faire porter versionApp par chaque appelant de signalerErreur(),
+ *  y compris backend-android.ts qui n'a pas facilement accès à cette valeur. */
+export function definirVersionApp(v: string) {
+  versionAppCourante = v;
 }
 
 /** Identifiant aléatoire local, jamais relié à une identité. Affiché en
@@ -163,7 +171,7 @@ export async function enregistrerAppareil(versionApp: string): Promise<void> {
  *  et plafonné par session : une erreur qui se répète pendant qu'un
  *  utilisateur navigue ne doit pas inonder la table. `message` doit déjà
  *  être assaini par l'appelant (aucun nom de fichier, aucun chemin). */
-export async function signalerErreur(message: string, versionApp: string): Promise<void> {
+export async function signalerErreur(message: string): Promise<void> {
   if (!activee || !SUPABASE_URL || !SUPABASE_ANON_KEY) return;
   if (diagnosticsEnvoyes.has(message) || diagnosticsEnvoyes.size >= MAX_DIAGNOSTICS_SESSION) return;
   diagnosticsEnvoyes.add(message);
@@ -181,7 +189,7 @@ export async function signalerErreur(message: string, versionApp: string): Promi
         p_anon_id: anonId(),
         p_appareil: appareil,
         p_os: os,
-        p_version_app: versionApp,
+        p_version_app: versionAppCourante,
         p_message: message.slice(0, 500),
       }),
     });

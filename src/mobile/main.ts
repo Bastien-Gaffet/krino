@@ -16,6 +16,7 @@ import { confirmer, informer } from "../dialogues";
 import {
   anonId,
   definirTelemetrieActivee,
+  definirVersionApp,
   enregistrerAppareil,
   enregistrerRevue,
   enregistrerSuppression,
@@ -161,13 +162,9 @@ function debugActif(): boolean {
   }
 }
 
-// Renseigné au démarrage (demarrer()) — getVersion() est asynchrone,
-// journaliserEchec() ne l'est pas.
-let versionApp = "?";
-
 function journaliserEchec(texte: string) {
   console.error("[krino]", texte);
-  void signalerErreur(texte, versionApp);
+  void signalerErreur(texte);
   if (!debugActif()) return;
   let bandeau = document.getElementById("debug-echecs");
   if (!bandeau) {
@@ -254,7 +251,7 @@ async function demarrer() {
   definirTelemetrieActivee(prefs.telemetrieActivee);
   appliquerTraductions();
   void getVersion().then((v) => {
-    versionApp = v;
+    definirVersionApp(v);
     void enregistrerAppareil(v);
   });
 

@@ -115,15 +115,20 @@ export class BackendAndroid implements Backend {
    * réel malgré une confirmation système en bonne et due forme.
    *
    * Un premier secours (revérifier l'état réel via `listerCorbeille()` dès
-   * que l'app redevient visible) s'est révélé insuffisant à son tour : une
-   * testeuse a eu le même blocage indéfini malgré ce correctif, sur un
-   * Samsung Android 11, sans qu'aucune erreur ne remonte (voir
-   * signalerErreur) — signe que ni le callback natif NI l'évènement
-   * `visibilitychange` ne se déclenchent sur cet appareil pour ce dialogue
-   * système précis (contrairement à celui de la permission, qui fonctionne).
-   * On ajoute donc un filet supplémentaire, indépendant de tout signal du
-   * navigateur : une vérification différée dans le temps, qui se déclenche
-   * de toute façon même si rien d'autre ne s'est jamais manifesté.
+   * que l'app redevient visible), puis un filet à délai fixe indépendant de
+   * tout signal navigateur, se sont révélés insuffisants à leur tour — même
+   * blocage persistant. Cause probable trouvée en relisant le code
+   * appelant : `Promise.race` propage un REJET dès que la PREMIÈRE des
+   * promesses se règle, qu'elle réussisse ou échoue — si l'appel natif
+   * rejette (une vraie erreur, pas juste une lenteur), ce rejet remontait
+   * jusqu'à `validerMois()` qui n'avait pas de `try/catch` autour de
+   * `await backend.mettreCorbeille(...)` : `chargement(null)` n'était donc
+   * jamais atteint, et le voile de chargement restait affiché indéfiniment
+   * — indiscernable d'un vrai blocage côté utilisateur, alors qu'aucun des
+   * filets ci-dessous n'avait de raison d'agir puisque la promesse s'était
+   * déjà réglée (par un rejet). Cette méthode ne doit donc plus jamais
+   * rejeter : un échec de l'appel natif est maintenant traité comme un
+   * signal de plus qui déclenche la vérification, pas une fin de partie.
    */
   private async confirmerViaCorbeille(
     ids: string[],
@@ -137,14 +142,36 @@ export class BackendAndroid implements Backend {
       nettoyeurs.forEach((fn) => fn());
     };
 
+    // Propre filet de temps : si `lister_corbeille` (l'appel natif utilisé
+    // pour vérifier) est lui-même affecté par ce qui bloque le reste, cette
+    // vérification ne doit pas non plus pouvoir bloquer indéfiniment.
     const verifierEtat = async (): Promise<number> => {
-      const corbeille = await this.listerCorbeille();
-      const dansCorbeille = new Set(corbeille.map((m) => m.id));
-      return ids.filter((id) => dansCorbeille.has(id) === attendrePresenceEnCorbeille).length;
+      try {
+        const corbeille = await Promise.race([
+          this.listerCorbeille(),
+          new Promise<Media[]>((_, reject) =>
+            window.setTimeout(() => reject(new Error("délai de vérification dépassé")), 5000),
+          ),
+        ]);
+        const dansCorbeille = new Set(corbeille.map((m) => m.id));
+        return ids.filter((id) => dansCorbeille.has(id) === attendrePresenceEnCorbeille).length;
+      } catch {
+        // Impossible de confirmer l'état réel : mieux vaut débloquer l'écran
+        // avec un résultat pessimiste (0 = rien de confirmé) que de rester
+        // bloqué indéfiniment.
+        return 0;
+      }
     };
 
     const promesseNative = invoquerNatif()
       .then((r) => r.nombre)
+      .catch(
+        (erreur: unknown) =>
+          void signalerErreur(
+            `confirmerViaCorbeille : appel natif rejeté (${erreur instanceof Error ? erreur.message : String(erreur)})`,
+          ),
+      )
+      .then((n) => (typeof n === "number" ? n : verifierEtat()))
       .finally(nettoyer);
 
     const promesseVisibilite = new Promise<number>((resolve) => {

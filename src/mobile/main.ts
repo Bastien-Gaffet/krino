@@ -947,10 +947,18 @@ async function validerMois() {
   const octets = jetees.reduce((s, m) => s + m.taille, 0);
 
   chargement(t("chargement.validation"));
-  // Une seule confirmation système pour tout le mois : createTrashRequest accepte
-  // jusqu'à 2000 URIs d'un coup.
-  const misCorbeille = await backend.mettreCorbeille(jetees.map((m) => m.id));
-  chargement(null);
+  // `finally` : backend.mettreCorbeille() ne devrait plus jamais rejeter
+  // (voir confirmerViaCorbeille), mais un voile de chargement qui ne se
+  // referme plus si jamais c'est le cas — comme rapporté deux fois de
+  // suite avant ce filet — est bien pire qu'un retour silencieux ici.
+  // Une seule confirmation système pour tout le mois : createTrashRequest
+  // accepte jusqu'à 2000 URIs d'un coup.
+  let misCorbeille = 0;
+  try {
+    misCorbeille = await backend.mettreCorbeille(jetees.map((m) => m.id));
+  } finally {
+    chargement(null);
+  }
 
   // L'utilisateur peut refuser la boîte système : dans ce cas on ne valide rien.
   if (jetees.length > 0 && misCorbeille === 0) return;
@@ -1012,7 +1020,13 @@ async function rendreCorbeille() {
 async function restaurerTout() {
   const liste = await backend.listerCorbeille();
   if (liste.length === 0) return;
-  const n = await backend.restaurer(liste.map((m) => m.id));
+  chargement(t("chargement.validation"));
+  let n = 0;
+  try {
+    n = await backend.restaurer(liste.map((m) => m.id));
+  } finally {
+    chargement(null);
+  }
 
   // Les médias restaurés redeviennent à trier : on efface leur décision.
   for (const m of liste) delete etat.decisions[m.id];
@@ -1029,7 +1043,12 @@ async function viderCorbeille() {
   const liste = await backend.listerCorbeille();
   if (liste.length === 0) return;
   if (!(await confirmer(t("corbeille.vider") + " ?", { danger: true }))) return;
-  await backend.supprimerDefinitivement(liste.map((m) => m.id));
+  chargement(t("chargement.validation"));
+  try {
+    await backend.supprimerDefinitivement(liste.map((m) => m.id));
+  } finally {
+    chargement(null);
+  }
   await rendreCorbeille();
 }
 

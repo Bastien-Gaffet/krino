@@ -13,6 +13,7 @@
 import {
   type Backend,
   type Etat,
+  type IdentifiantMedia,
   type Media,
   type PermissionEtat,
   ETAT_VIDE,
@@ -117,11 +118,11 @@ export class BackendDemo implements Backend {
     return `https://picsum.photos/seed/${graine}/${taille}/${taille}`;
   }
 
-  async mettreCorbeille(ids: string[]): Promise<number> {
+  async mettreCorbeille(medias: IdentifiantMedia[]): Promise<number> {
     const corbeille = lireJSON<string[]>(CLE_CORBEILLE, []);
-    for (const id of ids) if (!corbeille.includes(id)) corbeille.push(id);
+    for (const { id } of medias) if (!corbeille.includes(id)) corbeille.push(id);
     localStorage.setItem(CLE_CORBEILLE, JSON.stringify(corbeille));
-    return ids.length;
+    return medias.length;
   }
 
   async listerCorbeille(): Promise<Media[]> {
@@ -129,16 +130,18 @@ export class BackendDemo implements Backend {
     return this.catalogue.filter((m) => corbeille.has(m.id));
   }
 
-  async restaurer(ids: string[]): Promise<number> {
-    const garde = lireJSON<string[]>(CLE_CORBEILLE, []).filter((id) => !ids.includes(id));
+  async restaurer(medias: IdentifiantMedia[]): Promise<number> {
+    const ids = new Set(medias.map((m) => m.id));
+    const garde = lireJSON<string[]>(CLE_CORBEILLE, []).filter((id) => !ids.has(id));
     localStorage.setItem(CLE_CORBEILLE, JSON.stringify(garde));
-    return ids.length;
+    return medias.length;
   }
 
-  async supprimerDefinitivement(ids: string[]): Promise<number> {
+  async supprimerDefinitivement(medias: IdentifiantMedia[]): Promise<number> {
     // En démo on ne perd rien pour de vrai : on sort juste le média du catalogue.
-    this.catalogue = this.catalogue.filter((m) => !ids.includes(m.id));
-    return this.restaurer(ids);
+    const ids = new Set(medias.map((m) => m.id));
+    this.catalogue = this.catalogue.filter((m) => !ids.has(m.id));
+    return this.restaurer(medias);
   }
 
   async lireEtat(): Promise<Etat> {

@@ -351,14 +351,14 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
      */
     @Command
     fun mettreCorbeille(invoke: Invoke) {
-        val ids = invoke.parseArgs(ArgsIds::class.java).ids
-        if (ids.isEmpty()) {
+        val items = invoke.parseArgs(ArgsMedias::class.java).items
+        if (items.isEmpty()) {
             val ret = JSObject()
             ret.put("nombre", 0)
             invoke.resolve(ret)
             return
         }
-        val uris = urisDepuisIds(ids)
+        val uris = urisDepuisItems(items)
         tailleDemandeCorbeille = uris.size
         val pending = MediaStore.createTrashRequest(activity.contentResolver, uris, true)
         startIntentSenderForResult(
@@ -381,14 +381,14 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
     /** Sort les médias de la corbeille (`IS_TRASHED = 0`). */
     @Command
     fun restaurer(invoke: Invoke) {
-        val ids = invoke.parseArgs(ArgsIds::class.java).ids
-        if (ids.isEmpty()) {
+        val items = invoke.parseArgs(ArgsMedias::class.java).items
+        if (items.isEmpty()) {
             val ret = JSObject()
             ret.put("nombre", 0)
             invoke.resolve(ret)
             return
         }
-        val uris = urisDepuisIds(ids)
+        val uris = urisDepuisItems(items)
         tailleDemandeRestauration = uris.size
         val pending = MediaStore.createTrashRequest(activity.contentResolver, uris, false)
         startIntentSenderForResult(
@@ -408,14 +408,14 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
     /** Suppression irréversible (`MediaStore.createDeleteRequest`). */
     @Command
     fun supprimerDefinitivement(invoke: Invoke) {
-        val ids = invoke.parseArgs(ArgsIds::class.java).ids
-        if (ids.isEmpty()) {
+        val items = invoke.parseArgs(ArgsMedias::class.java).items
+        if (items.isEmpty()) {
             val ret = JSObject()
             ret.put("nombre", 0)
             invoke.resolve(ret)
             return
         }
-        val uris = urisDepuisIds(ids)
+        val uris = urisDepuisItems(items)
         tailleDemandeSuppression = uris.size
         val pending = MediaStore.createDeleteRequest(activity.contentResolver, uris)
         startIntentSenderForResult(
@@ -433,47 +433,29 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     /**
-     * Construit les URIs typées (Images/Video) depuis des identifiants bruts.
+     * Construit les URIs typées (Images/Video) depuis les identifiants ET le
+     * type déjà connus côté JS (même `scanner()` que pour tout le reste).
      *
      * `createTrashRequest`/`createDeleteRequest` rejettent les URIs de la
      * collection générique `Files` avec « All requested items must be Media
      * items » (confirmé par un rapport de diagnostic réel) — même piège déjà
-     * rencontré et corrigé pour `loadThumbnail` (voir vignette()), mais pas
-     * ici : c'était la vraie cause de l'échec de la mise à la corbeille,
-     * pas juste un problème de timing. On interroge `Files` (valide en
-     * lecture, avec MEDIA_TYPE) pour connaître le type de chaque média, puis
-     * on reconstruit l'URI depuis la collection typée correspondante — en
-     * une seule requête groupée plutôt qu'une par id, vu que jusqu'à 2000
-     * ids peuvent arriver d'un coup (un mois entier). Les ids sont
-     * pré-validés par `.toLong()` (lève une exception sinon) avant d'être
-     * injectés tels quels dans la clause IN, donc sans risque d'injection —
-     * ça évite aussi la limite de ~999 paramètres liés de SQLite.
+     * rencontré et corrigé pour `loadThumbnail` (voir vignette()). Une
+     * première version de ce correctif interrogeait `Files` côté natif pour
+     * retrouver le type de chaque média avant de reconstruire l'URI typée —
+     * mais cette requête s'est révélée elle-même bloquante sur un appareil
+     * réel (aucune boîte système ne s'affichait, aucune erreur ne remontait,
+     * blocage total du thread principal donc de la WebView elle-même — plus
+     * aucun filet JS ne pouvait s'exécuter pour s'en sortir). Plus aucune
+     * requête ici : le type voyage avec chaque id depuis le JS, qui le
+     * connaît déjà.
      */
-    private fun urisDepuisIds(ids: Array<String>): List<Uri> {
-        if (ids.isEmpty()) return emptyList()
-        val idsLong = ids.map { it.toLong() }
-        val typesParId = mutableMapOf<Long, Int>()
-        activity.contentResolver.query(
-            MediaStore.Files.getContentUri("external"),
-            arrayOf(MediaStore.Files.FileColumns._ID, MediaStore.Files.FileColumns.MEDIA_TYPE),
-            "${MediaStore.Files.FileColumns._ID} IN (${idsLong.joinToString(",")})",
-            null,
-            null,
-        )?.use { curseur ->
-            val idxId = curseur.getColumnIndexOrThrow(MediaStore.Files.FileColumns._ID)
-            val idxType = curseur.getColumnIndexOrThrow(MediaStore.Files.FileColumns.MEDIA_TYPE)
-            while (curseur.moveToNext()) {
-                typesParId[curseur.getLong(idxId)] = curseur.getInt(idxType)
-            }
+    private fun urisDepuisItems(items: Array<ArgMediaItem>): List<Uri> = items.map {
+        val collection = if (it.video) {
+            MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+        } else {
+            MediaStore.Images.Media.EXTERNAL_CONTENT_URI
         }
-        return idsLong.map { id ->
-            val collection = if (typesParId[id] == MediaStore.Files.FileColumns.MEDIA_TYPE_VIDEO) {
-                MediaStore.Video.Media.EXTERNAL_CONTENT_URI
-            } else {
-                MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-            }
-            ContentUris.withAppendedId(collection, id)
-        }
+        ContentUris.withAppendedId(collection, it.id.toLong())
     }
 
     companion object {
@@ -498,7 +480,16 @@ class ArgsVignette {
     var video: Boolean = false
 }
 
+/** Un média ciblé par une opération corbeille — `video` permet de
+ *  reconstruire l'URI typée sans requête MediaStore supplémentaire côté
+ *  natif (voir urisDepuisItems). */
 @InvokeArg
-class ArgsIds {
-    lateinit var ids: Array<String>
+class ArgMediaItem {
+    lateinit var id: String
+    var video: Boolean = false
+}
+
+@InvokeArg
+class ArgsMedias {
+    lateinit var items: Array<ArgMediaItem>
 }

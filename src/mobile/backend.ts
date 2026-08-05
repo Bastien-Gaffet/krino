@@ -30,6 +30,18 @@ export type Media = {
 export type Decision = "garder" | "jeter";
 
 /**
+ * Sous-ensemble de `Media` nécessaire pour cibler une opération corbeille.
+ *
+ * `video` doit voyager avec l'id : côté Android, reconstruire l'URI
+ * MediaStore exige de savoir si c'est une image ou une vidéo (collections
+ * distinctes) — et interroger ce type côté natif via la collection
+ * générique `Files` s'est révélé bloquant sur au moins un appareil réel.
+ * L'appelant connaît déjà cette info (elle vient du même scanner()), pas de
+ * raison de la lui faire redemander au natif.
+ */
+export type IdentifiantMedia = Pick<Media, "id" | "video">;
+
+/**
  * État de tri, conservé dans le stockage privé de l'application.
  *
  * Contrairement au desktop — où `etat.json` vit dans le dossier trié pour
@@ -80,16 +92,16 @@ export interface Backend {
    * seule confirmation utilisateur, rétention 30 jours, restaurable.
    * Renvoie le nombre réellement mis à la corbeille (0 si l'utilisateur refuse).
    */
-  mettreCorbeille(ids: string[]): Promise<number>;
+  mettreCorbeille(medias: IdentifiantMedia[]): Promise<number>;
 
   /** Médias actuellement à la corbeille (`IS_TRASHED = 1`). */
   listerCorbeille(): Promise<Media[]>;
 
   /** Sort les médias de la corbeille (`IS_TRASHED = 0`). */
-  restaurer(ids: string[]): Promise<number>;
+  restaurer(medias: IdentifiantMedia[]): Promise<number>;
 
   /** Suppression irréversible (`MediaStore.createDeleteRequest`). */
-  supprimerDefinitivement(ids: string[]): Promise<number>;
+  supprimerDefinitivement(medias: IdentifiantMedia[]): Promise<number>;
 
   lireEtat(): Promise<Etat>;
   ecrireEtat(etat: Etat): Promise<void>;

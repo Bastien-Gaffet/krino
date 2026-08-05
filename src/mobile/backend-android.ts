@@ -12,6 +12,7 @@ import { invoke } from "@tauri-apps/api/core";
 import {
   type Backend,
   type Etat,
+  type IdentifiantMedia,
   type Media,
   type PermissionEtat,
   ETAT_VIDE,
@@ -75,11 +76,11 @@ export class BackendAndroid implements Backend {
     ).uri;
   }
 
-  async mettreCorbeille(ids: string[]): Promise<number> {
-    if (ids.length === 0) return 0;
+  async mettreCorbeille(medias: IdentifiantMedia[]): Promise<number> {
+    if (medias.length === 0) return 0;
     return this.confirmerViaCorbeille(
-      ids,
-      () => invoke<NombreReponse>(cmd("mettre_corbeille"), { ids }),
+      medias,
+      () => invoke<NombreReponse>(cmd("mettre_corbeille"), { items: medias }),
       true,
     );
   }
@@ -88,20 +89,20 @@ export class BackendAndroid implements Backend {
     return (await invoke<ScanReponse>(cmd("lister_corbeille"))).medias;
   }
 
-  async restaurer(ids: string[]): Promise<number> {
-    if (ids.length === 0) return 0;
+  async restaurer(medias: IdentifiantMedia[]): Promise<number> {
+    if (medias.length === 0) return 0;
     return this.confirmerViaCorbeille(
-      ids,
-      () => invoke<NombreReponse>(cmd("restaurer"), { ids }),
+      medias,
+      () => invoke<NombreReponse>(cmd("restaurer"), { items: medias }),
       false,
     );
   }
 
-  async supprimerDefinitivement(ids: string[]): Promise<number> {
-    if (ids.length === 0) return 0;
+  async supprimerDefinitivement(medias: IdentifiantMedia[]): Promise<number> {
+    if (medias.length === 0) return 0;
     return this.confirmerViaCorbeille(
-      ids,
-      () => invoke<NombreReponse>(cmd("supprimer_definitivement"), { ids }),
+      medias,
+      () => invoke<NombreReponse>(cmd("supprimer_definitivement"), { items: medias }),
       false,
     );
   }
@@ -129,12 +130,26 @@ export class BackendAndroid implements Backend {
    * déjà réglée (par un rejet). Cette méthode ne doit donc plus jamais
    * rejeter : un échec de l'appel natif est maintenant traité comme un
    * signal de plus qui déclenche la vérification, pas une fin de partie.
+   *
+   * Reste un cas que rien ci-dessous ne peut couvrir : si l'appel natif
+   * bloque le thread principal AVANT même d'atteindre la boîte système
+   * (aucune boîte ne s'affiche, aucune erreur ne remonte, et le blocage
+   * dépasse largement les délais de secours — confirmé sur un appareil
+   * réel), la WebView elle-même se bloque, donc plus aucun `setTimeout` JS
+   * ne peut s'exécuter pour nous sauver. La vraie cause trouvée : le côté
+   * natif reconstruisait le type (image/vidéo) de chaque média en
+   * interrogeant la collection générique `MediaStore.Files` — déjà signalée
+   * ailleurs dans ce fichier comme peu fiable sur certains appareils.
+   * `medias` porte maintenant `video` (déjà connu côté JS depuis le même
+   * scanner()), pour que le natif reconstruise l'URI typée directement,
+   * sans requête supplémentaire.
    */
   private async confirmerViaCorbeille(
-    ids: string[],
+    medias: IdentifiantMedia[],
     invoquerNatif: () => Promise<NombreReponse>,
     attendrePresenceEnCorbeille: boolean,
   ): Promise<number> {
+    const ids = medias.map((m) => m.id);
     let regle = false;
     const nettoyeurs: Array<() => void> = [];
     const nettoyer = () => {

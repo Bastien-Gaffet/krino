@@ -955,7 +955,7 @@ async function validerMois() {
   // accepte jusqu'à 2000 URIs d'un coup.
   let misCorbeille = 0;
   try {
-    misCorbeille = await backend.mettreCorbeille(jetees.map((m) => m.id));
+    misCorbeille = await backend.mettreCorbeille(jetees);
   } finally {
     chargement(null);
   }
@@ -1031,7 +1031,7 @@ async function restaurerTout() {
   chargement(t("chargement.validation"));
   let n = 0;
   try {
-    n = await backend.restaurer(liste.map((m) => m.id));
+    n = await backend.restaurer(liste);
   } finally {
     chargement(null);
   }
@@ -1053,7 +1053,7 @@ async function viderCorbeille() {
   if (!(await confirmer(t("corbeille.vider") + " ?", { danger: true }))) return;
   chargement(t("chargement.validation"));
   try {
-    await backend.supprimerDefinitivement(liste.map((m) => m.id));
+    await backend.supprimerDefinitivement(liste);
   } finally {
     chargement(null);
   }

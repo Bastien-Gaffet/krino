@@ -188,6 +188,18 @@ body.mobile .carte-mois h3 {
 body.mobile .carte-mois:hover {
   transform: none;
 }
+/* "Refaire ce mois" vit à côté de la carte (pas dedans, un <button> ne peut
+   pas en contenir un autre) dans cette enveloppe commune, qui est l'élément
+   de grille à la place de .carte-mois directement. */
+.carte-mois-enveloppe {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+  align-items: flex-start;
+}
+.carte-mois-enveloppe .carte-mois {
+  width: 100%;
+}
 /* Éventail d'aperçus : un peu plus haut que sur desktop, la carte occupant
    toute la largeur de l'écran. */
 body.mobile .eventail {

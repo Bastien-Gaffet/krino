@@ -378,6 +378,14 @@ function installerReglages() {
   ($("#kofi-symbole") as HTMLImageElement).src = kofiSymbole;
 
   $("#btn-revoir-tuto").addEventListener("click", () => tutoDemarrer());
+
+  $("#btn-reset-tout").addEventListener("click", async () => {
+    if (!(await confirmer(t("confirm.reset"), { danger: true }))) return;
+    etat.decisions = {};
+    etat.moisFaits = [];
+    await backend.ecrireEtat(etat);
+    afficherMois();
+  });
 }
 
 function ouvrirReglages() {
@@ -483,7 +491,37 @@ function carteDeMois(g: GroupeMois): HTMLElement {
 
   carte.append(titre, eventail, stats, jauge, avancement);
   carte.addEventListener("click", () => ouvrirTri(g.cle));
-  return carte;
+
+  if (!fait) return carte;
+
+  // Un <button> ne peut pas en contenir un autre (HTML invalide, et de toute
+  // façon inopérable pour les technologies d'assistance) : "Refaire ce mois"
+  // vit à côté de la carte, pas dedans, dans une enveloppe commune pour la
+  // grille — comme sur desktop (où la carte est un <div>, pas un <button>,
+  // donc le problème ne se pose pas).
+  const enveloppe = document.createElement("div");
+  enveloppe.className = "carte-mois-enveloppe";
+  enveloppe.append(carte);
+
+  const btnRefaire = document.createElement("button");
+  btnRefaire.className = "btn btn-petit btn-danger-leger";
+  btnRefaire.textContent = t("mois.refaire");
+  btnRefaire.addEventListener("click", async () => {
+    if (
+      !(await confirmer(t("confirm.refaireMois", { m: libelleMois(g.cle, locale()) }), {
+        danger: true,
+      }))
+    ) {
+      return;
+    }
+    etat.moisFaits = etat.moisFaits.filter((cle) => cle !== g.cle);
+    for (const m of g.medias) delete etat.decisions[m.id];
+    await backend.ecrireEtat(etat);
+    afficherMois();
+  });
+  enveloppe.append(btnRefaire);
+
+  return enveloppe;
 }
 
 function definirModeMedia(mode: "photos" | "videos") {

@@ -70,6 +70,9 @@ const prefs: Prefs = {
 /** Inversion du sens de tri des mois — pas une préférence persistée, comme sur desktop. */
 let sensInverse = false;
 
+/** Photos ou vidéos — pas persisté non plus : repart sur "photos" à chaque lancement. */
+let modeMedia: "photos" | "videos" = "photos";
+
 function sauverPrefs() {
   localStorage.setItem(CLE_PREFS, JSON.stringify(prefs));
 }
@@ -280,6 +283,8 @@ async function demarrer() {
     afficherMois();
   });
   $("#masquer-faits").addEventListener("change", () => afficherMois());
+  $("#btn-mode-photos").addEventListener("click", () => definirModeMedia("photos"));
+  $("#btn-mode-videos").addEventListener("click", () => definirModeMedia("videos"));
   $("#tuto-suivant").addEventListener("click", () => void tutoAller(etapeTuto + 1));
   $("#tuto-quitter").addEventListener("click", () => tutoFin());
 
@@ -397,6 +402,7 @@ type GroupeMois = {
 function grouper(): GroupeMois[] {
   const par = new Map<string, Media[]>();
   for (const m of medias) {
+    if (m.video !== (modeMedia === "videos")) continue;
     const c = cleMois(m.dateMs);
     if (!par.has(c)) par.set(c, []);
     par.get(c)!.push(m);
@@ -478,6 +484,13 @@ function carteDeMois(g: GroupeMois): HTMLElement {
   carte.append(titre, eventail, stats, jauge, avancement);
   carte.addEventListener("click", () => ouvrirTri(g.cle));
   return carte;
+}
+
+function definirModeMedia(mode: "photos" | "videos") {
+  modeMedia = mode;
+  $("#btn-mode-photos").setAttribute("aria-selected", String(mode === "photos"));
+  $("#btn-mode-videos").setAttribute("aria-selected", String(mode === "videos"));
+  afficherMois();
 }
 
 function afficherMois() {
@@ -659,13 +672,14 @@ const tailleCarte = () =>
  * la promotion la retrouve donc déjà en cache.
  */
 const cacheVignetteCarte = new Map<string, string>();
+const cacheUrlVideoCarte = new Map<string, string>();
 const TAILLE_CACHE_CARTE = 6;
 
-function memoriserVignetteCarte(id: string, url: string) {
-  cacheVignetteCarte.set(id, url);
-  if (cacheVignetteCarte.size > TAILLE_CACHE_CARTE) {
-    const plusAncien = cacheVignetteCarte.keys().next().value;
-    if (plusAncien !== undefined) cacheVignetteCarte.delete(plusAncien);
+function memoriserDansCache(cache: Map<string, string>, id: string, valeur: string) {
+  cache.set(id, valeur);
+  if (cache.size > TAILLE_CACHE_CARTE) {
+    const plusAncien = cache.keys().next().value;
+    if (plusAncien !== undefined) cache.delete(plusAncien);
   }
 }
 
@@ -674,42 +688,65 @@ function peupler(carte: HTMLElement, m: Media, avecInfos: boolean) {
   const flou = carte.querySelector<HTMLImageElement>(".apercu-fond")!;
   const photo = carte.querySelector<HTMLImageElement>("img.apercu-photo")!;
   const video = carte.querySelector<HTMLVideoElement>("video.apercu-photo");
+  const marqueVideo = carte.querySelector<HTMLElement>(".marque-video-carte");
+  if (marqueVideo) marqueVideo.hidden = !m.video;
 
-  // Une vidéo assignée directement en `src` (content://) ne charge rien
-  // dans la WebView Android — même limitation de process-isolation que pour
-  // les <img>, déjà contournée plus bas via vignette() (data: URI), mais
-  // jamais appliquée ici : la carte restait sur une vidéo cassée (rapporté
-  // par une testeuse). En attendant une vraie lecture vidéo (nécessiterait
-  // d'intercepter les requêtes content:// côté WebView, plus gros
-  // chantier), on affiche l'image de la première frame comme pour une
-  // photo — la pastille « vidéo » (voir plus bas) garde l'info visible.
-  if (video) {
-    video.hidden = true;
-    video.removeAttribute("src");
-  }
-  photo.hidden = false;
-  flou.hidden = false;
-  const enCache = cacheVignetteCarte.get(m.id);
-  if (enCache) {
-    chargerImage(photo, enCache);
-    chargerImage(flou, enCache);
+  // Le fond flouté (et l'image plein cadre pour une photo) passent toujours
+  // par vignette() : un <img src="m.uri"> (content://) ne charge rien dans
+  // la WebView Android, dont le rendu s'exécute hors du processus qui
+  // détient les permissions MediaStore. Pour une vidéo, cette même image
+  // sert d'affiche (poster) le temps que la lecture démarre.
+  const afficherVignette = (url: string) => {
+    memoriserDansCache(cacheVignetteCarte, m.id, url);
+    chargerImage(flou, url);
+    if (m.video) {
+      if (video) video.poster = url;
+    } else {
+      chargerImage(photo, url);
+    }
+  };
+  const enCacheVignette = cacheVignetteCarte.get(m.id);
+  if (enCacheVignette) {
+    afficherVignette(enCacheVignette);
   } else {
-    // Comme pour les vignettes de la grille des mois : un <img src="m.uri">
-    // (content://) ne charge rien dans la WebView Android, dont le rendu
-    // s'exécute hors du processus qui détient les permissions MediaStore.
-    backend.vignette(m, tailleCarte()).then(
-      (url) => {
-        memoriserVignetteCarte(m.id, url);
-        chargerImage(photo, url);
-        chargerImage(flou, url);
-      },
-      (erreur: unknown) => {
-        photo.classList.add("image-absente");
-        const texte = erreur instanceof Error ? erreur.message : String(erreur);
-        journaliserEchec(`vignette() rejetée (id=${m.id}, carte) : ${texte}`);
-      },
-    );
+    backend.vignette(m, tailleCarte()).then(afficherVignette, (erreur: unknown) => {
+      photo.classList.add("image-absente");
+      const texte = erreur instanceof Error ? erreur.message : String(erreur);
+      journaliserEchec(`vignette() rejetée (id=${m.id}, carte) : ${texte}`);
+    });
   }
+
+  if (m.video && video) {
+    photo.hidden = true;
+    video.hidden = false;
+    // Une vidéo assignée directement en `src` (content://) ne charge rien
+    // dans la WebView Android — même limitation de process-isolation que
+    // pour les <img>. urlVideo() sert la vidéo via un petit serveur HTTP
+    // local (voir VideoServer côté Kotlin), que la balise <video> peut
+    // charger et streamer normalement (y compris avancer dans la vidéo).
+    const enCacheUrl = cacheUrlVideoCarte.get(m.id);
+    if (enCacheUrl) {
+      video.src = enCacheUrl;
+    } else {
+      backend.urlVideo(m).then(
+        (url) => {
+          memoriserDansCache(cacheUrlVideoCarte, m.id, url);
+          video.src = url;
+        },
+        (erreur: unknown) => {
+          const texte = erreur instanceof Error ? erreur.message : String(erreur);
+          journaliserEchec(`urlVideo() rejetée (id=${m.id}, carte) : ${texte}`);
+        },
+      );
+    }
+  } else {
+    if (video) {
+      video.hidden = true;
+      video.removeAttribute("src");
+    }
+    photo.hidden = false;
+  }
+  flou.hidden = false;
 
   const infos = carte.querySelector(".carte-infos");
   if (infos && avecInfos) {
@@ -876,7 +913,12 @@ function installerSwipe() {
 /* ══ Revue de fin de mois ══ */
 
 function mediasDuMois(): Media[] {
-  return medias.filter((m) => cleMois(m.dateMs) === moisCourant);
+  // Doit filtrer par modeMedia comme grouper() : sinon, en mode "photos", les
+  // vidéos du mois (jamais montrées ni décidées dans cette session de tri)
+  // comptaient quand même comme « non décidées », bloquant la validation.
+  return medias.filter(
+    (m) => cleMois(m.dateMs) === moisCourant && m.video === (modeMedia === "videos"),
+  );
 }
 
 function ouvrirRevue() {

@@ -29,7 +29,10 @@
     <!-- ═══ Liste des mois ═══ -->
     <section id="vue-mois" class="vue" hidden>
       <header class="barre barre-mobile">
-        <span class="titre-dossier" data-i18n="mobile.titre"></span>
+        <div class="bascule-media" role="tablist" aria-label="Photos ou vidéos">
+          <button type="button" id="btn-mode-photos" class="bascule-option" role="tab" aria-selected="true" data-i18n="mobile.photos"></button>
+          <button type="button" id="btn-mode-videos" class="bascule-option" role="tab" aria-selected="false" data-i18n="mobile.videos"></button>
+        </div>
         <span class="espace"></span>
         <button id="btn-corbeille" class="btn btn-ico" data-i18n-title="corbeille.titre" aria-label="Corbeille">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2M19 6l-1 14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1L5 6"/></svg>
@@ -71,6 +74,7 @@
           <div class="carte-visuel">
             <img class="apercu-fond" alt="" aria-hidden="true" />
             <img class="apercu-photo" alt="" />
+            <span class="marque-video-carte" data-i18n="vignette.video" hidden></span>
           </div>
           <div class="carte-infos"><span></span><span></span></div>
         </div>
@@ -78,7 +82,8 @@
           <div class="carte-visuel">
             <img id="apercu-fond" class="apercu-fond" alt="" aria-hidden="true" />
             <img id="apercu-img" class="apercu-photo" alt="" draggable="false" hidden />
-            <video id="apercu-video" class="apercu-photo" playsinline muted loop hidden></video>
+            <video id="apercu-video" class="apercu-photo" playsinline muted loop controls hidden></video>
+            <span class="marque-video-carte" data-i18n="vignette.video" hidden></span>
             <div id="badge-garder" class="badge badge-garder" data-i18n="rafale.garder"></div>
             <div id="badge-jeter" class="badge badge-jeter" data-i18n="rafale.jeter"></div>
           </div>

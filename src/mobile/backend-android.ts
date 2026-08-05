@@ -27,6 +27,7 @@ const cmd = (nom: string) => `plugin:${PLUGIN}|${nom}`;
 type PermissionReponse = { etat: PermissionEtat };
 type ScanReponse = { medias: Media[] };
 type VignetteReponse = { uri: string };
+type UrlVideoReponse = { url: string };
 type NombreReponse = { nombre: number };
 
 export class BackendAndroid implements Backend {
@@ -74,6 +75,10 @@ export class BackendAndroid implements Backend {
         video: media.video,
       })
     ).uri;
+  }
+
+  async urlVideo(media: Media): Promise<string> {
+    return (await invoke<UrlVideoReponse>(cmd("url_video"), { id: media.id })).url;
   }
 
   async mettreCorbeille(medias: IdentifiantMedia[]): Promise<number> {

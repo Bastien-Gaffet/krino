@@ -86,6 +86,18 @@ export interface Backend {
   vignette(media: Media, taille: number): Promise<string>;
 
   /**
+   * URL de lecture d'une vidéo, pour une vraie lecture dans la carte de tri
+   * (pas juste un aperçu figé).
+   *
+   * Android : un petit serveur HTTP local (127.0.0.1 uniquement) — une URI
+   * `content://` assignée directement à une balise `<video>` ne charge rien
+   * dans la WebView Android, même limitation de process-isolation que pour
+   * les `<img>` (contournée pour celles-ci par un encodage base64 ; une
+   * vidéo entière ne tient pas raisonnablement en mémoire de la même façon).
+   */
+  urlVideo(media: Media): Promise<string>;
+
+  /**
    * Envoie les médias à la corbeille système.
    *
    * Android : `MediaStore.createTrashRequest` — jusqu'à 2000 URIs pour une

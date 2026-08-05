@@ -95,3 +95,18 @@ pub struct NombreReponse {
 pub struct PermissionReponse {
     pub etat: PermissionEtat,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UrlVideoArgs {
+    pub id: String,
+}
+
+/// URL `http://127.0.0.1:<port>/video/<id>` du serveur local de streaming
+/// vidéo (voir `VideoServer` côté Kotlin) — une URI `content://` ne charge
+/// rien dans une balise `<video>` de la WebView Android.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UrlVideoReponse {
+    pub url: String,
+}

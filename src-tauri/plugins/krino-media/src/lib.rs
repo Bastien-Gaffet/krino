@@ -64,6 +64,12 @@ impl<R: Runtime> KrinoMedia<R> {
             .map_err(Into::into)
     }
 
+    pub fn url_video(&self, args: UrlVideoArgs) -> Result<UrlVideoReponse> {
+        self.handle
+            .run_mobile_plugin("urlVideo", args)
+            .map_err(Into::into)
+    }
+
     pub fn lister_corbeille(&self) -> Result<ScanReponse> {
         self.handle
             .run_mobile_plugin("listerCorbeille", SansArgument {})
@@ -104,6 +110,10 @@ impl<R: Runtime> KrinoMedia<R> {
     }
 
     pub fn vignette(&self, _args: VignetteArgs) -> Result<VignetteReponse> {
+        Err(Error::HorsAndroid)
+    }
+
+    pub fn url_video(&self, _args: UrlVideoArgs) -> Result<UrlVideoReponse> {
         Err(Error::HorsAndroid)
     }
 
@@ -161,6 +171,11 @@ async fn vignette<R: Runtime>(
 }
 
 #[tauri::command]
+async fn url_video<R: Runtime>(app: tauri::AppHandle<R>, id: String) -> Result<UrlVideoReponse> {
+    app.krino_media().url_video(UrlVideoArgs { id })
+}
+
+#[tauri::command]
 async fn lister_corbeille<R: Runtime>(app: tauri::AppHandle<R>) -> Result<ScanReponse> {
     app.krino_media().lister_corbeille()
 }
@@ -197,6 +212,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             demander_permission,
             scanner,
             vignette,
+            url_video,
             lister_corbeille,
             mettre_corbeille,
             restaurer,

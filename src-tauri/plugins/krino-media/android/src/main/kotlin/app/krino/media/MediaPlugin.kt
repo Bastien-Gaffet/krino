@@ -39,6 +39,8 @@ import java.io.ByteArrayOutputStream
 @TauriPlugin
 class MediaPlugin(private val activity: Activity) : Plugin(activity) {
 
+    private val videoServer = VideoServer(activity)
+
     private val permissionsLecture: Array<String>
         get() = if (Build.VERSION.SDK_INT >= 33) {
             arrayOf(Manifest.permission.READ_MEDIA_IMAGES, Manifest.permission.READ_MEDIA_VIDEO)
@@ -341,6 +343,21 @@ class MediaPlugin(private val activity: Activity) : Plugin(activity) {
     }
 
     /**
+     * URL de lecture d'une vidéo, via le petit serveur HTTP local
+     * (voir `VideoServer`) — une URI `content://` ne charge rien dans une
+     * balise `<video>` de la WebView Android, même limitation de
+     * process-isolation déjà rencontrée pour les `<img>`.
+     */
+    @Command
+    fun urlVideo(invoke: Invoke) {
+        val args = invoke.parseArgs(ArgUrlVideo::class.java)
+        val port = videoServer.demarrerSiBesoin()
+        val ret = JSObject()
+        ret.put("url", "http://127.0.0.1:$port/video/${args.id}")
+        invoke.resolve(ret)
+    }
+
+    /**
      * Envoie les médias à la corbeille système.
      *
      * Une seule confirmation utilisateur pour jusqu'à 2000 URIs : c'est ce qui
@@ -492,4 +509,9 @@ class ArgMediaItem {
 @InvokeArg
 class ArgsMedias {
     lateinit var items: Array<ArgMediaItem>
+}
+
+@InvokeArg
+class ArgUrlVideo {
+    lateinit var id: String
 }

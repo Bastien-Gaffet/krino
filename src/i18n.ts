@@ -284,6 +284,8 @@ const FR: Dico = {
 
   /* ── Mobile (pré-tri) ── */
   "mobile.titre": "Mes photos",
+  "mobile.photos": "Photos",
+  "mobile.videos": "Vidéos",
   "mobile.accroche": "Fais le tri dans tes photos d'un coup de pouce. Garde à droite, jette à gauche.",
   "mobile.point1": "Rien n'est supprimé sans que tu valides le mois.",
   "mobile.point2": "Les photos jetées partent à la corbeille de ton téléphone, récupérables 30 jours.",
@@ -589,6 +591,8 @@ const EN: Dico = {
 
   /* ── Mobile (pre-sorting) ── */
   "mobile.titre": "My photos",
+  "mobile.photos": "Photos",
+  "mobile.videos": "Videos",
   "mobile.accroche": "Sort your photos with your thumb. Swipe right to keep, left to bin.",
   "mobile.point1": "Nothing is deleted until you confirm the month.",
   "mobile.point2": "Binned photos go to your phone's trash, recoverable for 30 days.",

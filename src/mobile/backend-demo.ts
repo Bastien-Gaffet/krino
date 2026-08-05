@@ -118,6 +118,12 @@ export class BackendDemo implements Backend {
     return `https://picsum.photos/seed/${graine}/${taille}/${taille}`;
   }
 
+  async urlVideo(): Promise<string> {
+    // Pas de vrais fichiers vidéo en démo : un clip public de test, juste
+    // pour prévisualiser le composant <video> sans appareil Android.
+    return "https://interactive-examples.mdn.mozilla.net/media/cc0-videos/flower.mp4";
+  }
+
   async mettreCorbeille(medias: IdentifiantMedia[]): Promise<number> {
     const corbeille = lireJSON<string[]>(CLE_CORBEILLE, []);
     for (const { id } of medias) if (!corbeille.includes(id)) corbeille.push(id);

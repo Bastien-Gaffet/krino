@@ -38,6 +38,32 @@ body.mobile .titre-dossier {
   text-overflow: ellipsis;
 }
 
+/* ── Bascule Photos/Vidéos ── */
+.bascule-media {
+  display: flex;
+  background: var(--fond);
+  border: 1px solid var(--bord);
+  border-radius: 999px;
+  padding: 2px;
+  gap: 2px;
+}
+.bascule-option {
+  border: none;
+  background: transparent;
+  color: var(--texte);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.88em;
+  padding: 0.4em 0.9em;
+  border-radius: 999px;
+  cursor: pointer;
+  min-height: 36px;
+}
+.bascule-option[aria-selected="true"] {
+  background: var(--accent);
+  color: #fff;
+}
+
 /* ── Cibles tactiles ──
    44 px est le minimum confortable au pouce ; les boutons desktop sont calibrés
    pour la souris. */
@@ -477,6 +503,21 @@ body.mobile .aide-revue {
 }
 .vignette.jeter img {
   opacity: 0.45;
+}
+.carte-visuel .marque-video-carte {
+  position: absolute;
+  left: 10px;
+  top: 10px;
+  background: #000000aa;
+  color: #fff;
+  border-radius: 6px;
+  font-size: 0.75em;
+  font-weight: 600;
+  padding: 0.3em 0.6em;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  pointer-events: none;
+  z-index: 2;
 }
 .vignette .marque-video {
   position: absolute;

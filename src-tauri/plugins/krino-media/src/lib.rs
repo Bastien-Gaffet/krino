@@ -70,19 +70,19 @@ impl<R: Runtime> KrinoMedia<R> {
             .map_err(Into::into)
     }
 
-    pub fn mettre_corbeille(&self, args: IdsArgs) -> Result<NombreReponse> {
+    pub fn mettre_corbeille(&self, args: MediaItemsArgs) -> Result<NombreReponse> {
         self.handle
             .run_mobile_plugin("mettreCorbeille", args)
             .map_err(Into::into)
     }
 
-    pub fn restaurer(&self, args: IdsArgs) -> Result<NombreReponse> {
+    pub fn restaurer(&self, args: MediaItemsArgs) -> Result<NombreReponse> {
         self.handle
             .run_mobile_plugin("restaurer", args)
             .map_err(Into::into)
     }
 
-    pub fn supprimer_definitivement(&self, args: IdsArgs) -> Result<NombreReponse> {
+    pub fn supprimer_definitivement(&self, args: MediaItemsArgs) -> Result<NombreReponse> {
         self.handle
             .run_mobile_plugin("supprimerDefinitivement", args)
             .map_err(Into::into)
@@ -111,15 +111,15 @@ impl<R: Runtime> KrinoMedia<R> {
         Err(Error::HorsAndroid)
     }
 
-    pub fn mettre_corbeille(&self, _args: IdsArgs) -> Result<NombreReponse> {
+    pub fn mettre_corbeille(&self, _args: MediaItemsArgs) -> Result<NombreReponse> {
         Err(Error::HorsAndroid)
     }
 
-    pub fn restaurer(&self, _args: IdsArgs) -> Result<NombreReponse> {
+    pub fn restaurer(&self, _args: MediaItemsArgs) -> Result<NombreReponse> {
         Err(Error::HorsAndroid)
     }
 
-    pub fn supprimer_definitivement(&self, _args: IdsArgs) -> Result<NombreReponse> {
+    pub fn supprimer_definitivement(&self, _args: MediaItemsArgs) -> Result<NombreReponse> {
         Err(Error::HorsAndroid)
     }
 }
@@ -168,25 +168,26 @@ async fn lister_corbeille<R: Runtime>(app: tauri::AppHandle<R>) -> Result<ScanRe
 #[tauri::command]
 async fn mettre_corbeille<R: Runtime>(
     app: tauri::AppHandle<R>,
-    ids: Vec<String>,
+    items: Vec<MediaItem>,
 ) -> Result<NombreReponse> {
-    app.krino_media().mettre_corbeille(IdsArgs { ids })
+    app.krino_media().mettre_corbeille(MediaItemsArgs { items })
 }
 
 #[tauri::command]
 async fn restaurer<R: Runtime>(
     app: tauri::AppHandle<R>,
-    ids: Vec<String>,
+    items: Vec<MediaItem>,
 ) -> Result<NombreReponse> {
-    app.krino_media().restaurer(IdsArgs { ids })
+    app.krino_media().restaurer(MediaItemsArgs { items })
 }
 
 #[tauri::command]
 async fn supprimer_definitivement<R: Runtime>(
     app: tauri::AppHandle<R>,
-    ids: Vec<String>,
+    items: Vec<MediaItem>,
 ) -> Result<NombreReponse> {
-    app.krino_media().supprimer_definitivement(IdsArgs { ids })
+    app.krino_media()
+        .supprimer_definitivement(MediaItemsArgs { items })
 }
 
 pub fn init<R: Runtime>() -> TauriPlugin<R> {

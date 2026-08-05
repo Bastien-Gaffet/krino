@@ -61,10 +61,22 @@ pub struct ScanReponse {
     pub medias: Vec<Media>,
 }
 
+/// Un média ciblé par une opération corbeille. `video` doit voyager avec
+/// l'id : côté Android, reconstruire l'URI MediaStore typée (Images/Video)
+/// exige de savoir de quelle collection il s'agit — une requête native pour
+/// le retrouver depuis l'id seul s'est révélée bloquante sur au moins un
+/// appareil réel (voir le commentaire de `urisDepuisItems` côté Kotlin).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
-pub struct IdsArgs {
-    pub ids: Vec<String>,
+pub struct MediaItem {
+    pub id: String,
+    pub video: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MediaItemsArgs {
+    pub items: Vec<MediaItem>,
 }
 
 /// Nombre de médias réellement traités par une opération de corbeille.

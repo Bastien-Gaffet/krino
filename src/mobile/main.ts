@@ -675,39 +675,40 @@ function peupler(carte: HTMLElement, m: Media, avecInfos: boolean) {
   const photo = carte.querySelector<HTMLImageElement>("img.apercu-photo")!;
   const video = carte.querySelector<HTMLVideoElement>("video.apercu-photo");
 
-  if (m.video && video) {
-    photo.hidden = true;
-    video.hidden = false;
-    video.src = m.uri;
-    flou.hidden = true;
+  // Une vidéo assignée directement en `src` (content://) ne charge rien
+  // dans la WebView Android — même limitation de process-isolation que pour
+  // les <img>, déjà contournée plus bas via vignette() (data: URI), mais
+  // jamais appliquée ici : la carte restait sur une vidéo cassée (rapporté
+  // par une testeuse). En attendant une vraie lecture vidéo (nécessiterait
+  // d'intercepter les requêtes content:// côté WebView, plus gros
+  // chantier), on affiche l'image de la première frame comme pour une
+  // photo — la pastille « vidéo » (voir plus bas) garde l'info visible.
+  if (video) {
+    video.hidden = true;
+    video.removeAttribute("src");
+  }
+  photo.hidden = false;
+  flou.hidden = false;
+  const enCache = cacheVignetteCarte.get(m.id);
+  if (enCache) {
+    chargerImage(photo, enCache);
+    chargerImage(flou, enCache);
   } else {
-    if (video) {
-      video.hidden = true;
-      video.removeAttribute("src");
-    }
-    photo.hidden = false;
-    flou.hidden = false;
-    const enCache = cacheVignetteCarte.get(m.id);
-    if (enCache) {
-      chargerImage(photo, enCache);
-      chargerImage(flou, enCache);
-    } else {
-      // Comme pour les vignettes de la grille des mois : un <img src="m.uri">
-      // (content://) ne charge rien dans la WebView Android, dont le rendu
-      // s'exécute hors du processus qui détient les permissions MediaStore.
-      backend.vignette(m, tailleCarte()).then(
-        (url) => {
-          memoriserVignetteCarte(m.id, url);
-          chargerImage(photo, url);
-          chargerImage(flou, url);
-        },
-        (erreur: unknown) => {
-          photo.classList.add("image-absente");
-          const texte = erreur instanceof Error ? erreur.message : String(erreur);
-          journaliserEchec(`vignette() rejetée (id=${m.id}, carte) : ${texte}`);
-        },
-      );
-    }
+    // Comme pour les vignettes de la grille des mois : un <img src="m.uri">
+    // (content://) ne charge rien dans la WebView Android, dont le rendu
+    // s'exécute hors du processus qui détient les permissions MediaStore.
+    backend.vignette(m, tailleCarte()).then(
+      (url) => {
+        memoriserVignetteCarte(m.id, url);
+        chargerImage(photo, url);
+        chargerImage(flou, url);
+      },
+      (erreur: unknown) => {
+        photo.classList.add("image-absente");
+        const texte = erreur instanceof Error ? erreur.message : String(erreur);
+        journaliserEchec(`vignette() rejetée (id=${m.id}, carte) : ${texte}`);
+      },
+    );
   }
 
   const infos = carte.querySelector(".carte-infos");

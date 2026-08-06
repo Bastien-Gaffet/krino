@@ -1,12 +1,13 @@
 "$schema" = "schemas/schema.json"
 
 [default]
-description = "Lecture et corbeille de la photothèque : état et demande d'autorisation, énumération des médias, vignettes, mise à la corbeille, restauration, suppression définitive."
+description = "Lecture et corbeille de la photothèque : état et demande d'autorisation, énumération des médias, vignettes, URL de lecture vidéo, mise à la corbeille, restauration, suppression définitive."
 permissions = [
   "allow-permission",
   "allow-demander-permission",
   "allow-scanner",
   "allow-vignette",
+  "allow-url-video",
   "allow-lister-corbeille",
   "allow-mettre-corbeille",
   "allow-restaurer",

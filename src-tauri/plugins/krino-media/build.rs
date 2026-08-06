@@ -6,6 +6,7 @@ const COMMANDS: &[&str] = &[
     "demander_permission",
     "scanner",
     "vignette",
+    "url_video",
     "lister_corbeille",
     "mettre_corbeille",
     "restaurer",

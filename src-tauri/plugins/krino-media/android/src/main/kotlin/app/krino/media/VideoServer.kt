@@ -39,7 +39,11 @@ class VideoServer(private val context: Context) {
     fun demarrerSiBesoin(): Int {
         serverSocket?.let { if (!it.isClosed) return port }
 
-        val socket = ServerSocket(0, 50, InetAddress.getLoopbackAddress())
+        // `getLoopbackAddress()` ne garantit PAS 127.0.0.1 : sa javadoc dit
+        // qu'elle peut renvoyer l'adresse IPv4 OU IPv6 (::1) selon la
+        // plateforme. Le client (JS) cible explicitement "127.0.0.1" — un
+        // décalage IPv4/IPv6 ferait échouer la connexion silencieusement.
+        val socket = ServerSocket(0, 50, InetAddress.getByName("127.0.0.1"))
         serverSocket = socket
         port = socket.localPort
 
@@ -63,10 +67,11 @@ class VideoServer(private val context: Context) {
                 val entree = s.getInputStream().bufferedReader(Charsets.ISO_8859_1)
                 val ligneRequete = entree.readLine() ?: return
                 val parties = ligneRequete.split(" ")
-                if (parties.size < 2 || parties[0] != "GET") {
-                    repondreErreur(s, 405, "Method Not Allowed")
+                if (parties.size < 2) {
+                    repondreErreur(s, 400, "Bad Request")
                     return
                 }
+                val methode = parties[0]
                 val chemin = parties[1]
 
                 var rangeEntete: String? = null
@@ -77,6 +82,24 @@ class VideoServer(private val context: Context) {
                     if (sep > 0 && ligne.substring(0, sep).trim().equals("Range", ignoreCase = true)) {
                         rangeEntete = ligne.substring(sep + 1).trim()
                     }
+                }
+
+                // Chromium (donc la WebView Android) applique désormais
+                // « Private Network Access » : une page envoie d'abord un
+                // préflight OPTIONS avec Access-Control-Request-Private-Network
+                // avant toute requête vers une adresse privée/loopback, et
+                // exige Access-Control-Allow-Private-Network: true en retour
+                // — sinon la vraie requête n'est même pas envoyée, et fetch()
+                // échoue avec un simple "Failed to fetch" sans détail. Comme
+                // ce serveur ne répondait qu'à GET (405 sur le reste, sans le
+                // moindre en-tête CORS), le préflight échouait silencieusement.
+                if (methode == "OPTIONS") {
+                    repondrePreflight(s)
+                    return
+                }
+                if (methode != "GET") {
+                    repondreErreur(s, 405, "Method Not Allowed")
+                    return
                 }
 
                 val id = chemin.removePrefix("/video/").substringBefore("?").toLongOrNull()
@@ -174,6 +197,7 @@ class VideoServer(private val context: Context) {
                 append("Accept-Ranges: bytes\r\n")
                 append("Content-Length: $longueur\r\n")
                 if (rangeEntete != null) append("Content-Range: bytes $debut-$fin/$longueurTotale\r\n")
+                appendCorsPna(this)
                 append("Connection: close\r\n")
                 append("\r\n")
             }
@@ -197,9 +221,42 @@ class VideoServer(private val context: Context) {
         }
     }
 
+    /**
+     * En-têtes CORS + Private Network Access, sur TOUTE réponse (succès et
+     * erreurs) : Chromium vérifie ces en-têtes indépendamment du code de
+     * statut, et un 404/500 sans eux romprait aussi la requête `fetch()`.
+     */
+    private fun appendCorsPna(sb: StringBuilder) {
+        sb.append("Access-Control-Allow-Origin: *\r\n")
+        sb.append("Access-Control-Allow-Private-Network: true\r\n")
+        sb.append("Access-Control-Allow-Methods: GET, OPTIONS\r\n")
+        sb.append("Access-Control-Allow-Headers: Range\r\n")
+        sb.append("Access-Control-Expose-Headers: Content-Range, Content-Length, Accept-Ranges\r\n")
+    }
+
+    private fun repondrePreflight(s: Socket) {
+        val entetes = buildString {
+            append("HTTP/1.1 204 No Content\r\n")
+            appendCorsPna(this)
+            append("Content-Length: 0\r\n")
+            append("Connection: close\r\n")
+            append("\r\n")
+        }
+        s.getOutputStream().apply {
+            write(entetes.toByteArray(Charsets.ISO_8859_1))
+            flush()
+        }
+    }
+
     private fun repondreErreur(s: Socket, code: Int, texte: String) {
         val corps = texte.toByteArray(Charsets.UTF_8)
-        val entetes = "HTTP/1.1 $code $texte\r\nContent-Length: ${corps.size}\r\nConnection: close\r\n\r\n"
+        val entetes = buildString {
+            append("HTTP/1.1 $code $texte\r\n")
+            append("Content-Length: ${corps.size}\r\n")
+            appendCorsPna(this)
+            append("Connection: close\r\n")
+            append("\r\n")
+        }
         s.getOutputStream().apply {
             write(entetes.toByteArray(Charsets.ISO_8859_1))
             write(corps)

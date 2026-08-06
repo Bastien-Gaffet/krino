@@ -896,6 +896,10 @@ function decider(choix: Decision) {
     fond.style.filter = "none";
   }
 
+  // Doit être >= la durée des transitions ci-dessus (220ms) : un délai plus
+  // court coupait l'animation avant qu'elle ne se termine visuellement, et le
+  // changement brutal de contenu qui suivait (idx++/rendreCarte()) créait un
+  // saut perceptible à chaque swipe plutôt qu'un enchaînement fluide.
   window.setTimeout(() => {
     carte.style.transition = "";
     carte.style.opacity = "";
@@ -905,7 +909,7 @@ function decider(choix: Decision) {
     idx++;
     rendreCarte();
     void backend.ecrireEtat(etat);
-  }, 180);
+  }, 230);
 }
 
 function annuler() {

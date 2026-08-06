@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Depuis Android 9 (API 28), le trafic HTTP en clair est bloqué par défaut,
+  y compris vers 127.0.0.1 selon les versions/OEM. Le petit serveur vidéo
+  local (VideoServer.kt) n'écoute que sur la boucle locale et n'est jamais
+  exposé au réseau, mais reste techniquement du HTTP en clair : sans cette
+  autorisation explicite, la balise <video> de la WebView ne peut pas
+  charger le flux (échec silencieux, sans exception côté Kotlin — donc sans
+  remontée possible via signalerErreur()).
+-->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>

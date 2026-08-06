@@ -9,6 +9,7 @@ const CLE_SESSION = "krino-admin-session";
 
 interface Session {
   access_token: string;
+  refresh_token: string;
 }
 
 interface TauxLigne {
@@ -38,6 +39,14 @@ interface MessageFrequent {
 
 const $ = <T extends HTMLElement>(sel: string) => document.querySelector<T>(sel)!;
 
+let sessionCourante: Session | null = null;
+// Dédoublonne les rafraîchissements : chargerTableauDeBord() lance plusieurs
+// appels RPC en parallèle (Promise.all) — si le jeton est expiré, TOUS
+// échouent en même temps avec 401. Sans ça, chacun tenterait son propre
+// rafraîchissement avec le MÊME refresh_token, dont Supabase invalide
+// l'ancien après le premier usage : les tentatives suivantes échoueraient.
+let rafraichissementEnCours: Promise<Session> | null = null;
+
 function lireSession(): Session | null {
   try {
     return JSON.parse(localStorage.getItem(CLE_SESSION) ?? "null");
@@ -47,6 +56,7 @@ function lireSession(): Session | null {
 }
 
 function ecrireSession(s: Session | null) {
+  sessionCourante = s;
   if (s) localStorage.setItem(CLE_SESSION, JSON.stringify(s));
   else localStorage.removeItem(CLE_SESSION);
 }
@@ -60,20 +70,50 @@ async function connecter(email: string, motDePasse: string): Promise<Session> {
   });
   if (!rep.ok) throw new Error("Identifiants refusés.");
   const data = await rep.json();
-  return { access_token: data.access_token };
+  return { access_token: data.access_token, refresh_token: data.refresh_token };
 }
 
-async function rpc<T>(nom: string, session: Session, args: Record<string, unknown> = {}): Promise<T> {
+/** Les jetons Supabase expirent après 1h — sans ça, l'utilisateur devait se
+ *  reconnecter à chaque visite passé ce délai (rapporté). */
+async function rafraichirJeton(refreshToken: string): Promise<Session> {
   if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new Error("Configuration Supabase manquante.");
-  const rep = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${nom}`, {
+  const rep = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      apikey: SUPABASE_ANON_KEY,
-      Authorization: `Bearer ${session.access_token}`,
-    },
-    body: JSON.stringify(args),
+    headers: { "Content-Type": "application/json", apikey: SUPABASE_ANON_KEY },
+    body: JSON.stringify({ refresh_token: refreshToken }),
   });
+  if (!rep.ok) throw new Error("Session expirée, reconnecte-toi.");
+  const data = await rep.json();
+  return { access_token: data.access_token, refresh_token: data.refresh_token };
+}
+
+async function rafraichirDedupe(refreshToken: string): Promise<Session> {
+  rafraichissementEnCours ??= rafraichirJeton(refreshToken).finally(() => {
+    rafraichissementEnCours = null;
+  });
+  return rafraichissementEnCours;
+}
+
+async function rpc<T>(nom: string, args: Record<string, unknown> = {}): Promise<T> {
+  if (!SUPABASE_URL || !SUPABASE_ANON_KEY) throw new Error("Configuration Supabase manquante.");
+  if (!sessionCourante) throw new Error("Non connecté.");
+
+  const appeler = () =>
+    fetch(`${SUPABASE_URL}/rest/v1/rpc/${nom}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: SUPABASE_ANON_KEY,
+        Authorization: `Bearer ${sessionCourante!.access_token}`,
+      },
+      body: JSON.stringify(args),
+    });
+
+  let rep = await appeler();
+  if (rep.status === 401) {
+    ecrireSession(await rafraichirDedupe(sessionCourante.refresh_token));
+    rep = await appeler();
+  }
   if (!rep.ok) throw new Error(`${nom} a échoué (${rep.status})`);
   return rep.json();
 }
@@ -154,14 +194,14 @@ function rendreMessages(cible: HTMLTableSectionElement, lignes: MessageFrequent[
     .join("");
 }
 
-async function chargerTableauDeBord(session: Session) {
+async function chargerTableauDeBord() {
   const [resume, parOs, parMarque, parVersion, parJour, messages] = await Promise.all([
-    rpc<Resume[]>("krino_admin_resume", session).then((r) => r[0]),
-    rpc<TauxLigne[]>("krino_admin_taux_par_os", session),
-    rpc<TauxLigne[]>("krino_admin_taux_par_marque", session),
-    rpc<TauxLigne[]>("krino_admin_taux_par_version_app", session),
-    rpc<JourBugs[]>("krino_admin_bugs_par_jour", session, { p_jours: 30 }),
-    rpc<MessageFrequent[]>("krino_admin_messages_frequents", session, { p_limite: 15 }),
+    rpc<Resume[]>("krino_admin_resume").then((r) => r[0]),
+    rpc<TauxLigne[]>("krino_admin_taux_par_os"),
+    rpc<TauxLigne[]>("krino_admin_taux_par_marque"),
+    rpc<TauxLigne[]>("krino_admin_taux_par_version_app"),
+    rpc<JourBugs[]>("krino_admin_bugs_par_jour", { p_jours: 30 }),
+    rpc<MessageFrequent[]>("krino_admin_messages_frequents", { p_limite: 15 }),
   ]);
 
   $("#admin-kpis").innerHTML = `
@@ -179,11 +219,12 @@ async function chargerTableauDeBord(session: Session) {
 }
 
 async function afficherTableau(session: Session) {
+  ecrireSession(session);
   $("#admin-connexion").hidden = true;
   const tableau = $("#admin-tableau");
   tableau.hidden = false;
   try {
-    await chargerTableauDeBord(session);
+    await chargerTableauDeBord();
   } catch (e) {
     tableau.hidden = true;
     $("#admin-connexion").hidden = false;
@@ -213,7 +254,6 @@ function demarrer() {
         $<HTMLInputElement>("#admin-email").value,
         $<HTMLInputElement>("#admin-mdp").value,
       );
-      ecrireSession(session);
       await afficherTableau(session);
     } catch (e) {
       erreur.textContent = e instanceof Error ? e.message : "Connexion impossible.";

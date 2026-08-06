@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Autorise le trafic HTTP en clair vers 127.0.0.1/localhost — requis
+         par le petit serveur vidéo local (VideoServer.kt), bloqué par
+         défaut depuis Android 9 sinon (voir res/xml/network_security_config.xml).
+         Fusionné dans le <application> final de l'app par le manifest merger
+         d'Android (une lib ne déclare normalement pas ses propres fenêtres,
+         mais peut contribuer des attributs comme celui-ci). -->
+    <application android:networkSecurityConfig="@xml/network_security_config" />
+
     <!-- Lecture de la photothèque. Ces permissions sont « sensibles » au sens
          de Google Play : la gestion de photos devant être la fonction
          principale de l'application, un formulaire de déclaration sera à

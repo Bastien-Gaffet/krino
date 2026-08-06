@@ -721,6 +721,46 @@ function memoriserDansCache(cache: Map<string, string>, id: string, valeur: stri
   }
 }
 
+/**
+ * Assigne la source d'une vidéo ET diagnostique un échec de lecture.
+ *
+ * Un échec de lecture vidéo est très facilement SILENCIEUX : si le serveur
+ * répond un HTTP 200 au corps vide ou tronqué, la requête « réussit », donc
+ * aucune erreur n'est levée — la vidéo reste juste figée, contrôles grisés.
+ * C'est exactement ce qui s'est produit (Content-Length: 0 renvoyé par
+ * VideoServer, voir son commentaire sur AssetFileDescriptor). Pour ne plus
+ * jamais déboguer ça à l'aveugle, on sonde l'URL en cas d'échec ou de
+ * blocage et on remonte le vrai statut HTTP et la taille annoncée.
+ */
+function brancherVideo(video: HTMLVideoElement, m: Media, url: string) {
+  let signale = false;
+  const diagnostiquer = async (motif: string) => {
+    if (signale) return;
+    signale = true;
+    let detail: string;
+    try {
+      const rep = await fetch(url, { headers: { Range: "bytes=0-1023" } });
+      detail = `HTTP ${rep.status}, Content-Length=${rep.headers.get("content-length")}, Content-Range=${rep.headers.get("content-range")}, Content-Type=${rep.headers.get("content-type")}`;
+    } catch (e) {
+      detail = `requête impossible : ${e instanceof Error ? e.message : String(e)}`;
+    }
+    journaliserEchec(
+      `lecture vidéo (id=${m.id}) ${motif} — code=${video.error?.code ?? "aucun"} readyState=${video.readyState} ; sonde : ${detail}`,
+    );
+  };
+
+  video.onerror = () => void diagnostiquer("erreur");
+  video.src = url;
+
+  // Filet : une vidéo qui ne dépasse jamais HAVE_NOTHING sans lever d'erreur
+  // (le cas du corps vide) ne déclencherait aucun `onerror`.
+  window.setTimeout(() => {
+    if (video.isConnected && video.src === url && video.readyState === 0) {
+      void diagnostiquer("bloquée sans métadonnées après 8s");
+    }
+  }, 8000);
+}
+
 /** Remplit une carte (active ou de fond) avec un média. Structure identique. */
 function peupler(carte: HTMLElement, m: Media, avecInfos: boolean) {
   const flou = carte.querySelector<HTMLImageElement>(".apercu-fond")!;
@@ -764,12 +804,12 @@ function peupler(carte: HTMLElement, m: Media, avecInfos: boolean) {
     // charger et streamer normalement (y compris avancer dans la vidéo).
     const enCacheUrl = cacheUrlVideoCarte.get(m.id);
     if (enCacheUrl) {
-      video.src = enCacheUrl;
+      brancherVideo(video, m, enCacheUrl);
     } else {
       backend.urlVideo(m).then(
         (url) => {
           memoriserDansCache(cacheUrlVideoCarte, m.id, url);
-          video.src = url;
+          brancherVideo(video, m, url);
         },
         (erreur: unknown) => {
           const texte = erreur instanceof Error ? erreur.message : String(erreur);

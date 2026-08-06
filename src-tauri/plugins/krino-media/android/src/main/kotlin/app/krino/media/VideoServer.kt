@@ -2,6 +2,7 @@ package app.krino.media
 
 import android.content.ContentUris
 import android.content.Context
+import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
 import java.io.BufferedOutputStream
 import java.io.IOException
@@ -91,6 +92,38 @@ class VideoServer(private val context: Context) {
         }
     }
 
+    /**
+     * Taille réelle du média, en octets, ou -1 si indéterminable.
+     *
+     * NE PAS utiliser `AssetFileDescriptor.getLength()` ici : l'implémentation
+     * par défaut de `ContentProvider.openAssetFile()` enveloppe le fichier
+     * avec `AssetFileDescriptor.UNKNOWN_LENGTH` (-1), et MediaProvider ne la
+     * redéfinit pas pour `openAssetFileDescriptor`. On lisait donc -1, d'où
+     * un `Content-Length: 0` : une réponse HTTP 200 parfaitement valide mais
+     * vide, que le lecteur ne peut pas décoder — sans lever la moindre
+     * erreur, puisque la requête a « réussi ». C'était la vraie cause de la
+     * lecture bloquée (aperçu visible, contrôles grisés, aucun rapport).
+     *
+     * `ParcelFileDescriptor.getStatSize()` fait un vrai `fstat` sur le
+     * descripteur ; la colonne MediaStore SIZE sert de repli.
+     */
+    private fun tailleReelle(pfd: ParcelFileDescriptor, uri: android.net.Uri): Long {
+        val parStat = try {
+            pfd.statSize
+        } catch (e: Exception) {
+            -1L
+        }
+        if (parStat > 0) return parStat
+
+        return context.contentResolver.query(
+            uri,
+            arrayOf(MediaStore.MediaColumns.SIZE),
+            null,
+            null,
+            null,
+        )?.use { c -> if (c.moveToFirst()) c.getLong(0) else -1L } ?: -1L
+    }
+
     private fun servirVideo(s: Socket, id: Long, rangeEntete: String?) {
         val uri = ContentUris.withAppendedId(MediaStore.Video.Media.EXTERNAL_CONTENT_URI, id)
         val resolver = context.contentResolver
@@ -103,28 +136,35 @@ class VideoServer(private val context: Context) {
             null,
         )?.use { c -> if (c.moveToFirst()) c.getString(0) else null } ?: "video/mp4"
 
-        val afd = try {
-            resolver.openAssetFileDescriptor(uri, "r")
+        val pfd = try {
+            resolver.openFileDescriptor(uri, "r")
         } catch (e: Exception) {
             null
         }
-        if (afd == null) {
+        if (pfd == null) {
             repondreErreur(s, 404, "Not Found")
             return
         }
 
-        afd.use { descripteur ->
-            val longueurTotale = descripteur.length
+        pfd.use { descripteur ->
+            val longueurTotale = tailleReelle(descripteur, uri)
+            if (longueurTotale <= 0) {
+                // Mieux vaut une vraie erreur HTTP qu'un 200 vide : un corps
+                // vide est indiscernable d'un problème de lecteur côté client.
+                repondreErreur(s, 500, "Taille du média indeterminable")
+                return
+            }
+
             var debut = 0L
             var fin = longueurTotale - 1
-
             if (rangeEntete != null && rangeEntete.startsWith("bytes=")) {
                 val plage = rangeEntete.removePrefix("bytes=").split("-")
-                plage.getOrNull(0)?.toLongOrNull()?.let { debut = it }
-                plage.getOrNull(1)?.toLongOrNull()?.let { fin = it }
+                plage.getOrNull(0)?.trim()?.toLongOrNull()?.let { debut = it }
+                plage.getOrNull(1)?.trim()?.toLongOrNull()?.let { fin = it }
             }
-            fin = fin.coerceAtMost(longueurTotale - 1)
-            val longueur = (fin - debut + 1).coerceAtLeast(0)
+            debut = debut.coerceIn(0, longueurTotale - 1)
+            fin = fin.coerceIn(debut, longueurTotale - 1)
+            val longueur = fin - debut + 1
 
             val sortie = BufferedOutputStream(s.getOutputStream())
             val statut = if (rangeEntete != null) "206 Partial Content" else "200 OK"
@@ -139,8 +179,11 @@ class VideoServer(private val context: Context) {
             }
             sortie.write(entetes.toByteArray(Charsets.ISO_8859_1))
 
-            descripteur.createInputStream().use { flux ->
-                flux.skip(debut)
+            // `InputStream.skip()` peut sauter MOINS d'octets que demandé (c'est
+            // documenté) : pour un Range, on positionne le canal, seul moyen
+            // fiable de servir exactement la plage demandée.
+            ParcelFileDescriptor.AutoCloseInputStream(descripteur).use { flux ->
+                flux.channel.position(debut)
                 val tampon = ByteArray(64 * 1024)
                 var reste = longueur
                 while (reste > 0) {

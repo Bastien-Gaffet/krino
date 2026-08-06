@@ -949,7 +949,18 @@ function installerSwipe() {
   };
 
   carte.addEventListener("pointerdown", (e) => {
-    if ((e.target as HTMLElement).tagName === "VIDEO") return;
+    const cible = e.target as HTMLElement;
+    if (cible.tagName === "VIDEO") {
+      // La vidéo occupe (quasi) toute la carte : ignorer tout `pointerdown`
+      // dessus rendait le swipe totalement impossible sur une carte vidéo
+      // (seuls les boutons hors carte fonctionnaient encore). On ne laisse
+      // la main aux contrôles natifs (lecture/pause/défilement) que sur la
+      // fine bande du bas où ils s'affichent — le reste de la vidéo reste
+      // swipable comme une photo.
+      const rect = cible.getBoundingClientRect();
+      const hauteurBarreControles = 48;
+      if (e.clientY > rect.bottom - hauteurBarreControles) return;
+    }
     actif = true;
     x0 = e.clientX;
     y0 = e.clientY;

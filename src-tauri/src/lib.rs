@@ -226,17 +226,17 @@ async fn scanner(fenetre: tauri::Window, racine: String) -> Result<Vec<Media>, S
     Ok(medias)
 }
 
-/// Renvoie le chemin d'une miniature JPEG (320 px) du fichier, générée via WIC
-/// et mise en cache dans `.krino/miniatures` — la clé intègre la date de
-/// modification, donc un fichier remplacé régénère sa miniature.
-#[tauri::command]
-async fn miniature(racine: String, rel: String, corbeille: bool) -> Result<String, String> {
+/// Calcule (et génère si besoin) le chemin de la miniature JPEG (320 px) d'un
+/// fichier, mise en cache dans `.krino/miniatures` — la clé intègre la date de
+/// modification, donc un fichier remplacé régénère sa miniature. Bloquant
+/// (WIC/COM + I/O disque) : à appeler uniquement depuis un contexte déjà
+/// déporté (spawn_blocking / thread rayon), jamais directement sur le runtime async.
+fn chemin_miniature(racine_p: &Path, rel: &str, corbeille: bool) -> Result<PathBuf, String> {
     use std::hash::{Hash, Hasher};
-    let racine_p = PathBuf::from(&racine);
     let source = if corbeille {
-        chemin_corbeille(&racine_p).join(&rel)
+        chemin_corbeille(racine_p).join(rel)
     } else {
-        racine_p.join(&rel)
+        racine_p.join(rel)
     };
     let meta = fs::metadata(&source).map_err(|e| e.to_string())?;
     let mtime = meta
@@ -276,7 +276,45 @@ async fn miniature(racine: String, rel: String, corbeille: bool) -> Result<Strin
             res?;
         }
     }
-    Ok(cible.to_string_lossy().into_owned())
+    Ok(cible)
+}
+
+/// Chemin de la miniature d'un seul fichier (généré à la demande, ex. galerie
+/// au premier affichage d'une vignette pas encore en cache).
+#[tauri::command]
+async fn miniature(racine: String, rel: String, corbeille: bool) -> Result<String, String> {
+    // Le décodage WIC + les accès disque sont entièrement synchrones : sans
+    // spawn_blocking, `async fn` ne les rend pas non-bloquants, ils monopolisent
+    // simplement un thread du runtime tokio le temps de l'appel. Pendant un
+    // défilement rapide, la galerie déclenche des dizaines d'appels quasi
+    // simultanés (IntersectionObserver, rootMargin 200px) : sans ça, ils se
+    // sérialisent au lieu de se paralléliser sur tous les cœurs disponibles.
+    tauri::async_runtime::spawn_blocking(move || {
+        let racine_p = PathBuf::from(&racine);
+        chemin_miniature(&racine_p, &rel, corbeille).map(|p| p.to_string_lossy().into_owned())
+    })
+    .await
+    .map_err(|e| e.to_string())?
+}
+
+/// Génère en amont, en parallèle sur tous les cœurs (rayon), les miniatures
+/// de tous les médias fournis. Appelé une fois juste après le scan d'un
+/// dossier : sans ça, chaque vignette n'est générée qu'à son apparition dans
+/// la galerie (une invocation IPC par photo, une à la fois côté disque tant
+/// qu'elle n'est pas en cache). En la préchauffant en lot dès l'ouverture, la
+/// galerie affiche des miniatures déjà prêtes au lieu de les décoder au fil
+/// du défilement. Best-effort : une photo illisible ou disparue est ignorée,
+/// le reste du lot continue.
+#[tauri::command]
+async fn pregenerer_miniatures(racine: String, rels: Vec<String>) -> Result<(), String> {
+    use rayon::prelude::*;
+    tauri::async_runtime::spawn_blocking(move || {
+        let racine_p = PathBuf::from(&racine);
+        rels.par_iter()
+            .for_each(|rel| { let _ = chemin_miniature(&racine_p, rel, false); });
+    })
+    .await
+    .map_err(|e| e.to_string())
 }
 
 #[tauri::command]
@@ -1111,6 +1149,7 @@ pub fn run() {
             restaurer_corbeille,
             apercu_png,
             miniature,
+            pregenerer_miniatures,
             chercher_doublons,
             annuler_tache,
             ranger_par_date,

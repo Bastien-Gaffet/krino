@@ -208,6 +208,15 @@ async function urlMiniature(m: { rel: string; video: boolean }, corbeille = fals
   return cacheMiniatures.get(cle)!;
 }
 
+/** Préchauffe en arrière-plan (parallèle, côté Rust) le cache disque des
+ *  miniatures de tout le dossier ouvert, pour que la galerie n'ait plus à les
+ *  décoder une par une au fil du défilement. Fire-and-forget : n'affecte pas
+ *  la navigation, une erreur (dossier disparu en cours de route) est ignorée. */
+function prechaufferMiniatures(liste: Media[]) {
+  const rels = liste.filter((m) => !m.video).map((m) => m.rel);
+  if (rels.length) void invoke("pregenerer_miniatures", { racine, rels }).catch(() => {});
+}
+
 /** Élément d'aperçu pour l'éventail des cartes (mois, albums) : une image pour
    les photos, une balise vidéo (preload metadata, #t=0.1) pour les vidéos —
    ainsi un mois/album ne contenant que des vidéos n'affiche plus une case vide. */
@@ -367,6 +376,7 @@ async function ouvrirDossier(chemin: string) {
     cacherChargement();
   }
   dernierScanMs = Date.now();
+  prechaufferMiniatures(medias);
   etat = await invoke<Etat>("lire_etat", { racine });
   if (!etat.source_date) etat.source_date = "exif";
   etat.ordre ??= [];
@@ -414,6 +424,7 @@ async function rafraichir() {
   try {
     medias = await invoke<Media[]>("scanner", { racine });
     dernierScanMs = Date.now();
+    prechaufferMiniatures(medias);
     await purgerDisparus();
     construireEvenements();
     invaliderGalerie();

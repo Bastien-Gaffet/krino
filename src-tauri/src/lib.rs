@@ -297,26 +297,6 @@ async fn miniature(racine: String, rel: String, corbeille: bool) -> Result<Strin
     .map_err(|e| e.to_string())?
 }
 
-/// Génère en amont, en parallèle sur tous les cœurs (rayon), les miniatures
-/// de tous les médias fournis. Appelé une fois juste après le scan d'un
-/// dossier : sans ça, chaque vignette n'est générée qu'à son apparition dans
-/// la galerie (une invocation IPC par photo, une à la fois côté disque tant
-/// qu'elle n'est pas en cache). En la préchauffant en lot dès l'ouverture, la
-/// galerie affiche des miniatures déjà prêtes au lieu de les décoder au fil
-/// du défilement. Best-effort : une photo illisible ou disparue est ignorée,
-/// le reste du lot continue.
-#[tauri::command]
-async fn pregenerer_miniatures(racine: String, rels: Vec<String>) -> Result<(), String> {
-    use rayon::prelude::*;
-    tauri::async_runtime::spawn_blocking(move || {
-        let racine_p = PathBuf::from(&racine);
-        rels.par_iter()
-            .for_each(|rel| { let _ = chemin_miniature(&racine_p, rel, false); });
-    })
-    .await
-    .map_err(|e| e.to_string())
-}
-
 #[tauri::command]
 fn lire_etat(racine: String) -> Result<Etat, String> {
     let chemin = chemin_etat(Path::new(&racine));
@@ -1149,7 +1129,6 @@ pub fn run() {
             restaurer_corbeille,
             apercu_png,
             miniature,
-            pregenerer_miniatures,
             chercher_doublons,
             annuler_tache,
             ranger_par_date,

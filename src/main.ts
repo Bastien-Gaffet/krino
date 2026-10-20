@@ -225,6 +225,7 @@ document.addEventListener("scroll", (e) => {
 interface DemandeMiniature {
   cle: string;
   rel: string;
+  video: boolean;
   corbeille: boolean;
   voulues: (() => boolean)[];
   resoudre: (url: string) => void;
@@ -254,11 +255,20 @@ function pomperMiniatures() {
     miniaturesActives++;
     invoke<string>("miniature", { racine, rel: d.rel, corbeille: d.corbeille })
       .then((chemin) => convertFileSrc(chemin))
-      .catch(() => convertFileSrc(d.corbeille ? srcCorbeille(d.rel) : src(d.rel)))
+      .catch((e) => {
+        // Photo : l'original fait office de miniature. Vidéo : surtout pas, une
+        // <img> se ferait servir le fichier entier en mémoire (crash sur les gros
+        // MP4/MOV) ; l'appelant se rabat sur une balise <video>.
+        if (d.video) throw new Error(String(e));
+        return convertFileSrc(d.corbeille ? srcCorbeille(d.rel) : src(d.rel));
+      })
       .then((url) => {
         cacheMiniatures.set(d.cle, url);
         miniaturesEnVol.delete(d.cle);
         d.resoudre(url);
+      }, (e: Error) => {
+        miniaturesEnVol.delete(d.cle);
+        d.rejeter(e);
       })
       .finally(() => { miniaturesActives--; pomperMiniatures(); });
   }
@@ -267,7 +277,7 @@ function pomperMiniatures() {
 /** Miniature JPEG 320 px générée et mise en cache côté Rust — pour les grilles.
     `voulue` permet d'abandonner la demande si elle n'est plus utile au moment
     où son tour arrive (la promesse est alors rejetée par MINIATURE_ABANDONNEE). */
-function urlMiniature(m: { rel: string }, corbeille = false, voulue: () => boolean = () => true): Promise<string> {
+function urlMiniature(m: { rel: string; video?: boolean }, corbeille = false, voulue: () => boolean = () => true): Promise<string> {
   const cle = `${corbeille}|${m.rel}`;
   const enCache = cacheMiniatures.get(cle);
   if (enCache) return Promise.resolve(enCache);
@@ -282,7 +292,7 @@ function urlMiniature(m: { rel: string }, corbeille = false, voulue: () => boole
   const enVol = miniaturesEnVol.get(cle);
   if (enVol) return enVol;
   const promesse = new Promise<string>((resoudre, rejeter) => {
-    const d: DemandeMiniature = { cle, rel: m.rel, corbeille, voulues: [voulue], resoudre, rejeter };
+    const d: DemandeMiniature = { cle, rel: m.rel, video: !!m.video, corbeille, voulues: [voulue], resoudre, rejeter };
     fileMiniatures.push(d);
     miniaturesEnAttente.set(cle, d);
   });
@@ -1209,7 +1219,7 @@ function rendreGroupesDoublons() {
       const img = document.createElement("img");
       img.loading = "lazy";
       img.decoding = "async";
-      urlMiniature(f).then((u) => { img.src = u; });
+      urlMiniature(f).then((u) => { img.src = u; }, () => { /* vidéo sans miniature */ });
       const marque = document.createElement("span");
       marque.className = "marque marque-sel";
       const legende = document.createElement("span");
@@ -1284,7 +1294,7 @@ function rendreVerifDoublons() {
     const img = document.createElement("img");
     img.loading = "lazy";
     img.decoding = "async";
-    urlMiniature(f).then((u) => { img.src = u; });
+    urlMiniature(f).then((u) => { img.src = u; }, () => { /* vidéo sans miniature */ });
     const marque = document.createElement("span");
     marque.className = "marque marque-sel";
     marque.textContent = "✗";
@@ -2162,13 +2172,15 @@ function vignetteGalerie(m: Media): HTMLElement {
   img.decoding = "async";
   img.loading = "lazy";
   img.dataset.rel = m.rel;
-  observerVignette(img, (voulue) => urlMiniature(m, false, voulue));
   v.appendChild(img);
-  if (m.video) {
-    // Image de couverture extraite par Windows. Si le codec lui est inconnu,
-    // repli sur la balise vidéo (preload=none : chargée seulement à l'apparition).
-    img.addEventListener("error", () => {
-      if (!img.getAttribute("src") || !img.isConnected) return;
+  if (!m.video) {
+    observerVignette(img, (voulue) => urlMiniature(m, false, voulue));
+  } else {
+    // Image de couverture extraite par Windows. Si elle est impossible (codec
+    // inconnu), repli sur la balise vidéo : preload=none, chargée à l'apparition
+    // et par morceaux (requêtes Range), jamais le fichier entier.
+    const versVideo = () => {
+      if (!img.isConnected) return;
       observateurVignettes.unobserve(img);
       const vid = document.createElement("video");
       vid.preload = "none";
@@ -2176,7 +2188,12 @@ function vignetteGalerie(m: Media): HTMLElement {
       vid.dataset.src = `${convertFileSrc(src(m.rel))}#t=0.1`;
       img.replaceWith(vid);
       observateurVignettes.observe(vid);
-    });
+    };
+    observerVignette(img, (voulue) => urlMiniature(m, false, voulue).catch((e) => {
+      if (e !== MINIATURE_ABANDONNEE) versVideo();
+      throw e;
+    }));
+    img.addEventListener("error", () => { if (img.getAttribute("src")) versVideo(); });
     const marque = document.createElement("span");
     marque.className = "marque";
     marque.textContent = t("vignette.video");

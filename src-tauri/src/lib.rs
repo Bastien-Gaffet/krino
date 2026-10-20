@@ -249,6 +249,11 @@ static DISQUE: std::sync::Mutex<()> = std::sync::Mutex::new(());
 static INTERACTIVES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 /// Incrémenté à chaque pré-génération lancée : l'ancienne s'arrête d'elle-même.
 static GENERATION_FOND: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+/// Miniatures dont la génération a échoué pendant cette session (fichier
+/// corrompu, codec inconnu de Windows) : pas de nouvel essai, qui reprendrait le
+/// verrou DISQUE à chaque apparition de la vignette.
+static ECHECS: std::sync::LazyLock<std::sync::Mutex<std::collections::HashSet<PathBuf>>> =
+    std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashSet::new()));
 /// Suffixe des fichiers temporaires : deux générations simultanées de la même
 /// miniature (écran + fond) n'écrivent jamais dans le même fichier.
 static NUMERO_TMP: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
@@ -323,9 +328,11 @@ fn generer_miniature(source: &Path, cible: &Path, video: bool, ancienne: &Path) 
         fs::copy(ancienne, &tmp).map(|_| ()).map_err(|e| e.to_string())
     } else if video {
         // L'extraction d'image d'une vidéo (shell Windows) ne lit qu'une partie
-        // du fichier, et profite du cache de miniatures de l'Explorateur.
+        // du fichier, et profite du cache de miniatures de l'Explorateur. Le shell
+        // refuse les « / » (E_INVALIDARG) que contient `racine.join(rel)`.
         let _verrou = verrou_disque();
-        wic::miniature_shell(&source.to_string_lossy(), &tmp.to_string_lossy(), COTE_MINIATURE)
+        let chemin = source.to_string_lossy().replace('/', "\\");
+        wic::miniature_shell(&chemin, &tmp.to_string_lossy(), COTE_MINIATURE)
             .map_err(|e| format!("miniature vidéo : {e}"))
     } else {
         let octets = {
@@ -357,13 +364,20 @@ fn chemin_miniature(racine_p: &Path, rel: &str, corbeille: bool) -> Result<PathB
     let meta = fs::metadata(&source).map_err(|e| e.to_string())?;
     let cible = chemin_cache_miniature(&dossier_miniatures(), &source, mtime_ms(&meta), meta.len());
     if !cible.is_file() {
+        let echecs = || ECHECS.lock().unwrap_or_else(|e| e.into_inner());
+        if echecs().contains(&cible) {
+            return Err("miniature : échec précédent".into());
+        }
         let ext = source
             .extension()
             .map(|e| e.to_string_lossy().to_lowercase())
             .unwrap_or_default();
         let video = EXT_VIDEOS.contains(&ext.as_str());
         let ancienne = ancienne_miniature(racine_p, rel, &meta);
-        generer_miniature(&source, &cible, video, &ancienne)?;
+        if let Err(e) = generer_miniature(&source, &cible, video, &ancienne) {
+            echecs().insert(cible);
+            return Err(e);
+        }
     }
     Ok(cible)
 }

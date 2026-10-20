@@ -193,19 +193,78 @@ function srcCorbeille(rel: string): string { return `${racine}/.krino/corbeille/
 
 const cacheMiniatures = new Map<string, string>();
 
-/** Miniature JPEG 320 px générée et mise en cache côté Rust — pour les grilles. */
-async function urlMiniature(m: { rel: string; video: boolean }, corbeille = false): Promise<string> {
-  if (m.video) return convertFileSrc(corbeille ? srcCorbeille(m.rel) : src(m.rel));
-  const cle = `${corbeille}|${m.rel}`;
-  if (!cacheMiniatures.has(cle)) {
-    try {
-      const chemin = await invoke<string>("miniature", { racine, rel: m.rel, corbeille });
-      cacheMiniatures.set(cle, convertFileSrc(chemin));
-    } catch {
-      cacheMiniatures.set(cle, convertFileSrc(corbeille ? srcCorbeille(m.rel) : src(m.rel)));
+/* ── File de génération des miniatures ──
+   Chaque génération est un décodage WIC pleine résolution côté Rust. Sans borne,
+   un défilement rapide en lançait des centaines à la fois (pool spawn_blocking
+   quasi illimité) : CPU/RAM/disque saturés, appli figée, et les vignettes
+   réellement à l'écran attendaient 15-25 s derrière celles déjà dépassées.
+   Ici : au plus MAX_MINIATURES en vol, la plus récemment demandée passe d'abord
+   (LIFO = ce que l'utilisateur regarde maintenant), et une demande dont plus
+   personne ne veut (vignette ressortie de l'écran) est abandonnée avant envoi. */
+const MAX_MINIATURES = Math.max(2, Math.min(6, (navigator.hardwareConcurrency || 4) - 2));
+const MINIATURE_ABANDONNEE = new Error("miniature abandonnée");
+
+interface DemandeMiniature {
+  cle: string;
+  rel: string;
+  corbeille: boolean;
+  voulues: (() => boolean)[];
+  resoudre: (url: string) => void;
+  rejeter: (e: Error) => void;
+}
+const fileMiniatures: DemandeMiniature[] = [];
+const miniaturesEnAttente = new Map<string, DemandeMiniature>();
+const miniaturesEnVol = new Map<string, Promise<string>>();
+let miniaturesActives = 0;
+
+function pomperMiniatures() {
+  while (miniaturesActives < MAX_MINIATURES && fileMiniatures.length) {
+    const d = fileMiniatures.pop()!;
+    miniaturesEnAttente.delete(d.cle);
+    if (!d.voulues.some((v) => v())) {
+      miniaturesEnVol.delete(d.cle);
+      d.rejeter(MINIATURE_ABANDONNEE);
+      continue;
     }
+    miniaturesActives++;
+    invoke<string>("miniature", { racine, rel: d.rel, corbeille: d.corbeille })
+      .then((chemin) => convertFileSrc(chemin))
+      .catch(() => convertFileSrc(d.corbeille ? srcCorbeille(d.rel) : src(d.rel)))
+      .then((url) => {
+        cacheMiniatures.set(d.cle, url);
+        miniaturesEnVol.delete(d.cle);
+        d.resoudre(url);
+      })
+      .finally(() => { miniaturesActives--; pomperMiniatures(); });
   }
-  return cacheMiniatures.get(cle)!;
+}
+
+/** Miniature JPEG 320 px générée et mise en cache côté Rust — pour les grilles.
+    `voulue` permet d'abandonner la demande si elle n'est plus utile au moment
+    où son tour arrive (la promesse est alors rejetée par MINIATURE_ABANDONNEE). */
+function urlMiniature(m: { rel: string; video: boolean }, corbeille = false, voulue: () => boolean = () => true): Promise<string> {
+  if (m.video) return Promise.resolve(convertFileSrc(corbeille ? srcCorbeille(m.rel) : src(m.rel)));
+  const cle = `${corbeille}|${m.rel}`;
+  const enCache = cacheMiniatures.get(cle);
+  if (enCache) return Promise.resolve(enCache);
+  const attente = miniaturesEnAttente.get(cle);
+  if (attente) {
+    // Redemandée : on la remet en tête de file (elle est de nouveau d'actualité)
+    attente.voulues.push(voulue);
+    fileMiniatures.splice(fileMiniatures.indexOf(attente), 1);
+    fileMiniatures.push(attente);
+    return miniaturesEnVol.get(cle)!;
+  }
+  const enVol = miniaturesEnVol.get(cle);
+  if (enVol) return enVol;
+  const promesse = new Promise<string>((resoudre, rejeter) => {
+    const d: DemandeMiniature = { cle, rel: m.rel, corbeille, voulues: [voulue], resoudre, rejeter };
+    fileMiniatures.push(d);
+    miniaturesEnAttente.set(cle, d);
+  });
+  miniaturesEnVol.set(cle, promesse);
+  pomperMiniatures();
+  return promesse;
 }
 
 /** Élément d'aperçu pour l'éventail des cartes (mois, albums) : une image pour
@@ -975,7 +1034,7 @@ function vignetteCorbeille(f: FichierCorbeille): HTMLElement {
     const img = document.createElement("img");
     img.decoding = "async";
     img.loading = "lazy";
-    observerVignette(img, () => urlMiniature(f, true));
+    observerVignette(img, (voulue) => urlMiniature(f, true, voulue));
     v.appendChild(img);
   }
   v.addEventListener("click", (e) => clicVignetteCorbeille(f.rel, e));
@@ -1924,7 +1983,7 @@ function majBadgeVignette(rel: string) {
    reste basse et, en défilant vite, un élément qui ressort du viewport avant
    d'avoir chargé voit son chargement ignoré (priorité au visible). Le rootMargin
    réduit évite de charger loin devant/derrière la zone vue. */
-const chargeurVignette = new WeakMap<HTMLImageElement, () => Promise<string>>();
+const chargeurVignette = new WeakMap<HTMLImageElement, (voulue: () => boolean) => Promise<string>>();
 
 const observateurVignettes = new IntersectionObserver((entrees) => {
   for (const e of entrees) {
@@ -1945,7 +2004,7 @@ const observateurVignettes = new IntersectionObserver((entrees) => {
   }
 }, { rootMargin: "200px" });
 
-function observerVignette(img: HTMLImageElement, chargeur: () => Promise<string>) {
+function observerVignette(img: HTMLImageElement, chargeur: (voulue: () => boolean) => Promise<string>) {
   chargeurVignette.set(img, chargeur);
   observateurVignettes.observe(img);
 }
@@ -1955,10 +2014,13 @@ function chargerVignette(img: HTMLImageElement) {
   if (img.dataset.charge === "1") return; // déjà chargée
   const chargeur = chargeurVignette.get(img);
   if (!chargeur) return;
-  void chargeur().then((u) => {
+  // Abandonnée en file si la vignette ressort de l'écran avant son tour ;
+  // elle sera redemandée à sa prochaine apparition.
+  const visible = () => img.isConnected && img.dataset.visible === "1";
+  chargeur(visible).then((u) => {
     // Ignore si la vignette est ressortie de l'écran entre-temps
-    if (img.dataset.visible === "1") { img.src = u; img.dataset.charge = "1"; }
-  });
+    if (visible()) { img.src = u; img.dataset.charge = "1"; }
+  }, () => {});
 }
 
 function dechargerVignette(img: HTMLImageElement) {
@@ -2068,7 +2130,7 @@ function vignetteGalerie(m: Media): HTMLElement {
     img.decoding = "async";
     img.loading = "lazy";
     img.dataset.rel = m.rel;
-    observerVignette(img, () => urlMiniature(m));
+    observerVignette(img, (voulue) => urlMiniature(m, false, voulue));
     v.appendChild(img);
   }
   const badges = document.createElement("span");

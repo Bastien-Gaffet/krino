@@ -23,6 +23,7 @@ interface Media {
   exif_ms: number | null;
   video: boolean;
   wic: boolean; // format décodé côté Rust (HEIC, TIFF…)
+  mini?: string | null; // miniature déjà en cache (chemin absolu), sinon null
 }
 
 interface Etat {
@@ -194,15 +195,32 @@ function srcCorbeille(rel: string): string { return `${racine}/.krino/corbeille/
 const cacheMiniatures = new Map<string, string>();
 
 /* ── File de génération des miniatures ──
-   Chaque génération est un décodage WIC pleine résolution côté Rust. Sans borne,
-   un défilement rapide en lançait des centaines à la fois (pool spawn_blocking
-   quasi illimité) : CPU/RAM/disque saturés, appli figée, et les vignettes
-   réellement à l'écran attendaient 15-25 s derrière celles déjà dépassées.
-   Ici : au plus MAX_MINIATURES en vol, la plus récemment demandée passe d'abord
-   (LIFO = ce que l'utilisateur regarde maintenant), et une demande dont plus
-   personne ne veut (vignette ressortie de l'écran) est abandonnée avant envoi. */
-const MAX_MINIATURES = Math.max(2, Math.min(6, (navigator.hardwareConcurrency || 4) - 2));
+   Seules les miniatures absentes du cache passent ici (les autres sont connues
+   dès le scan, voir preparerMiniatures). Chaque génération lit la photo sur un
+   disque parfois lent, une seule lecture à la fois côté Rust : quelques demandes
+   en vol suffisent à occuper le disque pendant que les précédentes se décodent.
+   La plus récemment demandée passe d'abord (LIFO = ce que l'utilisateur regarde
+   maintenant), une demande dont plus personne ne veut (vignette ressortie de
+   l'écran) est abandonnée avant envoi, et rien n'est envoyé pendant un défilement
+   rapide : les vignettes qui ne font que passer ne coûtent rien. */
+const MAX_MINIATURES = 3;
 const MINIATURE_ABANDONNEE = new Error("miniature abandonnée");
+/** Au-delà (px/ms, ~2 écrans par seconde), le défilement est jugé rapide. */
+const VITESSE_RAPIDE = 2;
+let defilementRapideJusqua = 0;
+let pompeDifferee = 0;
+let dernierDefilement = { el: null as EventTarget | null, y: 0, t: 0 };
+
+document.addEventListener("scroll", (e) => {
+  const el = e.target;
+  if (!(el instanceof HTMLElement)) return;
+  const t = performance.now();
+  const d = dernierDefilement;
+  if (d.el === el && Math.abs(el.scrollTop - d.y) / Math.max(1, t - d.t) > VITESSE_RAPIDE) {
+    defilementRapideJusqua = t + 150;
+  }
+  dernierDefilement = { el, y: el.scrollTop, t };
+}, { capture: true, passive: true });
 
 interface DemandeMiniature {
   cle: string;
@@ -218,6 +236,13 @@ const miniaturesEnVol = new Map<string, Promise<string>>();
 let miniaturesActives = 0;
 
 function pomperMiniatures() {
+  const attente = defilementRapideJusqua - performance.now();
+  if (attente > 0) {
+    if (!pompeDifferee) {
+      pompeDifferee = window.setTimeout(() => { pompeDifferee = 0; pomperMiniatures(); }, attente);
+    }
+    return;
+  }
   while (miniaturesActives < MAX_MINIATURES && fileMiniatures.length) {
     const d = fileMiniatures.pop()!;
     miniaturesEnAttente.delete(d.cle);
@@ -242,8 +267,7 @@ function pomperMiniatures() {
 /** Miniature JPEG 320 px générée et mise en cache côté Rust — pour les grilles.
     `voulue` permet d'abandonner la demande si elle n'est plus utile au moment
     où son tour arrive (la promesse est alors rejetée par MINIATURE_ABANDONNEE). */
-function urlMiniature(m: { rel: string; video: boolean }, corbeille = false, voulue: () => boolean = () => true): Promise<string> {
-  if (m.video) return Promise.resolve(convertFileSrc(corbeille ? srcCorbeille(m.rel) : src(m.rel)));
+function urlMiniature(m: { rel: string }, corbeille = false, voulue: () => boolean = () => true): Promise<string> {
   const cle = `${corbeille}|${m.rel}`;
   const enCache = cacheMiniatures.get(cle);
   if (enCache) return Promise.resolve(enCache);
@@ -265,6 +289,19 @@ function urlMiniature(m: { rel: string; video: boolean }, corbeille = false, vou
   miniaturesEnVol.set(cle, promesse);
   pomperMiniatures();
   return promesse;
+}
+
+/** Après un scan : les miniatures déjà en cache s'affichent sans aller-retour,
+    les autres sont générées en tâche de fond côté Rust, dans l'ordre de la
+    galerie (plus récentes d'abord). */
+function preparerMiniatures() {
+  cacheMiniatures.clear();
+  const manquantes: string[] = [];
+  for (const m of [...medias].sort((a, b) => dateDe(b) - dateDe(a))) {
+    if (m.mini) cacheMiniatures.set(`false|${m.rel}`, convertFileSrc(m.mini));
+    else manquantes.push(m.rel);
+  }
+  void invoke("pregenerer_miniatures", { racine, rels: manquantes });
 }
 
 /** Élément d'aperçu pour l'éventail des cartes (mois, albums) : une image pour
@@ -435,6 +472,7 @@ async function ouvrirDossier(chemin: string) {
   etat.ordre_albums ??= [];
   albumsOrdonnes(); // migration douce : réconcilie l'ordre avec les albums existants
   await purgerDisparus();
+  preparerMiniatures();
   construireEvenements();
   invaliderGalerie();
   $("#titre-dossier").textContent = t("mois.entete", { d: chemin, n: medias.length });
@@ -474,6 +512,7 @@ async function rafraichir() {
     medias = await invoke<Media[]>("scanner", { racine });
     dernierScanMs = Date.now();
     await purgerDisparus();
+    preparerMiniatures();
     construireEvenements();
     invaliderGalerie();
     $("#titre-dossier").textContent = t("mois.entete", { d: racine, n: medias.length });
@@ -2119,19 +2158,29 @@ function vignetteGalerie(m: Media): HTMLElement {
   v.className = "vignette vignette-galerie";
   v.dataset.rel = m.rel;
   v.title = m.rel;
+  const img = document.createElement("img");
+  img.decoding = "async";
+  img.loading = "lazy";
+  img.dataset.rel = m.rel;
+  observerVignette(img, (voulue) => urlMiniature(m, false, voulue));
+  v.appendChild(img);
   if (m.video) {
-    // preload=none : la première image n'est chargée qu'à l'apparition
-    v.innerHTML = `<video preload="none" muted></video><span class="marque">${t("vignette.video")}</span>`;
-    const vid = v.querySelector("video")!;
-    vid.dataset.src = `${convertFileSrc(src(m.rel))}#t=0.1`;
-    observateurVignettes.observe(vid);
-  } else {
-    const img = document.createElement("img");
-    img.decoding = "async";
-    img.loading = "lazy";
-    img.dataset.rel = m.rel;
-    observerVignette(img, (voulue) => urlMiniature(m, false, voulue));
-    v.appendChild(img);
+    // Image de couverture extraite par Windows. Si le codec lui est inconnu,
+    // repli sur la balise vidéo (preload=none : chargée seulement à l'apparition).
+    img.addEventListener("error", () => {
+      if (!img.getAttribute("src") || !img.isConnected) return;
+      observateurVignettes.unobserve(img);
+      const vid = document.createElement("video");
+      vid.preload = "none";
+      vid.muted = true;
+      vid.dataset.src = `${convertFileSrc(src(m.rel))}#t=0.1`;
+      img.replaceWith(vid);
+      observateurVignettes.observe(vid);
+    });
+    const marque = document.createElement("span");
+    marque.className = "marque";
+    marque.textContent = t("vignette.video");
+    v.appendChild(marque);
   }
   const badges = document.createElement("span");
   badges.className = "badges-galerie";
@@ -2634,6 +2683,10 @@ window.addEventListener("DOMContentLoaded", () => {
   appliquerLangue();
 
   // Progression du scan (émise par le backend)
+  listen<[number, number]>("miniatures-progres", (e) => {
+    const [n, total] = e.payload;
+    $("#prog-miniatures").textContent = n < total ? t("galerie.prepMiniatures", { n, t: total }) : "";
+  });
   listen<[number, number]>("scan-progres", (e) => {
     const [fait, total] = e.payload;
     $("#chargement-detail").textContent = t("chargement.progression", { a: fait, b: total });

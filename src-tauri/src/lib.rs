@@ -23,6 +23,9 @@ struct Media {
     exif_ms: Option<i64>,
     video: bool,
     wic: bool,
+    /// Miniature déjà présente dans le cache (chemin absolu), sinon None : la
+    /// galerie l'affiche directement, sans aller-retour par `miniature`.
+    mini: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Default)]
@@ -169,6 +172,7 @@ async fn scanner(fenetre: tauri::Window, racine: String) -> Result<Vec<Media>, S
 
     // 2) Lecture EXIF en parallèle (sauf entrées en cache), avec progression
     let fait = AtomicUsize::new(0);
+    let dossier_mini = dossier_miniatures();
     let medias: Vec<Media> = entrees
         .par_iter()
         .filter_map(|(chemin, ext, video)| {
@@ -176,12 +180,8 @@ async fn scanner(fenetre: tauri::Window, racine: String) -> Result<Vec<Media>, S
                 return None;
             }
             let meta = fs::metadata(chemin).ok()?;
-            let mtime_ms = meta
-                .modified()
-                .ok()
-                .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                .map(|d| d.as_millis() as i64)
-                .unwrap_or(0);
+            let mtime_ms = mtime_ms(&meta);
+            let mini = chemin_cache_miniature(&dossier_mini, chemin, mtime_ms, meta.len());
             let rel = chemin
                 .strip_prefix(&racine)
                 .unwrap()
@@ -206,6 +206,7 @@ async fn scanner(fenetre: tauri::Window, racine: String) -> Result<Vec<Media>, S
                 exif_ms,
                 video: *video,
                 wic: EXT_WIC.contains(&ext.as_str()),
+                mini: mini.is_file().then(|| mini.to_string_lossy().into_owned()),
             })
         })
         .collect();
@@ -226,19 +227,69 @@ async fn scanner(fenetre: tauri::Window, racine: String) -> Result<Vec<Media>, S
     Ok(medias)
 }
 
-/// Calcule (et génère si besoin) le chemin de la miniature JPEG (320 px) d'un
-/// fichier, mise en cache dans `.krino/miniatures` — la clé intègre la date de
-/// modification, donc un fichier remplacé régénère sa miniature. Bloquant
-/// (WIC/COM + I/O disque) : à appeler uniquement depuis un contexte déjà
-/// déporté (spawn_blocking / thread rayon), jamais directement sur le runtime async.
-fn chemin_miniature(racine_p: &Path, rel: &str, corbeille: bool) -> Result<PathBuf, String> {
+/* ── Miniatures ──
+   La bibliothèque vit souvent sur un disque lent (disque dur USB). Mesuré sur
+   un WD Elements : ~110 ms pour lire une miniature de 35 Ko à un endroit
+   quelconque du disque, ~1 s pour générer une miniature avec WIC lisant la photo
+   directement sur le disque, et la tête de lecture s'effondre dès que plusieurs
+   lectures se concurrencent. D'où :
+   - un cache sur le disque système (SSD en général), lu en < 1 ms ;
+   - un seul accès à la fois au disque source (verrou DISQUE), fichier lu d'un
+     bloc puis décodé en mémoire (~0,2 s), le décodage restant parallèle ;
+   - une pré-génération de fond qui s'efface devant les demandes de l'écran. */
+
+/// Version du rendu : bump pour régénérer toutes les miniatures.
+const VERSION_MINIATURES: &str = "v4";
+/// Côté (largeur des photos, plus grand côté des vidéos) des miniatures.
+const COTE_MINIATURE: u32 = 320;
+
+/// Sérialise les lectures sur le disque des photos (voir plus haut).
+static DISQUE: std::sync::Mutex<()> = std::sync::Mutex::new(());
+/// Demandes de l'écran en cours : la pré-génération attend qu'il n'y en ait plus.
+static INTERACTIVES: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+/// Incrémenté à chaque pré-génération lancée : l'ancienne s'arrête d'elle-même.
+static GENERATION_FOND: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+/// Suffixe des fichiers temporaires : deux générations simultanées de la même
+/// miniature (écran + fond) n'écrivent jamais dans le même fichier.
+static NUMERO_TMP: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Dossier du cache des miniatures, sur le disque système (%LOCALAPPDATA%).
+fn dossier_miniatures() -> PathBuf {
+    std::env::var_os("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .unwrap_or_else(std::env::temp_dir)
+        .join("com.basti.krino")
+        .join("miniatures")
+}
+
+fn mtime_ms(meta: &fs::Metadata) -> i64 {
+    meta.modified()
+        .ok()
+        .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+        .map(|d| d.as_millis() as i64)
+        .unwrap_or(0)
+}
+
+/// Clé de cache : chemin absolu + date + taille + version. Un fichier remplacé
+/// (date ou taille différente) régénère donc sa miniature. Les séparateurs sont
+/// normalisés : `racine.join("a/b.jpg")` et le parcours WalkDir (`a\b.jpg`)
+/// doivent donner la même clé.
+fn chemin_cache_miniature(dossier: &Path, source: &Path, mtime_ms: i64, taille: u64) -> PathBuf {
+    use sha2::{Digest, Sha256};
+    let mut h = Sha256::new();
+    h.update(source.to_string_lossy().replace('/', "\\").as_bytes());
+    h.update(mtime_ms.to_le_bytes());
+    h.update(taille.to_le_bytes());
+    h.update(VERSION_MINIATURES.as_bytes());
+    let cle: String = h.finalize()[..8].iter().map(|o| format!("{o:02x}")).collect();
+    dossier.join(format!("{cle}.jpg"))
+}
+
+/// Emplacement de la miniature dans l'ancien cache (`.krino/miniatures`, à côté
+/// des photos, versions ≤ 0.11) : recopiée si elle existe, c'est deux fois moins
+/// cher que de la régénérer.
+fn ancienne_miniature(racine_p: &Path, rel: &str, meta: &fs::Metadata) -> PathBuf {
     use std::hash::{Hash, Hasher};
-    let source = if corbeille {
-        chemin_corbeille(racine_p).join(rel)
-    } else {
-        racine_p.join(rel)
-    };
-    let meta = fs::metadata(&source).map_err(|e| e.to_string())?;
     let mtime = meta
         .modified()
         .ok()
@@ -248,33 +299,71 @@ fn chemin_miniature(racine_p: &Path, rel: &str, corbeille: bool) -> Result<PathB
     let mut hacheur = std::collections::hash_map::DefaultHasher::new();
     rel.hash(&mut hacheur);
     mtime.hash(&mut hacheur);
-    // Version du rendu : bump pour régénérer toutes les miniatures (orientation EXIF).
     "_o3".hash(&mut hacheur);
-    let dossier = racine_p.join(DOSSIER_ETAT).join("miniatures");
-    let cle = hacheur.finish();
-    let cible = dossier.join(format!("{cle:016x}.jpg"));
-    // Course bénigne assumée : si deux appels simultanés demandent la même
-    // miniature, tous deux voient `!exists()` et la génèrent. La clé de cache
-    // étant déterministe (rel + mtime + version), ils écrivent le même contenu
-    // au même endroit — le second écrase le premier à l'identique. Pas de verrou
-    // par clé : le coût d'un décodage WIC redondant occasionnel est négligeable
-    // devant la complexité d'un registre de verrous partagé.
-    // Un échec ou une interruption pendant l'encodage laisserait un JPEG tronqué
-    // sur disque, resservi ensuite comme s'il était valide : on génère donc dans
-    // un fichier temporaire puis on renomme (atomique) une fois complet.
-    if !cible.exists() {
-        fs::create_dir_all(&dossier).map_err(|e| e.to_string())?;
-        // Nom temporaire propre à la clé : deux clés différentes ne se marchent
-        // jamais dessus ; deux appels simultanés de la MÊME clé écrivent le même
-        // contenu (course bénigne, comme pour la cible).
-        let tmp = dossier.join(format!("{cle:016x}.tmp"));
-        let res = wic::generer_miniature(&source.to_string_lossy(), &tmp.to_string_lossy(), 320)
+    racine_p
+        .join(DOSSIER_ETAT)
+        .join("miniatures")
+        .join(format!("{:016x}.jpg", hacheur.finish()))
+}
+
+fn verrou_disque() -> std::sync::MutexGuard<'static, ()> {
+    DISQUE.lock().unwrap_or_else(|e| e.into_inner())
+}
+
+/// Génère `cible` depuis `source`. On écrit dans un fichier temporaire puis on
+/// renomme : une génération interrompue ne laisse jamais un JPEG tronqué servi
+/// ensuite comme valide.
+fn generer_miniature(source: &Path, cible: &Path, video: bool, ancienne: &Path) -> Result<(), String> {
+    let dossier = cible.parent().unwrap();
+    fs::create_dir_all(dossier).map_err(|e| e.to_string())?;
+    let numero = NUMERO_TMP.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let tmp = cible.with_extension(format!("{numero}.tmp"));
+    let res = if ancienne.is_file() {
+        let _verrou = verrou_disque();
+        fs::copy(ancienne, &tmp).map(|_| ()).map_err(|e| e.to_string())
+    } else if video {
+        // L'extraction d'image d'une vidéo (shell Windows) ne lit qu'une partie
+        // du fichier, et profite du cache de miniatures de l'Explorateur.
+        let _verrou = verrou_disque();
+        wic::miniature_shell(&source.to_string_lossy(), &tmp.to_string_lossy(), COTE_MINIATURE)
+            .map_err(|e| format!("miniature vidéo : {e}"))
+    } else {
+        let octets = {
+            let _verrou = verrou_disque();
+            fs::read(source).map_err(|e| e.to_string())?
+        };
+        wic::generer_miniature(&octets, &tmp.to_string_lossy(), COTE_MINIATURE)
             .map_err(|e| format!("miniature : {e}"))
-            .and_then(|()| fs::rename(&tmp, &cible).map_err(|e| e.to_string()));
-        if res.is_err() {
-            let _ = fs::remove_file(&tmp);
-            res?;
-        }
+    };
+    let res = res.and_then(|()| match fs::rename(&tmp, cible) {
+        // La même miniature a pu être produite entre-temps par l'autre file
+        // (écran / fond) et être en cours de lecture : la sienne fait foi.
+        Err(_) if cible.is_file() => Ok(()),
+        r => r.map_err(|e| e.to_string()),
+    });
+    let _ = fs::remove_file(&tmp);
+    res
+}
+
+/// Chemin de la miniature JPEG d'un fichier, générée si besoin. Bloquant
+/// (WIC/COM + I/O disque) : à appeler uniquement depuis un contexte déjà
+/// déporté (spawn_blocking / thread dédié), jamais sur le runtime async.
+fn chemin_miniature(racine_p: &Path, rel: &str, corbeille: bool) -> Result<PathBuf, String> {
+    let source = if corbeille {
+        chemin_corbeille(racine_p).join(rel)
+    } else {
+        racine_p.join(rel)
+    };
+    let meta = fs::metadata(&source).map_err(|e| e.to_string())?;
+    let cible = chemin_cache_miniature(&dossier_miniatures(), &source, mtime_ms(&meta), meta.len());
+    if !cible.is_file() {
+        let ext = source
+            .extension()
+            .map(|e| e.to_string_lossy().to_lowercase())
+            .unwrap_or_default();
+        let video = EXT_VIDEOS.contains(&ext.as_str());
+        let ancienne = ancienne_miniature(racine_p, rel, &meta);
+        generer_miniature(&source, &cible, video, &ancienne)?;
     }
     Ok(cible)
 }
@@ -283,18 +372,46 @@ fn chemin_miniature(racine_p: &Path, rel: &str, corbeille: bool) -> Result<PathB
 /// au premier affichage d'une vignette pas encore en cache).
 #[tauri::command]
 async fn miniature(racine: String, rel: String, corbeille: bool) -> Result<String, String> {
-    // Le décodage WIC + les accès disque sont entièrement synchrones : sans
-    // spawn_blocking, `async fn` ne les rend pas non-bloquants, ils monopolisent
-    // simplement un thread du runtime tokio le temps de l'appel. Pendant un
-    // défilement rapide, la galerie déclenche des dizaines d'appels quasi
-    // simultanés (IntersectionObserver, rootMargin 200px) : sans ça, ils se
-    // sérialisent au lieu de se paralléliser sur tous les cœurs disponibles.
+    use std::sync::atomic::Ordering;
+    // spawn_blocking : le décodage WIC et les accès disque sont synchrones et
+    // monopoliseraient sinon un thread du runtime async.
     tauri::async_runtime::spawn_blocking(move || {
-        let racine_p = PathBuf::from(&racine);
-        chemin_miniature(&racine_p, &rel, corbeille).map(|p| p.to_string_lossy().into_owned())
+        INTERACTIVES.fetch_add(1, Ordering::SeqCst);
+        let r = chemin_miniature(Path::new(&racine), &rel, corbeille);
+        INTERACTIVES.fetch_sub(1, Ordering::SeqCst);
+        r.map(|p| p.to_string_lossy().into_owned())
     })
     .await
     .map_err(|e| e.to_string())?
+}
+
+/// Génère en tâche de fond, dans l'ordre donné, les miniatures manquantes de
+/// `rels`, pour que toute la galerie s'affiche ensuite instantanément. Un seul
+/// thread, qui se met en pause tant que l'écran attend des miniatures, et
+/// s'arrête si une nouvelle pré-génération est lancée (autre dossier, rescan).
+/// Progression : événement `miniatures-progres` (faites, total).
+#[tauri::command]
+fn pregenerer_miniatures(fenetre: tauri::Window, racine: String, rels: Vec<String>) {
+    use std::sync::atomic::Ordering;
+    use tauri::Emitter;
+    let generation = GENERATION_FOND.fetch_add(1, Ordering::SeqCst) + 1;
+    std::thread::spawn(move || {
+        let racine_p = PathBuf::from(&racine);
+        let actuelle = || GENERATION_FOND.load(Ordering::SeqCst) == generation;
+        let total = rels.len();
+        for (n, rel) in rels.iter().enumerate() {
+            while INTERACTIVES.load(Ordering::SeqCst) > 0 && actuelle() {
+                std::thread::sleep(std::time::Duration::from_millis(50));
+            }
+            if !actuelle() {
+                return;
+            }
+            let _ = chemin_miniature(&racine_p, rel, false);
+            if n % 10 == 0 || n + 1 == total {
+                let _ = fenetre.emit("miniatures-progres", (n + 1, total));
+            }
+        }
+    });
 }
 
 #[tauri::command]
@@ -893,13 +1010,17 @@ async fn exporter_album(racine: String, nom: String, rels: Vec<String>) -> Resul
 
 mod wic {
     use windows::core::{Interface, HSTRING};
-    use windows::Win32::Foundation::{GENERIC_READ, GENERIC_WRITE};
+    use windows::Win32::Foundation::{GENERIC_READ, GENERIC_WRITE, SIZE};
+    use windows::Win32::Graphics::Gdi::{DeleteObject, HGDIOBJ, HPALETTE};
     use windows::Win32::Graphics::Imaging::*;
     use windows::Win32::System::Com::StructuredStorage::{
         PropVariantToUInt16WithDefault, PROPVARIANT,
     };
     use windows::Win32::System::Com::*;
-    use windows::Win32::UI::Shell::SHCreateMemStream;
+    use windows::Win32::UI::Shell::{
+        IShellItemImageFactory, SHCreateItemFromParsingName, SHCreateMemStream,
+        SIIGBF_THUMBNAILONLY,
+    };
 
     /// Lit l'orientation EXIF (tag 274) du cadre décodé via le lecteur de
     /// métadonnées WIC. Renvoie une valeur 1..=8 (défaut 1 = aucune rotation).
@@ -944,19 +1065,27 @@ mod wic {
         }
     }
 
-    unsafe fn source_redimensionnee(
+    unsafe fn decodeur_fichier(
         fabrique: &IWICImagingFactory,
         chemin: &str,
-        largeur_max: u32,
-        orienter: bool,
-    ) -> windows::core::Result<IWICBitmapSource> {
+    ) -> windows::core::Result<IWICBitmapDecoder> {
         unsafe {
-            let decodeur = fabrique.CreateDecoderFromFilename(
+            fabrique.CreateDecoderFromFilename(
                 &HSTRING::from(chemin),
                 None,
                 GENERIC_READ,
                 WICDecodeMetadataCacheOnDemand,
-            )?;
+            )
+        }
+    }
+
+    unsafe fn source_redimensionnee(
+        fabrique: &IWICImagingFactory,
+        decodeur: &IWICBitmapDecoder,
+        largeur_max: u32,
+        orienter: bool,
+    ) -> windows::core::Result<IWICBitmapSource> {
+        unsafe {
             let cadre = decodeur.GetFrame(0)?;
             let options = if orienter {
                 transformation_orientation(lire_orientation_exif(&cadre))
@@ -1005,9 +1134,11 @@ mod wic {
         }
     }
 
-    /// Génère une miniature JPEG sur disque (cache des vues en grille).
+    /// Génère une miniature JPEG sur disque (cache des vues en grille) à partir
+    /// du fichier source déjà lu en mémoire. `octets` doit vivre jusqu'à la fin
+    /// de l'encodage : le pipeline WIC lit le flux à la demande.
     pub fn generer_miniature(
-        source_chemin: &str,
+        octets: &[u8],
         cible: &str,
         largeur_max: u32,
     ) -> windows::core::Result<()> {
@@ -1015,7 +1146,46 @@ mod wic {
             let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
             let fabrique: IWICImagingFactory =
                 CoCreateInstance(&CLSID_WICImagingFactory, None, CLSCTX_INPROC_SERVER)?;
-            let source = source_redimensionnee(&fabrique, source_chemin, largeur_max, true)?;
+            let flux_source = fabrique.CreateStream()?;
+            flux_source.InitializeFromMemory(octets)?;
+            let decodeur = fabrique.CreateDecoderFromStream(
+                &flux_source,
+                std::ptr::null(),
+                WICDecodeMetadataCacheOnDemand,
+            )?;
+            let source = source_redimensionnee(&fabrique, &decodeur, largeur_max, true)?;
+            encoder_jpeg(&fabrique, &source, cible)
+        }
+    }
+
+    /// Miniature d'une vidéo (ou de tout fichier que l'Explorateur sait
+    /// représenter) via le shell Windows, encodée en JPEG sur disque. `cote`
+    /// borne le plus grand côté, proportions conservées.
+    pub fn miniature_shell(source: &str, cible: &str, cote: u32) -> windows::core::Result<()> {
+        unsafe {
+            let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
+            let fabrique: IWICImagingFactory =
+                CoCreateInstance(&CLSID_WICImagingFactory, None, CLSCTX_INPROC_SERVER)?;
+            let usine: IShellItemImageFactory =
+                SHCreateItemFromParsingName(&HSTRING::from(source), None::<&IBindCtx>)?;
+            let taille = SIZE { cx: cote as i32, cy: cote as i32 };
+            let hbitmap = usine.GetImage(taille, SIIGBF_THUMBNAILONLY)?;
+            let res = (|| -> windows::core::Result<()> {
+                let image =
+                    fabrique.CreateBitmapFromHBITMAP(hbitmap, HPALETTE::default(), WICBitmapIgnoreAlpha)?;
+                encoder_jpeg(&fabrique, &image.cast()?, cible)
+            })();
+            let _ = DeleteObject(HGDIOBJ(hbitmap.0));
+            res
+        }
+    }
+
+    unsafe fn encoder_jpeg(
+        fabrique: &IWICImagingFactory,
+        source: &IWICBitmapSource,
+        cible: &str,
+    ) -> windows::core::Result<()> {
+        unsafe {
             let flux = fabrique.CreateStream()?;
             flux.InitializeFromFilename(&HSTRING::from(cible), GENERIC_WRITE.0)?;
             let encodeur = fabrique.CreateEncoder(&GUID_ContainerFormatJpeg, std::ptr::null())?;
@@ -1024,7 +1194,7 @@ mod wic {
             encodeur.CreateNewFrame(&mut cadre_sortie, std::ptr::null_mut())?;
             let cadre_sortie = cadre_sortie.unwrap();
             cadre_sortie.Initialize(None)?;
-            cadre_sortie.WriteSource(&source, std::ptr::null())?;
+            cadre_sortie.WriteSource(source, std::ptr::null())?;
             cadre_sortie.Commit()?;
             encodeur.Commit()?;
             Ok(())
@@ -1078,7 +1248,8 @@ mod wic {
             let _ = CoInitializeEx(None, COINIT_APARTMENTTHREADED);
             let fabrique: IWICImagingFactory =
                 CoCreateInstance(&CLSID_WICImagingFactory, None, CLSCTX_INPROC_SERVER)?;
-            let source = source_redimensionnee(&fabrique, chemin, largeur_max, false)?;
+            let decodeur = decodeur_fichier(&fabrique, chemin)?;
+            let source = source_redimensionnee(&fabrique, &decodeur, largeur_max, false)?;
 
             let flux = SHCreateMemStream(None).ok_or_else(windows::core::Error::empty)?;
             let encodeur = fabrique.CreateEncoder(&GUID_ContainerFormatPng, std::ptr::null())?;
@@ -1129,6 +1300,7 @@ pub fn run() {
             restaurer_corbeille,
             apercu_png,
             miniature,
+            pregenerer_miniatures,
             chercher_doublons,
             annuler_tache,
             ranger_par_date,

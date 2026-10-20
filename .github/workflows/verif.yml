@@ -1,0 +1,33 @@
+name: Vérification
+
+# Compile l'appli sur les branches de travail, sans rien publier : permet de
+# valider le code Rust avant de tagger une release.
+on:
+  push:
+    branches-ignore:
+      - main
+  workflow_dispatch:
+
+jobs:
+  verif:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: npm ci
+
+      # Le front doit être construit : generate_context! embarque ../dist.
+      - run: npm run build
+
+      - run: cargo check --manifest-path src-tauri/Cargo.toml
